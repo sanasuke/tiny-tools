@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tiny-tools</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+    }
+
+    header {
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      color: #222;
+    }
+
+    header p {
+      font-size: 0.9rem;
+      color: #888;
+      margin-top: 0.4rem;
+    }
+
+    .tools {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .tool-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.2s, transform 0.2s;
+      display: block;
+    }
+
+    .tool-card:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      transform: translateY(-2px);
+    }
+
+    .tool-day {
+      font-size: 0.75rem;
+      color: #4a90d9;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+
+    .tool-name {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #222;
+    }
+
+    .tool-desc {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 0.3rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>tiny-tools</h1>
+      <p>小さくて便利なWebツール集</p>
+    </header>
+    <div class="tools">
+      <a class="tool-card" href="./day001_char-counter/">
+        <div class="tool-day">Day 1</div>
+        <div class="tool-name">文字数カウンター</div>
+        <div class="tool-desc">文字数・行数・単語数・バイト数を計測</div>
+      </a>
+    </div>
+  </div>
+</body>
+</html>
