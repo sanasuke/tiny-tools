@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>マルチペルソナレビュー | tiny-tools Day 2</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+      padding: 0 1rem;
+      margin-top: 1.5rem;
+    }
+
+    /* --- Sections --- */
+    .section {
+      margin-bottom: 1.25rem;
+    }
+
+    .section-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    /* --- API Key --- */
+    .api-key-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .api-key-row input {
+      flex: 1;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.875rem;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    .api-key-row input:focus {
+      outline: none;
+      border-color: #4a90d9;
+    }
+
+    .api-key-help {
+      margin-top: 0.4rem;
+    }
+
+    .api-key-help a {
+      font-size: 0.8rem;
+      color: #4a90d9;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .api-key-help a:hover {
+      text-decoration: underline;
+    }
+
+    /* --- Buttons --- */
+    .btn {
+      padding: 0.5rem 1rem;
+      font-size: 0.8rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-save {
+      background: #4a90d9;
+      color: #fff;
+    }
+
+    .btn-save:hover {
+      background: #357abd;
+    }
+
+    .btn-clear {
+      background: #e74c3c;
+      color: #fff;
+    }
+
+    .btn-clear:hover {
+      background: #c0392b;
+    }
+
+    .btn-primary {
+      background: #4a90d9;
+      color: #fff;
+      padding: 0.75rem 2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      font-family: inherit;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: #357abd;
+    }
+
+    .btn-primary:disabled {
+      background: #b0b0b0;
+      cursor: not-allowed;
+    }
+
+    /* --- Select --- */
+    select {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.875rem;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-family: inherit;
+      background: #fff;
+      transition: border-color 0.2s;
+      cursor: pointer;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #4a90d9;
+    }
+
+    /* --- Persona Grid --- */
+    .persona-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+
+    .persona-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #fff;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      user-select: none;
+      font-size: 0.8rem;
+    }
+
+    .persona-item:hover {
+      border-color: #b0c8e8;
+    }
+
+    .persona-item.selected {
+      border-color: #4a90d9;
+      background: #f0f6ff;
+    }
+
+    .persona-item input[type="checkbox"] {
+      display: none;
+    }
+
+    .persona-check {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #ccc;
+      border-radius: 4px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .persona-item.selected .persona-check {
+      background: #4a90d9;
+      border-color: #4a90d9;
+    }
+
+    .persona-check-icon {
+      display: none;
+      width: 10px;
+      height: 10px;
+    }
+
+    .persona-item.selected .persona-check-icon {
+      display: block;
+    }
+
+    .persona-count {
+      font-size: 0.75rem;
+      color: #888;
+      margin-top: 0.4rem;
+    }
+
+    /* --- Textarea --- */
+    textarea {
+      width: 100%;
+      height: 200px;
+      padding: 1rem;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      resize: vertical;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #4a90d9;
+    }
+
+    /* --- Results --- */
+    .results-container {
+      width: 100%;
+      max-width: 1100px;
+      padding: 0 1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .result-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .result-persona {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: #4a90d9;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #eee;
+    }
+
+    .result-body {
+      font-size: 0.85rem;
+      line-height: 1.7;
+      word-wrap: break-word;
+    }
+
+    .result-body h1, .result-body h2, .result-body h3 {
+      font-size: 0.9rem;
+      margin: 0.75rem 0 0.25rem;
+    }
+
+    .result-body p {
+      margin: 0.4rem 0;
+    }
+
+    .result-body ul, .result-body ol {
+      padding-left: 1.25rem;
+      margin: 0.4rem 0;
+    }
+
+    .result-body li {
+      margin: 0.2rem 0;
+    }
+
+    .result-body code {
+      background: #f0f0f0;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-size: 0.8rem;
+    }
+
+    .result-body pre {
+      background: #f0f0f0;
+      padding: 0.75rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 0.4rem 0;
+    }
+
+    .result-body pre code {
+      background: none;
+      padding: 0;
+    }
+
+    .result-body strong {
+      font-weight: 600;
+    }
+
+    .result-body.error {
+      color: #e74c3c;
+    }
+
+    /* --- Loading Skeleton --- */
+    .result-card.loading .result-body {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      height: 120px;
+      border-radius: 4px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* --- Modal --- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 200;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 520px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #888;
+      line-height: 1;
+      padding: 0.25rem;
+    }
+
+    .modal-close:hover {
+      color: #333;
+    }
+
+    .modal-content h2 {
+      font-size: 1.1rem;
+      color: #222;
+      margin-bottom: 1rem;
+    }
+
+    .modal-content ol {
+      padding-left: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .modal-content li {
+      font-size: 0.875rem;
+      line-height: 1.8;
+      color: #444;
+    }
+
+    .modal-content a {
+      color: #4a90d9;
+      text-decoration: none;
+    }
+
+    .modal-content a:hover {
+      text-decoration: underline;
+    }
+
+    .modal-note {
+      font-size: 0.8rem;
+      color: #888;
+      background: #f9f9f9;
+      border-radius: 6px;
+      padding: 0.75rem;
+      line-height: 1.6;
+    }
+
+    /* --- Toast --- */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(1rem);
+      background: #333;
+      color: #fff;
+      padding: 0.6rem 1.25rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+      z-index: 300;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* --- Responsive --- */
+    @media (max-width: 900px) {
+      .results-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .results-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .persona-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+  <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- API Key Section -->
+    <div class="section">
+      <label class="section-label">Gemini API Key</label>
+      <div class="api-key-row">
+        <input type="password" id="apiKeyInput" placeholder="APIキーを入力...">
+        <button class="btn btn-save" id="saveKeyBtn">保存</button>
+        <button class="btn btn-clear" id="clearKeyBtn">クリア</button>
+      </div>
+      <div class="api-key-help">
+        <a id="apiKeyHelpLink">APIキーの取得方法</a>
+      </div>
+    </div>
+
+    <!-- Genre Section -->
+    <div class="section">
+      <label class="section-label">ジャンル</label>
+      <select id="genreSelect">
+        <option value="program">プログラム</option>
+        <option value="business">ビジネス文書</option>
+        <option value="casual">日常会話</option>
+        <option value="english">英文</option>
+      </select>
+    </div>
+
+    <!-- Persona Section -->
+    <div class="section">
+      <label class="section-label">ペルソナを選択</label>
+      <div class="persona-grid" id="personaGrid"></div>
+      <div class="persona-count" id="personaCount">0 / 6 選択中</div>
+    </div>
+
+    <!-- Text Input Section -->
+    <div class="section">
+      <label class="section-label">レビュー対象テキスト</label>
+      <textarea id="reviewText" placeholder="レビューしたいテキストを貼り付け..."></textarea>
+    </div>
+
+    <!-- Submit -->
+    <div class="section">
+      <button class="btn-primary" id="submitBtn">レビュー開始</button>
+    </div>
+  </div>
+
+  <!-- Results (wider container) -->
+  <div class="results-container" id="resultsContainer" style="display: none;">
+    <div class="results-grid" id="resultsGrid"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- API Key Help Modal -->
+  <div class="modal-overlay" id="helpModal">
+    <div class="modal-content">
+      <button class="modal-close" id="modalCloseBtn">&times;</button>
+      <h2>Gemini APIキーの取得方法</h2>
+      <ol>
+        <li><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> にアクセスします</li>
+        <li>Googleアカウントでログインします</li>
+        <li>「APIキーを作成」ボタンをクリックします</li>
+        <li>プロジェクトを選択し、APIキーを生成します</li>
+        <li>生成されたAPIキーをコピーします</li>
+        <li>このツールの入力欄に貼り付けて「保存」を押します</li>
+      </ol>
+      <p class="modal-note">
+        Gemini 2.5 Flash-Liteモデルは無料枠で利用できます。<br>
+        APIキーはブラウザのlocalStorageにのみ保存され、外部サーバーには送信されません。
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // Persona Definitions
+    // ============================================================
+    const PERSONAS = {
+      program: [
+        { id: 'senior-eng',    label: 'シニアエンジニア',       role: 'あなたは10年以上の経験を持つシニアソフトウェアエンジニアです。コードの設計パターン、保守性、スケーラビリティの観点からレビューしてください。' },
+        { id: 'junior-eng',    label: 'ジュニアエンジニア',     role: 'あなたは経験1年未満のジュニアエンジニアです。コードの読みやすさ、理解しやすさ、ドキュメントの充実度の観点からレビューしてください。' },
+        { id: 'code-reviewer', label: 'コードレビュアー',       role: 'あなたは厳格なコードレビュアーです。コーディング規約、命名規則、コードの一貫性、ベストプラクティスの観点からレビューしてください。' },
+        { id: 'tech-lead',     label: 'テックリード',           role: 'あなたはテックリードです。アーキテクチャ、技術選定、チーム全体への影響の観点からレビューしてください。' },
+        { id: 'qa-eng',        label: 'QAエンジニア',           role: 'あなたはQAエンジニアです。テスタビリティ、エッジケース、バグの可能性、テストカバレッジの観点からレビューしてください。' },
+        { id: 'security-eng',  label: 'セキュリティエンジニア', role: 'あなたはセキュリティエンジニアです。セキュリティ脆弱性、入力バリデーション、認証認可、データ保護の観点からレビューしてください。' },
+        { id: 'non-engineer',  label: '非エンジニア',               role: 'あなたはプログラミングを一切知らない素人です。英語もほとんど読めません。コードを見て「これ何？呪文？」くらいの感覚で、素朴な感想や的外れな解釈を述べてください。面白い例えや大喜利っぽいボケを交えて、笑えるレビューにしてください。技術的に正しい必要はありません。' },
+      ],
+      business: [
+        { id: 'boss',      label: '上司',         role: 'あなたは部下の文書をチェックする上司です。論理性、簡潔さ、ビジネスとしての適切さの観点からレビューしてください。' },
+        { id: 'client',    label: '取引先担当者', role: 'あなたは取引先の担当者です。受け取り手の視点で、分かりやすさ、丁寧さ、信頼感の観点からレビューしてください。' },
+        { id: 'legal',     label: '法務担当',     role: 'あなたは法務担当者です。法的リスク、契約上の問題、コンプライアンスの観点からレビューしてください。' },
+        { id: 'newcomer',  label: '新入社員',     role: 'あなたは新入社員です。専門用語の分かりやすさ、文書の理解しやすさの観点からレビューしてください。' },
+        { id: 'executive', label: '経営層',       role: 'あなたは経営層です。経営戦略との整合性、ROI、意思決定に必要な情報の充足度の観点からレビューしてください。' },
+        { id: 'pr',        label: '広報担当',     role: 'あなたは広報担当者です。外部への印象、ブランドイメージ、表現の適切さの観点からレビューしてください。' },
+      ],
+      casual: [
+        { id: 'close-friend',  label: '親しい友人',         role: 'あなたは親しい友人です。自然さ、親しみやすさ、気持ちの伝わりやすさの観点からレビューしてください。' },
+        { id: 'senior-person', label: '目上の人',           role: 'あなたは目上の立場の人です。敬語の正しさ、礼儀、適切な距離感の観点からレビューしてください。' },
+        { id: 'stranger',      label: '初対面の人',         role: 'あなたは初対面の人です。第一印象、分かりやすさ、適切な丁寧さの観点からレビューしてください。' },
+        { id: 'jsl-learner',   label: '外国人日本語学習者', role: 'あなたは日本語を学習中の外国人です。日本語の難易度、文法の正しさ、分かりやすさの観点からレビューしてください。' },
+        { id: 'manners',       label: 'マナー講師',         role: 'あなたはマナー講師です。社会的マナー、言葉遣い、TPOの適切さの観点からレビューしてください。' },
+        { id: 'child',         label: '子ども',             role: 'あなたは10歳の子どもです。言葉の分かりやすさ、難しい言葉がないかの観点からレビューしてください。' },
+      ],
+      english: [
+        { id: 'native',      label: 'ネイティブスピーカー',   role: 'You are a native English speaker. Review the text for naturalness, idiomatic expressions, and overall fluency.' },
+        { id: 'esl-teacher',  label: 'ESL教師',               role: 'You are an ESL teacher. Review the text for grammar accuracy, common learner mistakes, and suggest improvements for clarity.' },
+        { id: 'biz-english',  label: 'ビジネス英語専門家',     role: 'You are a business English specialist. Review the text for professional tone, formality, and business communication best practices.' },
+        { id: 'academic',     label: 'アカデミック英語専門家', role: 'You are an academic English specialist. Review the text for academic writing conventions, citation style, and scholarly tone.' },
+        { id: 'copywriter',   label: 'コピーライター',         role: 'You are a professional copywriter. Review the text for impact, readability, engagement, and persuasive writing techniques.' },
+        { id: 'toeic',        label: 'TOEIC講師',             role: 'You are a TOEIC instructor. Review the text for TOEIC-relevant grammar patterns, vocabulary usage, and suggest score-improving alternatives.' },
+      ],
+    };
+
+    const MAX_PERSONAS = 6;
+
+    // ============================================================
+    // DOM Elements
+    // ============================================================
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const saveKeyBtn = document.getElementById('saveKeyBtn');
+    const clearKeyBtn = document.getElementById('clearKeyBtn');
+    const apiKeyHelpLink = document.getElementById('apiKeyHelpLink');
+    const genreSelect = document.getElementById('genreSelect');
+    const personaGrid = document.getElementById('personaGrid');
+    const personaCount = document.getElementById('personaCount');
+    const reviewText = document.getElementById('reviewText');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const resultsGrid = document.getElementById('resultsGrid');
+    const toast = document.getElementById('toast');
+    const helpModal = document.getElementById('helpModal');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+
+    // ============================================================
+    // State
+    // ============================================================
+    let currentGenre = 'program';
+    let selectedPersonas = new Set();
+    let isReviewing = false;
+
+    // ============================================================
+    // localStorage
+    // ============================================================
+    const STORAGE_KEY = 'tt-gemini-api-key';
+
+    function getApiKey() {
+      return localStorage.getItem(STORAGE_KEY) || '';
+    }
+
+    function saveApiKey(key) {
+      localStorage.setItem(STORAGE_KEY, key);
+    }
+
+    function clearApiKey() {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    // ============================================================
+    // Toast
+    // ============================================================
+    let toastTimer = null;
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    // ============================================================
+    // Persona Rendering
+    // ============================================================
+    function renderPersonas() {
+      selectedPersonas.clear();
+      personaGrid.innerHTML = '';
+      const personas = PERSONAS[currentGenre];
+      personas.forEach(p => {
+        const item = document.createElement('label');
+        item.className = 'persona-item';
+        item.dataset.id = p.id;
+        item.innerHTML = `
+          <input type="checkbox" value="${p.id}">
+          <span class="persona-check">
+            <svg class="persona-check-icon" viewBox="0 0 10 10" fill="none">
+              <path d="M1.5 5.5L4 8L8.5 2" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>${p.label}</span>
+        `;
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+          togglePersona(p.id, item);
+        });
+        personaGrid.appendChild(item);
+      });
+      updatePersonaCount();
+    }
+
+    function togglePersona(id, item) {
+      if (selectedPersonas.has(id)) {
+        selectedPersonas.delete(id);
+        item.classList.remove('selected');
+      } else {
+        if (selectedPersonas.size >= MAX_PERSONAS) {
+          showToast(`最大${MAX_PERSONAS}つまで選択できます`);
+          return;
+        }
+        selectedPersonas.add(id);
+        item.classList.add('selected');
+      }
+      updatePersonaCount();
+    }
+
+    function updatePersonaCount() {
+      personaCount.textContent = `${selectedPersonas.size} / ${MAX_PERSONAS} 選択中`;
+    }
+
+    // ============================================================
+    // Markdown Parser (lightweight)
+    // ============================================================
+    function md(src) {
+      let html = src
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      // code blocks
+      html = html.replace(/```[\w]*\n([\s\S]*?)```/g, (_, code) =>
+        `<pre><code>${code.trim()}</code></pre>`);
+      // inline code
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // headings
+      html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+      html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+      html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+      // bold / italic
+      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      // unordered list
+      html = html.replace(/(^[\t ]*[-*] .+(\n|$))+/gm, (block) => {
+        const items = block.trim().split('\n')
+          .map(l => `<li>${l.replace(/^[\t ]*[-*] /, '')}</li>`).join('');
+        return `<ul>${items}</ul>`;
+      });
+      // ordered list
+      html = html.replace(/(^\d+\. .+(\n|$))+/gm, (block) => {
+        const items = block.trim().split('\n')
+          .map(l => `<li>${l.replace(/^\d+\. /, '')}</li>`).join('');
+        return `<ol>${items}</ol>`;
+      });
+      // paragraphs
+      html = html.replace(/\n{2,}/g, '</p><p>');
+      html = `<p>${html}</p>`;
+      // clean up empty <p> around block elements
+      html = html.replace(/<p>\s*(<(ul|ol|pre|h[1-3]))/g, '<$2');
+      html = html.replace(/(<\/(ul|ol|pre|h[1-3])>)\s*<\/p>/g, '$1');
+      html = html.replace(/<p>\s*<\/p>/g, '');
+      return html;
+    }
+
+    // ============================================================
+    // Gemini API
+    // ============================================================
+    async function callGemini(apiKey, persona, text, maxRetries = 3) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+      const body = JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [{
+            text: `${persona.role}\n\n以下のテキストをレビューしてください。回答は以下のフォーマットで、各項目1行以内の箇条書きにしてください。それぞれ最大5つまでにしてください。\n\n## 良い点\n- ...\n\n## 悪い点\n- ...\n\n---\n${text}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1024
+        }
+      });
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return data.candidates?.[0]?.content?.parts?.[0]?.text || '（レビュー結果が空でした）';
+        }
+        if (res.status === 429 && attempt < maxRetries) {
+          const wait = Math.pow(2, attempt + 1) * 1000 + Math.random() * 1000;
+          await new Promise(r => setTimeout(r, wait));
+          continue;
+        }
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 400) throw new Error('APIキーが無効です');
+        if (res.status === 429) throw new Error('1日のリクエスト上限に達した可能性があります。日本時間17時以降にリセットされます');
+        throw new Error(err.error?.message || `APIエラー: ${res.status}`);
+      }
+    }
+
+    // ============================================================
+    // Submit Handler
+    // ============================================================
+    async function handleSubmit() {
+      if (isReviewing) return;
+
+      const apiKey = getApiKey();
+      if (!apiKey) {
+        showToast('APIキーを保存してください');
+        return;
+      }
+
+      const text = reviewText.value.trim();
+      if (!text) {
+        showToast('レビューするテキストを入力してください');
+        return;
+      }
+
+      if (selectedPersonas.size === 0) {
+        showToast('ペルソナを1つ以上選択してください');
+        return;
+      }
+
+      isReviewing = true;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'レビュー中...';
+
+      const personas = PERSONAS[currentGenre].filter(p => selectedPersonas.has(p.id));
+
+      // Create loading cards
+      resultsGrid.innerHTML = '';
+      personas.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'result-card loading';
+        card.id = `result-${p.id}`;
+        card.innerHTML = `
+          <div class="result-persona">${p.label}</div>
+          <div class="result-body"></div>
+        `;
+        resultsGrid.appendChild(card);
+      });
+      resultsContainer.style.display = '';
+
+      // Scroll to results
+      resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Fire requests sequentially with delay to avoid rate limits
+      for (let i = 0; i < personas.length; i++) {
+        if (i > 0) await new Promise(r => setTimeout(r, 2000));
+        const card = document.getElementById(`result-${personas[i].id}`);
+        const body = card.querySelector('.result-body');
+        try {
+          const result = await callGemini(apiKey, personas[i], text);
+          card.classList.remove('loading');
+          body.innerHTML = md(result);
+        } catch (err) {
+          card.classList.remove('loading');
+          body.textContent = err.message;
+          body.classList.add('error');
+        }
+      }
+
+      isReviewing = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'レビュー開始';
+    }
+
+    // ============================================================
+    // Modal
+    // ============================================================
+    function openModal() {
+      helpModal.classList.add('active');
+    }
+
+    function closeModal() {
+      helpModal.classList.remove('active');
+    }
+
+    // ============================================================
+    // Event Listeners
+    // ============================================================
+    saveKeyBtn.addEventListener('click', () => {
+      const key = apiKeyInput.value.trim();
+      if (!key) {
+        showToast('APIキーを入力してください');
+        return;
+      }
+      saveApiKey(key);
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = '保存済み';
+      showToast('APIキーを保存しました');
+    });
+
+    clearKeyBtn.addEventListener('click', () => {
+      clearApiKey();
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = 'APIキーを入力...';
+      showToast('APIキーをクリアしました');
+    });
+
+    apiKeyHelpLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      openModal();
+    });
+
+    modalCloseBtn.addEventListener('click', closeModal);
+
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) closeModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    genreSelect.addEventListener('change', (e) => {
+      currentGenre = e.target.value;
+      renderPersonas();
+    });
+
+    submitBtn.addEventListener('click', handleSubmit);
+
+    // ============================================================
+    // Init
+    // ============================================================
+    if (getApiKey()) {
+      apiKeyInput.placeholder = '保存済み';
+    }
+    renderPersonas();
+  </script>
+</body>
+</html>
