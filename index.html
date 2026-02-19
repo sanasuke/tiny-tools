@@ -19,27 +19,14 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 2rem 1rem;
+      padding: 0;
     }
 
     .container {
       width: 100%;
       max-width: 720px;
-    }
-
-    header {
-      margin-bottom: 2rem;
-    }
-
-    header h1 {
-      font-size: 1.75rem;
-      color: #222;
-    }
-
-    header p {
-      font-size: 0.9rem;
-      color: #888;
-      margin-top: 0.4rem;
+      padding: 0 1rem;
+      margin-top: 1rem;
     }
 
     .tools {
@@ -82,14 +69,19 @@
       color: #888;
       margin-top: 0.3rem;
     }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #888;
+      margin-bottom: 1.25rem;
+      margin-top: 1rem;
+    }
   </style>
+  <script src="./shared/header.js" data-repo="https://github.com/USERNAME/tiny-tools"></script>
 </head>
 <body>
   <div class="container">
-    <header>
-      <h1>tiny-tools</h1>
-      <p>小さくて便利なWebツール集</p>
-    </header>
+    <p class="subtitle">小さくて便利なWebツール集</p>
     <div class="tools">
       <a class="tool-card" href="./day001_char-counter/">
         <div class="tool-day">Day 1</div>

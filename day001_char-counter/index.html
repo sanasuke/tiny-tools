@@ -19,18 +19,14 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 2rem 1rem;
-    }
-
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 1.5rem;
-      color: #222;
+      padding: 0;
     }
 
     .container {
       width: 100%;
       max-width: 720px;
+      padding: 0 1rem;
+      margin-top: 1.5rem;
     }
 
     textarea {
@@ -132,10 +128,10 @@
       transform: translateX(-50%) translateY(0);
     }
   </style>
+  <script src="../shared/header.js" data-repo="https://github.com/USERNAME/tiny-tools"></script>
 </head>
 <body>
   <div class="container">
-    <h1>文字数カウンター</h1>
     <textarea id="input" placeholder="ここにテキストを入力..."></textarea>
     <div class="buttons">
       <button class="btn-clear" id="clearBtn">クリア</button>
