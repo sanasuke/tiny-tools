@@ -10,7 +10,7 @@
 
 | Day | ツール名 | 説明 |
 | --- | --- | --- |
-| [001](https://tiny-tools-sanasuke.netlify.app/day001_char-counter/) | 文字数カウンター | リアルタイムでテキストの文字数・行数・バイト数をカウント |
+| [001](https://tiny-tools-sanasuke.netlify.app/day001_char-counter/) | 文字数カウンター | リアルタイムでテキストの文字数（スペース込み/除外）・行数・単語数・バイト数をカウント |
 | [002](https://tiny-tools-sanasuke.netlify.app/day002_multi-persona-review/) | マルチペルソナレビュー | AIが複数の視点からテキストをレビュー（Gemini API使用） |
 
 ## 使い方
