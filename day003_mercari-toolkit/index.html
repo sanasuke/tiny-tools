@@ -1,0 +1,1930 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>メルカリツールキット | tiny-tools Day 3</title>
+  <meta name="description" content="メルカリ出品を効率化する5つのツール。テンプレート生成・送料計算・サイズ判定・タイトルチェック・写真トリミング。">
+  <meta property="og:title" content="メルカリツールキット | tiny-tools Day 3">
+  <meta property="og:description" content="メルカリ出品を効率化する5つのツール。テンプレート生成・送料計算・サイズ判定・タイトルチェック・写真トリミング。">
+  <meta property="og:type" content="website">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    /* ============================================================
+       Reset & Base
+       ============================================================ */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ============================================================
+       Layout: Sidebar + Content
+       ============================================================ */
+    .app-wrapper {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: #fff;
+      border-right: 1px solid #e0e0e0;
+      padding: 1rem 0;
+      flex-shrink: 0;
+      z-index: 130;
+      overflow-y: auto;
+    }
+
+    .sidebar-nav {
+      list-style: none;
+    }
+
+    .sidebar-nav li {
+      padding: 0;
+    }
+
+    .sidebar-nav a {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.75rem 1.25rem;
+      text-decoration: none;
+      color: #555;
+      font-size: 0.875rem;
+      transition: background 0.15s, color 0.15s;
+      border-left: 3px solid transparent;
+    }
+
+    .sidebar-nav a:hover {
+      background: #f0f6ff;
+      color: #333;
+    }
+
+    .sidebar-nav a.active {
+      background: #f0f6ff;
+      color: #4a90d9;
+      border-left-color: #4a90d9;
+      font-weight: 600;
+    }
+
+    .sidebar-nav .tab-icon {
+      font-size: 1.1rem;
+      width: 1.5rem;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .content-area {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      min-width: 0;
+    }
+
+    .tab-panel {
+      display: none;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* ============================================================
+       FAB (Mobile)
+       ============================================================ */
+    .fab {
+      display: none;
+      position: fixed;
+      bottom: 1.5rem;
+      left: 1.5rem;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #4a90d9;
+      color: #fff;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      z-index: 150;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .fab:hover { background: #357abd; }
+
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 120;
+    }
+
+    .overlay.active { display: block; }
+
+    /* ============================================================
+       Common UI Components
+       ============================================================ */
+    .section {
+      margin-bottom: 1.25rem;
+    }
+
+    .section-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      margin-bottom: 1rem;
+    }
+
+    .card h3 {
+      font-size: 1rem;
+      color: #222;
+      margin-bottom: 0.75rem;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="password"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.875rem;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-family: inherit;
+      background: #fff;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #4a90d9;
+    }
+
+    textarea {
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      font-size: 0.8rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: #4a90d9;
+      color: #fff;
+      padding: 0.75rem 2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      font-family: inherit;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary:hover { background: #357abd; }
+    .btn-primary:disabled { background: #b0b0b0; cursor: not-allowed; }
+
+    .btn-save { background: #4a90d9; color: #fff; }
+    .btn-save:hover { background: #357abd; }
+
+    .btn-clear { background: #e74c3c; color: #fff; }
+    .btn-clear:hover { background: #c0392b; }
+
+    .btn-secondary {
+      background: #eee;
+      color: #333;
+    }
+    .btn-secondary:hover { background: #ddd; }
+
+    .btn-copy {
+      background: #27ae60;
+      color: #fff;
+    }
+    .btn-copy:hover { background: #219a52; }
+
+    .inline-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .inline-row input { flex: 1; }
+
+    /* ============================================================
+       Toast
+       ============================================================ */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(1rem);
+      background: #333;
+      color: #fff;
+      padding: 0.6rem 1.25rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+      z-index: 300;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ============================================================
+       Modal
+       ============================================================ */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal-content {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 520px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #888;
+      line-height: 1;
+      padding: 0.25rem;
+    }
+
+    .modal-close:hover { color: #333; }
+
+    .modal-content h2 {
+      font-size: 1.1rem;
+      color: #222;
+      margin-bottom: 1rem;
+    }
+
+    .modal-content ol {
+      padding-left: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .modal-content li {
+      font-size: 0.875rem;
+      line-height: 1.8;
+      color: #444;
+    }
+
+    .modal-content a {
+      color: #4a90d9;
+      text-decoration: none;
+    }
+
+    .modal-content a:hover { text-decoration: underline; }
+
+    .modal-note {
+      font-size: 0.8rem;
+      color: #888;
+      background: #f9f9f9;
+      border-radius: 6px;
+      padding: 0.75rem;
+      line-height: 1.6;
+    }
+
+    /* ============================================================
+       Tab 1: Template Generator
+       ============================================================ */
+    .api-key-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .api-key-row input { flex: 1; }
+
+    .api-key-help {
+      margin-top: 0.4rem;
+    }
+
+    .api-key-help a {
+      font-size: 0.8rem;
+      color: #4a90d9;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .api-key-help a:hover { text-decoration: underline; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .form-grid .full-width {
+      grid-column: 1 / -1;
+    }
+
+    .generated-output {
+      display: none;
+    }
+
+    .generated-output.visible {
+      display: block;
+    }
+
+    .generated-output textarea {
+      height: 200px;
+      margin-bottom: 0.75rem;
+    }
+
+    .output-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .mercari-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.5rem 1rem;
+      background: #e74c3c;
+      color: #fff;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.8rem;
+      transition: background 0.2s;
+    }
+
+    .mercari-link:hover { background: #c0392b; }
+
+    /* ============================================================
+       Tab 2: Shipping & Profit
+       ============================================================ */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #ccc;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background: #4a90d9;
+    }
+
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
+
+    .toggle-label {
+      font-size: 0.85rem;
+      color: #555;
+    }
+
+    .shipping-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .shipping-table th {
+      background: #f8f8f8;
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      font-weight: 600;
+      color: #555;
+      border-bottom: 2px solid #e0e0e0;
+      white-space: nowrap;
+    }
+
+    .shipping-table td {
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid #eee;
+    }
+
+    .shipping-table .group-header td {
+      background: #f0f6ff;
+      font-weight: 600;
+      color: #4a90d9;
+      font-size: 0.78rem;
+      padding: 0.4rem 0.6rem;
+    }
+
+    .shipping-table .best-profit {
+      background: #eafaf1;
+    }
+
+    .shipping-table .negative {
+      color: #e74c3c;
+      font-weight: 600;
+    }
+
+    .shipping-table .positive {
+      color: #27ae60;
+    }
+
+    .profit-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .profit-input-row label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #555;
+      white-space: nowrap;
+    }
+
+    .profit-input-row input {
+      max-width: 200px;
+    }
+
+    .yen-suffix {
+      font-size: 0.875rem;
+      color: #555;
+    }
+
+    .size-inputs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .size-input-group label {
+      display: block;
+      font-size: 0.75rem;
+      color: #888;
+      margin-bottom: 0.25rem;
+    }
+
+    .badge-recommend {
+      display: inline-block;
+      background: #27ae60;
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+      font-weight: 600;
+    }
+
+    .badge-anonymous {
+      display: inline-block;
+      background: #4a90d9;
+      color: #fff;
+      font-size: 0.65rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      margin-left: 0.3rem;
+    }
+
+    .not-fit-section {
+      margin-top: 0.75rem;
+    }
+
+    .not-fit-toggle {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 0.8rem;
+      cursor: pointer;
+      padding: 0.4rem 0;
+      font-family: inherit;
+    }
+
+    .not-fit-toggle:hover { color: #555; }
+
+    .not-fit-list {
+      display: none;
+      list-style: none;
+    }
+
+    .not-fit-list.visible {
+      display: block;
+    }
+
+    /* ============================================================
+       Tab 4: Title Checker
+       ============================================================ */
+    .title-input-area {
+      position: relative;
+    }
+
+    .title-input-area input {
+      font-size: 1.1rem;
+      padding: 0.75rem;
+    }
+
+    .char-count-display {
+      text-align: center;
+      margin: 1rem 0;
+    }
+
+    .char-count-number {
+      font-size: 3rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .char-count-label {
+      font-size: 0.875rem;
+      color: #888;
+      margin-top: 0.25rem;
+    }
+
+    .progress-bar-track {
+      width: 100%;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.2s, background 0.2s;
+      background: #4a90d9;
+    }
+
+    .char-warning {
+      font-size: 0.85rem;
+      min-height: 1.2em;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .keyword-section {
+      margin-top: 1rem;
+    }
+
+    .keyword-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+
+    .keyword-chip {
+      display: inline-block;
+      padding: 0.3rem 0.7rem;
+      background: #f0f6ff;
+      color: #4a90d9;
+      border: 1px solid #d0e0f0;
+      border-radius: 16px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      user-select: none;
+    }
+
+    .keyword-chip:hover {
+      background: #d0e4ff;
+    }
+
+    /* ============================================================
+       Tab 5: Photo Trimmer
+       ============================================================ */
+    .drop-zone {
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+      color: #888;
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+      margin-bottom: 1rem;
+    }
+
+    .drop-zone.dragover {
+      border-color: #4a90d9;
+      background: #f0f6ff;
+    }
+
+    .drop-zone-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .drop-zone-text {
+      font-size: 0.9rem;
+    }
+
+    .drop-zone-sub {
+      font-size: 0.75rem;
+      color: #aaa;
+      margin-top: 0.3rem;
+    }
+
+    .slider-controls {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .slider-group {
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .slider-group label {
+      display: block;
+      font-size: 0.8rem;
+      color: #555;
+      margin-bottom: 0.3rem;
+    }
+
+    .slider-group input[type="range"] {
+      width: 100%;
+      border: none;
+      padding: 0;
+    }
+
+    .slider-value {
+      font-size: 0.75rem;
+      color: #888;
+      text-align: right;
+    }
+
+    .slider-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-end;
+    }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .photo-item {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: border-color 0.15s;
+    }
+
+    .photo-item.selected {
+      border-color: #4a90d9;
+    }
+
+    .photo-item canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .photo-item .photo-remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 22px;
+      height: 22px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      font-size: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .photo-item:hover .photo-remove {
+      opacity: 1;
+    }
+
+    .photo-item .photo-index {
+      position: absolute;
+      bottom: 4px;
+      left: 4px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 0.65rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+    }
+
+    .download-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    /* ============================================================
+       Responsive
+       ============================================================ */
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        transform: translateX(-100%);
+        transition: transform 0.3s;
+        box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .fab {
+        display: flex;
+      }
+
+      .content-area {
+        padding: 1rem;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .size-inputs {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .shipping-table {
+        font-size: 0.75rem;
+      }
+
+      .photo-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      }
+    }
+  </style>
+  <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools"></script>
+</head>
+<body>
+  <!-- Overlay for mobile sidebar -->
+  <div class="overlay" id="overlay"></div>
+
+  <div class="app-wrapper">
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="#template" class="active" data-tab="template"><span class="tab-icon">&#128221;</span>テンプレート生成</a></li>
+        <li><a href="#shipping" data-tab="shipping"><span class="tab-icon">&#128230;</span>送料・利益計算</a></li>
+        <li><a href="#title" data-tab="title"><span class="tab-icon">&#128394;</span>タイトル文字数</a></li>
+        <li><a href="#photo" data-tab="photo"><span class="tab-icon">&#128247;</span>写真トリミング</a></li>
+      </ul>
+    </nav>
+
+    <!-- Content Area -->
+    <main class="content-area">
+      <!-- ============================================================
+           Tab 1: Template Generator
+           ============================================================ -->
+      <div class="tab-panel active" id="panel-template">
+        <div class="card">
+          <h3>出品テンプレート生成</h3>
+          <p style="font-size:0.8rem;color:#888;margin-bottom:1rem;">商品情報を入力すると、AIが出品用の説明文を生成します。全項目任意ですが、入力が多いほど精度の高い説明文が生成されます。</p>
+
+          <!-- API Key -->
+          <div class="section">
+            <label class="section-label">Gemini API Key</label>
+            <div class="api-key-row">
+              <input type="password" id="apiKeyInput" placeholder="APIキーを入力...">
+              <button class="btn btn-save" id="saveKeyBtn">保存</button>
+              <button class="btn btn-clear" id="clearKeyBtn">クリア</button>
+            </div>
+            <div class="api-key-help">
+              <a id="apiKeyHelpLink">APIキーの取得方法</a>
+            </div>
+          </div>
+
+          <!-- Form -->
+          <div class="form-grid">
+            <div class="section">
+              <label class="section-label">カテゴリ</label>
+              <select id="tmplCategory">
+                <option value="レディース">レディース</option>
+                <option value="メンズ">メンズ</option>
+                <option value="ベビー・キッズ">ベビー・キッズ</option>
+                <option value="家電・スマホ">家電・スマホ</option>
+                <option value="本・雑誌">本・雑誌</option>
+                <option value="ゲーム・おもちゃ">ゲーム・おもちゃ</option>
+                <option value="コスメ・美容">コスメ・美容</option>
+                <option value="スポーツ">スポーツ</option>
+                <option value="インテリア・雑貨">インテリア・雑貨</option>
+                <option value="その他">その他</option>
+              </select>
+            </div>
+            <div class="section">
+              <label class="section-label">商品名</label>
+              <input type="text" id="tmplName" placeholder="例: ユニクロ ダウンジャケット">
+            </div>
+            <div class="section">
+              <label class="section-label">ブランド</label>
+              <input type="text" id="tmplBrand" placeholder="例: UNIQLO">
+            </div>
+            <div class="section">
+              <label class="section-label">商品の状態</label>
+              <select id="tmplCondition">
+                <option value="新品・未使用">新品・未使用</option>
+                <option value="未使用に近い">未使用に近い</option>
+                <option value="目立った傷や汚れなし">目立った傷や汚れなし</option>
+                <option value="やや傷や汚れあり">やや傷や汚れあり</option>
+                <option value="傷や汚れあり">傷や汚れあり</option>
+                <option value="全体的に状態が悪い">全体的に状態が悪い</option>
+              </select>
+            </div>
+            <div class="section">
+              <label class="section-label">サイズ</label>
+              <input type="text" id="tmplSize" placeholder="例: L">
+            </div>
+            <div class="section">
+              <label class="section-label">購入時期</label>
+              <input type="text" id="tmplPurchaseDate" placeholder="例: 2024年冬">
+            </div>
+            <div class="section">
+              <label class="section-label">使用頻度</label>
+              <input type="text" id="tmplUsage" placeholder="例: 5回程度">
+            </div>
+            <div class="section">
+              <label class="section-label">付属品</label>
+              <input type="text" id="tmplAccessories" placeholder="例: タグ、箱">
+            </div>
+            <div class="section full-width">
+              <label class="section-label">欠損・ダメージの説明</label>
+              <input type="text" id="tmplDamage" placeholder="例: 袖口に小さな毛玉あり">
+            </div>
+            <div class="section">
+              <label class="section-label">希望価格</label>
+              <input type="number" id="tmplPrice" placeholder="例: 3000" min="0">
+            </div>
+            <div class="section full-width">
+              <label class="section-label">参考説明文（任意）</label>
+              <textarea id="tmplReference" rows="3" placeholder="他の出品者の説明文などを参考にしたい場合に入力..."></textarea>
+            </div>
+          </div>
+
+          <button class="btn-primary" id="generateBtn">説明文を生成</button>
+        </div>
+
+        <!-- Generated Output -->
+        <div class="card generated-output" id="generatedOutput">
+          <h3>生成された説明文</h3>
+          <textarea id="generatedText" placeholder="ここに生成結果が表示されます..."></textarea>
+          <div class="output-actions">
+            <button class="btn btn-copy" id="copyTextBtn">コピー</button>
+            <a class="mercari-link" id="mercariLink" href="https://jp.mercari.com/sell" target="_blank" rel="noopener">メルカリで出品</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           Tab 2: Shipping & Profit Calculator (統合)
+           ============================================================ -->
+      <div class="tab-panel" id="panel-shipping">
+        <div class="card">
+          <h3>送料・利益計算</h3>
+          <p style="font-size:0.8rem;color:#888;margin-bottom:1rem;">販売価格を入力すると利益を計算します。サイズ・重さを入力すると利用可能な配送方法に絞り込めます。</p>
+
+          <div class="profit-input-row">
+            <label>販売価格</label>
+            <input type="number" id="profitPrice" placeholder="0" min="0" step="1">
+            <span class="yen-suffix">円</span>
+          </div>
+
+          <div class="profit-input-row">
+            <label>梱包資材</label>
+            <input type="number" id="packagingCost" placeholder="0" min="0" step="1">
+            <span class="yen-suffix">円</span>
+          </div>
+
+          <div class="size-inputs" style="margin-bottom:0.75rem;">
+            <div class="size-input-group">
+              <label>縦 (cm)</label>
+              <input type="number" id="sizeH" placeholder="-" min="0" step="0.1">
+            </div>
+            <div class="size-input-group">
+              <label>横 (cm)</label>
+              <input type="number" id="sizeW" placeholder="-" min="0" step="0.1">
+            </div>
+            <div class="size-input-group">
+              <label>厚さ (cm)</label>
+              <input type="number" id="sizeD" placeholder="-" min="0" step="0.1">
+            </div>
+            <div class="size-input-group">
+              <label>重さ (g)</label>
+              <input type="number" id="sizeWeight" placeholder="-" min="0" step="1">
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <label class="toggle-switch">
+              <input type="checkbox" id="anonymousToggle">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">匿名配送のみ表示</span>
+          </div>
+
+          <div class="toggle-row">
+            <label class="toggle-switch">
+              <input type="checkbox" id="promoToggle">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">プロモーション利用（販売価格の5%）</span>
+          </div>
+
+          <div id="shippingResults"></div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           Tab 4: Title Checker
+           ============================================================ -->
+      <div class="tab-panel" id="panel-title">
+        <div class="card">
+          <h3>タイトル文字数チェッカー</h3>
+          <p style="font-size:0.8rem;color:#888;margin-bottom:1rem;">メルカリの商品タイトル（推奨40文字以内）の文字数をチェックします。</p>
+
+          <div class="title-input-area">
+            <input type="text" id="titleInput" maxlength="60" placeholder="商品タイトルを入力...">
+          </div>
+
+          <div class="char-count-display">
+            <div class="char-count-number" id="charCountNum" style="color:#4a90d9;">0</div>
+            <div class="char-count-label">文字</div>
+          </div>
+
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progressBar" style="width:0%;"></div>
+          </div>
+
+          <div class="char-warning" id="charWarning"></div>
+
+          <div class="keyword-section">
+            <div class="section">
+              <label class="section-label">カテゴリ</label>
+              <select id="keywordCategory">
+                <option value="レディース">レディース</option>
+                <option value="メンズ">メンズ</option>
+                <option value="家電・スマホ">家電・スマホ</option>
+                <option value="本・雑誌">本・雑誌</option>
+                <option value="コスメ・美容">コスメ・美容</option>
+                <option value="ゲーム・おもちゃ">ゲーム・おもちゃ</option>
+              </select>
+            </div>
+            <label class="section-label">よく使うキーワード</label>
+            <div class="keyword-chips" id="keywordChips"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           Tab 5: Photo Trimmer
+           ============================================================ -->
+      <div class="tab-panel" id="panel-photo">
+        <div class="card">
+          <h3>写真トリミング</h3>
+          <p style="font-size:0.8rem;color:#888;margin-bottom:1rem;">写真を正方形にクロップし、明るさ・彩度を調整してダウンロードできます。</p>
+
+          <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-icon">&#128206;</div>
+            <div class="drop-zone-text" id="dropZoneText">ドラッグ&ドロップ or クリックで画像を選択</div>
+            <div class="drop-zone-sub">最大10枚 / JPG, PNG</div>
+            <input type="file" id="photoFileInput" multiple accept="image/jpeg,image/png" style="display:none;">
+          </div>
+
+          <div class="slider-controls" id="sliderControls" style="display:none;">
+            <div class="slider-group">
+              <label>明るさ: <span id="brightnessVal">100</span>%</label>
+              <input type="range" id="brightnessSlider" min="0" max="200" value="100">
+            </div>
+            <div class="slider-group">
+              <label>彩度: <span id="saturationVal">100</span>%</label>
+              <input type="range" id="saturationSlider" min="0" max="200" value="100">
+            </div>
+            <div class="slider-actions">
+              <button class="btn btn-secondary" id="applyAllBtn">全画像に適用</button>
+            </div>
+          </div>
+
+          <div class="photo-grid" id="photoGrid"></div>
+
+          <div class="download-actions" id="downloadActions" style="display:none;">
+            <button class="btn btn-primary" id="downloadZipBtn" style="width:auto;">ZIP一括ダウンロード</button>
+            <button class="btn btn-secondary" id="downloadAllIndividual">個別ダウンロード（全て）</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="fab">&#9776;</button>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- API Key Help Modal -->
+  <div class="modal-overlay" id="helpModal">
+    <div class="modal-content">
+      <button class="modal-close" id="modalCloseBtn">&times;</button>
+      <h2>Gemini APIキーの取得方法</h2>
+      <ol>
+        <li><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> にアクセスします</li>
+        <li>Googleアカウントでログインします</li>
+        <li>「APIキーを作成」ボタンをクリックします</li>
+        <li>プロジェクトを選択し、APIキーを生成します</li>
+        <li>生成されたAPIキーをコピーします</li>
+        <li>このツールの入力欄に貼り付けて「保存」を押します</li>
+      </ol>
+      <p class="modal-note">
+        Gemini 2.5 Flash-Liteモデルは無料枠で利用できます。<br>
+        APIキーはブラウザのlocalStorageにのみ保存され、外部サーバーには送信されません。
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // Shipping Methods Data (shared by Tab 2 & 3)
+    // ============================================================
+    const SHIPPING_METHODS = [
+      // らくらくメルカリ便（匿名）
+      { name: 'ネコポス', cost: 210, anonymous: true, group: 'らくらくメルカリ便',
+        maxSize: { w: 31.2, h: 22.8, d: 3, sum: null }, maxWeight: 1000 },
+      { name: '宅急便コンパクト', cost: 450, anonymous: true, group: 'らくらくメルカリ便',
+        maxSize: { w: 25, h: 20, d: 5, sum: null }, maxWeight: null },
+      { name: '宅急便 60サイズ', cost: 750, anonymous: true, group: 'らくらくメルカリ便',
+        maxSize: { w: null, h: null, d: null, sum: 60 }, maxWeight: 2000 },
+      { name: '宅急便 80サイズ', cost: 850, anonymous: true, group: 'らくらくメルカリ便',
+        maxSize: { w: null, h: null, d: null, sum: 80 }, maxWeight: 5000 },
+      { name: '宅急便 100サイズ', cost: 1050, anonymous: true, group: 'らくらくメルカリ便',
+        maxSize: { w: null, h: null, d: null, sum: 100 }, maxWeight: 10000 },
+      { name: '宅急便 120サイズ', cost: 1200, anonymous: true, group: 'らくらくメルカリ便',
+        maxSize: { w: null, h: null, d: null, sum: 120 }, maxWeight: 15000 },
+      { name: '宅急便 140サイズ', cost: 1450, anonymous: true, group: 'らくらくメルカリ便',
+        maxSize: { w: null, h: null, d: null, sum: 140 }, maxWeight: 20000 },
+      { name: '宅急便 160サイズ', cost: 1700, anonymous: true, group: 'らくらくメルカリ便',
+        maxSize: { w: null, h: null, d: null, sum: 160 }, maxWeight: 25000 },
+      // ゆうゆうメルカリ便（匿名）
+      { name: 'ゆうパケット', cost: 230, anonymous: true, group: 'ゆうゆうメルカリ便',
+        maxSize: { w: 34, h: 25, d: 3, sum: null }, maxWeight: 1000 },
+      { name: 'ゆうパケットポスト', cost: 215, anonymous: true, group: 'ゆうゆうメルカリ便',
+        maxSize: { w: 32.7, h: 22.8, d: 4, sum: null }, maxWeight: 2000,
+        note: '※厚さは4cmまでで判定していますがポストにより異なります' },
+      { name: 'ゆうパケットポストミニ', cost: 160, anonymous: true, group: 'ゆうゆうメルカリ便',
+        maxSize: { w: 21.6, h: 17, d: 4, sum: null }, maxWeight: 2000,
+        note: '※厚さは4cmまでで判定していますがポストにより異なります' },
+      { name: 'ゆうパケットプラス', cost: 455, anonymous: true, group: 'ゆうゆうメルカリ便',
+        maxSize: { w: 24, h: 17, d: 7, sum: null }, maxWeight: 2000 },
+      { name: 'ゆうパック 60サイズ', cost: 770, anonymous: true, group: 'ゆうゆうメルカリ便',
+        maxSize: { w: null, h: null, d: null, sum: 60 }, maxWeight: 25000 },
+      { name: 'ゆうパック 80サイズ', cost: 870, anonymous: true, group: 'ゆうゆうメルカリ便',
+        maxSize: { w: null, h: null, d: null, sum: 80 }, maxWeight: 25000 },
+      { name: 'ゆうパック 100サイズ', cost: 1070, anonymous: true, group: 'ゆうゆうメルカリ便',
+        maxSize: { w: null, h: null, d: null, sum: 100 }, maxWeight: 25000 },
+      // 普通郵便（非匿名）
+      { name: '定形郵便 25g', cost: 84, anonymous: false, group: '普通郵便',
+        maxSize: { w: 23.5, h: 12, d: 1, sum: null }, maxWeight: 25 },
+      { name: '定形郵便 50g', cost: 94, anonymous: false, group: '普通郵便',
+        maxSize: { w: 23.5, h: 12, d: 1, sum: null }, maxWeight: 50 },
+      { name: '定形外(規格内) 50g', cost: 120, anonymous: false, group: '普通郵便',
+        maxSize: { w: 34, h: 25, d: 3, sum: null }, maxWeight: 50 },
+      { name: '定形外(規格内) 100g', cost: 140, anonymous: false, group: '普通郵便',
+        maxSize: { w: 34, h: 25, d: 3, sum: null }, maxWeight: 100 },
+      { name: '定形外(規格内) 150g', cost: 210, anonymous: false, group: '普通郵便',
+        maxSize: { w: 34, h: 25, d: 3, sum: null }, maxWeight: 150 },
+      { name: '定形外(規格内) 250g', cost: 250, anonymous: false, group: '普通郵便',
+        maxSize: { w: 34, h: 25, d: 3, sum: null }, maxWeight: 250 },
+      { name: '定形外(規格内) 500g', cost: 390, anonymous: false, group: '普通郵便',
+        maxSize: { w: 34, h: 25, d: 3, sum: null }, maxWeight: 500 },
+      { name: '定形外(規格内) 1kg', cost: 580, anonymous: false, group: '普通郵便',
+        maxSize: { w: 34, h: 25, d: 3, sum: null }, maxWeight: 1000 },
+      { name: '定形外(規格外) 50g', cost: 200, anonymous: false, group: '普通郵便',
+        maxSize: { w: 60, h: null, d: null, sum: 90 }, maxWeight: 50 },
+      { name: '定形外(規格外) 100g', cost: 220, anonymous: false, group: '普通郵便',
+        maxSize: { w: 60, h: null, d: null, sum: 90 }, maxWeight: 100 },
+      { name: '定形外(規格外) 150g', cost: 300, anonymous: false, group: '普通郵便',
+        maxSize: { w: 60, h: null, d: null, sum: 90 }, maxWeight: 150 },
+      { name: '定形外(規格外) 250g', cost: 350, anonymous: false, group: '普通郵便',
+        maxSize: { w: 60, h: null, d: null, sum: 90 }, maxWeight: 250 },
+      { name: '定形外(規格外) 500g', cost: 510, anonymous: false, group: '普通郵便',
+        maxSize: { w: 60, h: null, d: null, sum: 90 }, maxWeight: 500 },
+      { name: '定形外(規格外) 1kg', cost: 710, anonymous: false, group: '普通郵便',
+        maxSize: { w: 60, h: null, d: null, sum: 90 }, maxWeight: 1000 },
+      { name: '定形外(規格外) 2kg', cost: 1040, anonymous: false, group: '普通郵便',
+        maxSize: { w: 60, h: null, d: null, sum: 90 }, maxWeight: 2000 },
+      { name: '定形外(規格外) 4kg', cost: 1350, anonymous: false, group: '普通郵便',
+        maxSize: { w: 60, h: null, d: null, sum: 90 }, maxWeight: 4000 },
+      // その他（非匿名）
+      { name: 'クリックポスト', cost: 185, anonymous: false, group: 'その他',
+        maxSize: { w: 34, h: 25, d: 3, sum: null }, maxWeight: 1000 },
+      { name: 'レターパックライト', cost: 370, anonymous: false, group: 'その他',
+        maxSize: { w: 34, h: 24.8, d: 3, sum: null }, maxWeight: 4000 },
+      { name: 'レターパックプラス', cost: 520, anonymous: false, group: 'その他',
+        maxSize: { w: 34, h: 24.8, d: null, sum: null }, maxWeight: 4000 },
+    ];
+
+    // ============================================================
+    // DOM
+    // ============================================================
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => document.querySelectorAll(sel);
+
+    const sidebar = $('#sidebar');
+    const overlay = $('#overlay');
+    const fab = $('#fab');
+    const toastEl = $('#toast');
+
+    // ============================================================
+    // Toast
+    // ============================================================
+    let toastTimer = null;
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
+    }
+
+    // ============================================================
+    // Tab Switching
+    // ============================================================
+    function switchTab(tabId) {
+      $$('.sidebar-nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === tabId));
+      $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tabId}`));
+      closeSidebar();
+    }
+
+    $$('.sidebar-nav a').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab(a.dataset.tab);
+      });
+    });
+
+    // ============================================================
+    // Mobile Sidebar
+    // ============================================================
+    function openSidebar() {
+      sidebar.classList.add('open');
+      overlay.classList.add('active');
+    }
+
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('active');
+    }
+
+    fab.addEventListener('click', () => {
+      sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+    });
+
+    overlay.addEventListener('click', closeSidebar);
+
+    // ============================================================
+    // Modal
+    // ============================================================
+    const helpModal = $('#helpModal');
+
+    function openModal() { helpModal.classList.add('active'); }
+    function closeModal() { helpModal.classList.remove('active'); }
+
+    $('#modalCloseBtn').addEventListener('click', closeModal);
+    helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+    // ============================================================
+    // localStorage (API Key)
+    // ============================================================
+    const STORAGE_KEY = 'tt-gemini-api-key';
+    function getApiKey() { return localStorage.getItem(STORAGE_KEY) || ''; }
+    function saveApiKey(key) { localStorage.setItem(STORAGE_KEY, key); }
+    function clearApiKeyStorage() { localStorage.removeItem(STORAGE_KEY); }
+
+    const apiKeyInput = $('#apiKeyInput');
+    const saveKeyBtn = $('#saveKeyBtn');
+    const clearKeyBtn = $('#clearKeyBtn');
+
+    if (getApiKey()) {
+      apiKeyInput.placeholder = '保存済み';
+    }
+
+    saveKeyBtn.addEventListener('click', () => {
+      const key = apiKeyInput.value.trim();
+      if (!key) { showToast('APIキーを入力してください'); return; }
+      saveApiKey(key);
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = '保存済み';
+      showToast('APIキーを保存しました');
+    });
+
+    clearKeyBtn.addEventListener('click', () => {
+      clearApiKeyStorage();
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = 'APIキーを入力...';
+      showToast('APIキーをクリアしました');
+    });
+
+    $('#apiKeyHelpLink').addEventListener('click', (e) => { e.preventDefault(); openModal(); });
+
+    // ============================================================
+    // Tab 1: Template Generator
+    // ============================================================
+    const generateBtn = $('#generateBtn');
+    const generatedOutput = $('#generatedOutput');
+    const generatedText = $('#generatedText');
+    let isGenerating = false;
+
+    async function callGemini(apiKey, prompt, maxRetries = 3) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+      const body = JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+      });
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return data.candidates?.[0]?.content?.parts?.[0]?.text || '（生成結果が空でした）';
+        }
+        if (res.status === 429 && attempt < maxRetries) {
+          const wait = Math.pow(2, attempt + 1) * 1000 + Math.random() * 1000;
+          await new Promise(r => setTimeout(r, wait));
+          continue;
+        }
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 400) throw new Error('APIキーが無効です');
+        if (res.status === 429) throw new Error('リクエスト上限に達しました。しばらく時間をおいてお試しください');
+        throw new Error(err.error?.message || `APIエラー: ${res.status}`);
+      }
+    }
+
+    generateBtn.addEventListener('click', async () => {
+      if (isGenerating) return;
+      const apiKey = getApiKey();
+      if (!apiKey) { showToast('APIキーを保存してください'); return; }
+
+      const name = $('#tmplName').value.trim();
+      const hasAnyInput = [name, $('#tmplBrand').value, $('#tmplSize').value, $('#tmplPurchaseDate').value, $('#tmplUsage').value, $('#tmplAccessories').value, $('#tmplDamage').value, $('#tmplPrice').value, $('#tmplReference').value].some(v => v.trim());
+      if (!hasAnyInput) { showToast('少なくとも1つの項目を入力してください'); return; }
+
+      isGenerating = true;
+      generateBtn.disabled = true;
+      generateBtn.textContent = '生成中...';
+
+      const fields = {
+        カテゴリ: $('#tmplCategory').value,
+        商品名: name,
+        ブランド: $('#tmplBrand').value.trim(),
+        商品の状態: $('#tmplCondition').value,
+        サイズ: $('#tmplSize').value.trim(),
+        購入時期: $('#tmplPurchaseDate').value.trim(),
+        使用頻度: $('#tmplUsage').value.trim(),
+        付属品: $('#tmplAccessories').value.trim(),
+        欠損ダメージ: $('#tmplDamage').value.trim(),
+        希望価格: $('#tmplPrice').value.trim()
+      };
+
+      const reference = $('#tmplReference').value.trim();
+
+      let prompt = 'あなたはメルカリの出品説明文を作成するプロのライターです。\n';
+      prompt += '以下の商品情報をもとに、魅力的で購入意欲を高める出品説明文を生成してください。\n';
+      prompt += '説明文だけを出力してください（タイトルや見出しは不要）。\n\n';
+      prompt += '【商品情報】\n';
+      for (const [key, val] of Object.entries(fields)) {
+        if (val) prompt += `- ${key}: ${val}\n`;
+      }
+      if (reference) {
+        prompt += `\n【参考説明文】\n以下の文体やスタイルを参考にしてください:\n${reference}\n`;
+      }
+
+      try {
+        const result = await callGemini(apiKey, prompt);
+        generatedText.value = result;
+        generatedOutput.classList.add('visible');
+        generatedOutput.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) {
+        showToast(err.message);
+      } finally {
+        isGenerating = false;
+        generateBtn.disabled = false;
+        generateBtn.textContent = '説明文を生成';
+      }
+    });
+
+    // Copy & Mercari Link
+    $('#copyTextBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(generatedText.value).then(() => showToast('コピーしました'));
+    });
+
+    // Detect mobile for mercari link
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const mercariLink = $('#mercariLink');
+    if (isMobile) {
+      mercariLink.href = 'mercari://';
+      mercariLink.removeAttribute('target');
+    }
+
+    // ============================================================
+    // Tab 2: Shipping & Profit (統合)
+    // ============================================================
+    const profitPrice = $('#profitPrice');
+    const anonymousToggle = $('#anonymousToggle');
+    const shippingResults = $('#shippingResults');
+
+    function checkSizeFit(h, w, d, weight, method) {
+      const ms = method.maxSize;
+      const dims = [h, w, d].sort((a, b) => b - a);
+      const longest = dims[0];
+      const mid = dims[1];
+      const shortest = dims[2];
+      const sum = h + w + d;
+
+      if (ms.sum !== null) {
+        if (sum > ms.sum) return false;
+        if (ms.w !== null && longest > ms.w) return false;
+        if (method.maxWeight !== null && weight > 0 && weight > method.maxWeight) return false;
+        return true;
+      }
+
+      if (ms.w !== null && longest > ms.w) return false;
+      if (ms.h !== null && mid > ms.h) return false;
+      if (ms.d !== null && shortest > ms.d) return false;
+      if (method.maxWeight !== null && weight > 0 && weight > method.maxWeight) return false;
+      return true;
+    }
+
+    let shippingDebounceTimer = null;
+
+    function renderShippingResults() {
+      const price = parseInt(profitPrice.value) || 0;
+      const fee = Math.floor(price * 0.1);
+      const promo = $('#promoToggle').checked ? Math.floor(price * 0.05) : 0;
+      const packaging = parseInt($('#packagingCost').value) || 0;
+      const onlyAnonymous = anonymousToggle.checked;
+
+      const h = parseFloat($('#sizeH').value) || 0;
+      const w = parseFloat($('#sizeW').value) || 0;
+      const d = parseFloat($('#sizeD').value) || 0;
+      const weight = parseFloat($('#sizeWeight').value) || 0;
+      const hasSize = h > 0 || w > 0 || d > 0 || weight > 0;
+
+      // Deduplicate
+      let methods = [];
+      const seenNames = new Set();
+      for (const m of SHIPPING_METHODS) {
+        if (!seenNames.has(m.name)) {
+          seenNames.add(m.name);
+          methods.push(m);
+        }
+      }
+
+      if (onlyAnonymous) {
+        methods = methods.filter(m => m.anonymous);
+      }
+
+      // Split fit / not-fit
+      let fitMethods, notFitMethods;
+      if (hasSize) {
+        fitMethods = [];
+        notFitMethods = [];
+        methods.forEach(m => {
+          if (checkSizeFit(h, w, d, weight, m)) {
+            fitMethods.push(m);
+          } else {
+            notFitMethods.push(m);
+          }
+        });
+      } else {
+        fitMethods = methods;
+        notFitMethods = [];
+      }
+
+      // Sort fit methods by cost
+      fitMethods.sort((a, b) => a.cost - b.cost);
+      notFitMethods.sort((a, b) => a.cost - b.cost);
+
+      // Find best profit & cheapest anonymous
+      let bestProfit = -Infinity;
+      if (price > 0) {
+        fitMethods.forEach(m => {
+          const profit = price - fee - promo - m.cost - packaging;
+          if (profit > bestProfit) bestProfit = profit;
+        });
+      }
+      const cheapestAnonymous = hasSize ? fitMethods.find(m => m.anonymous) : null;
+
+      // Render table
+      let html = '';
+      if (hasSize && fitMethods.length === 0) {
+        html += '<p style="color:#e74c3c;font-size:0.85rem;margin-bottom:0.75rem;">該当する配送方法が見つかりません。サイズを確認してください。</p>';
+      }
+
+      if (fitMethods.length > 0) {
+        html += '<div style="overflow-x:auto;">';
+        html += '<table class="shipping-table"><thead><tr>';
+        html += '<th>配送方法</th><th>送料</th>';
+        if (price > 0) {
+          html += '<th>手数料(10%)</th>';
+          if (promo > 0) html += '<th>プロモ(5%)</th>';
+          html += '<th>利益</th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        const cols = 2 + (price > 0 ? 2 + (promo > 0 ? 1 : 0) : 0);
+        let currentGroup = '';
+        fitMethods.forEach(m => {
+          if (m.group !== currentGroup) {
+            currentGroup = m.group;
+            const anon = m.anonymous ? '（匿名）' : '（非匿名）';
+            html += `<tr class="group-header"><td colspan="${cols}">${currentGroup} ${anon}</td></tr>`;
+          }
+          const profit = price > 0 ? price - fee - promo - m.cost - packaging : 0;
+          const isBest = price > 0 && profit === bestProfit && profit > 0;
+          const profitClass = profit < 0 ? 'negative' : (profit > 0 ? 'positive' : '');
+          const rowClass = isBest ? 'best-profit' : '';
+          const isRecommend = hasSize && m === cheapestAnonymous;
+
+          html += `<tr class="${rowClass}">`;
+          html += `<td>${m.name}`;
+          if (isRecommend) html += ` <span class="badge-recommend">オススメ</span>`;
+          if (m.note) html += `<br><span style="font-size:0.7rem;color:#999;">${m.note}</span>`;
+          html += `</td>`;
+          html += `<td>${m.cost.toLocaleString()}円</td>`;
+          if (price > 0) {
+            html += `<td>${fee.toLocaleString()}円</td>`;
+            if (promo > 0) html += `<td>${promo.toLocaleString()}円</td>`;
+            html += `<td class="${profitClass}">${profit.toLocaleString()}円</td>`;
+          }
+          html += `</tr>`;
+        });
+        html += '</tbody></table></div>';
+      }
+
+      // Not-fit section
+      if (notFitMethods.length > 0) {
+        html += '<div class="not-fit-section">';
+        html += `<button class="not-fit-toggle" id="notFitToggle">&#9660; サイズ外の配送方法（${notFitMethods.length}件）</button>`;
+        html += '<div class="not-fit-list" id="notFitList" style="overflow-x:auto;">';
+        html += '<table class="shipping-table"><tbody>';
+        notFitMethods.forEach(m => {
+          html += `<tr style="opacity:0.4;"><td>${m.name}</td><td>${m.cost.toLocaleString()}円</td>`;
+          if (price > 0) {
+            const profit = price - fee - promo - m.cost - packaging;
+            html += `<td>${fee.toLocaleString()}円</td>`;
+            if (promo > 0) html += `<td>${promo.toLocaleString()}円</td>`;
+            html += `<td>${profit.toLocaleString()}円</td>`;
+          }
+          html += `</tr>`;
+        });
+        html += '</tbody></table></div></div>';
+      }
+
+      shippingResults.innerHTML = html;
+
+      // Toggle listener
+      const toggleBtn = $('#notFitToggle');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          const list = $('#notFitList');
+          const isVisible = list.classList.toggle('visible');
+          toggleBtn.innerHTML = (isVisible ? '&#9650;' : '&#9660;') + ` サイズ外の配送方法（${notFitMethods.length}件）`;
+        });
+      }
+    }
+
+    function onShippingInput() {
+      clearTimeout(shippingDebounceTimer);
+      shippingDebounceTimer = setTimeout(renderShippingResults, 200);
+    }
+
+    profitPrice.addEventListener('input', onShippingInput);
+    $('#packagingCost').addEventListener('input', onShippingInput);
+    ['sizeH', 'sizeW', 'sizeD', 'sizeWeight'].forEach(id => {
+      $(`#${id}`).addEventListener('input', onShippingInput);
+    });
+    anonymousToggle.addEventListener('change', renderShippingResults);
+    $('#promoToggle').addEventListener('change', renderShippingResults);
+    renderShippingResults();
+
+    // ============================================================
+    // Tab 4: Title Checker
+    // ============================================================
+    const titleInput = $('#titleInput');
+    const charCountNum = $('#charCountNum');
+    const progressBar = $('#progressBar');
+    const charWarning = $('#charWarning');
+    const keywordChips = $('#keywordChips');
+    const keywordCategory = $('#keywordCategory');
+
+    const KEYWORDS = {
+      'レディース': ['新品', '未使用', '美品', 'タグ付き', '送料無料', '即購入OK', '限定', 'セール', 'ワンピース', 'トップス', 'スカート', 'パンツ'],
+      'メンズ': ['新品', '未使用', '美品', 'タグ付き', '送料無料', '即購入OK', '限定', 'Tシャツ', 'ジャケット', 'パンツ', 'スニーカー'],
+      '家電・スマホ': ['新品', '未使用', '美品', '動作確認済', '付属品完備', '送料無料', '即購入OK', 'iPhone', 'Android', 'イヤホン'],
+      '本・雑誌': ['新品', '未使用', '美品', '初版', '帯付き', '送料無料', '即購入OK', 'セット', 'まとめ売り', '全巻'],
+      'コスメ・美容': ['新品', '未使用', '未開封', '残量8割', '送料無料', '即購入OK', '限定', 'デパコス', 'プチプラ'],
+      'ゲーム・おもちゃ': ['新品', '未使用', '美品', '動作確認済', '送料無料', '即購入OK', '限定', 'レア', 'セット', 'まとめ']
+    };
+
+    function updateTitleCounter() {
+      const len = titleInput.value.length;
+      charCountNum.textContent = len;
+
+      // Progress bar
+      const pct = Math.min((len / 40) * 100, 100);
+      progressBar.style.width = pct + '%';
+
+      // Color
+      let color;
+      if (len <= 30) color = '#4a90d9';
+      else if (len <= 38) color = '#f39c12';
+      else color = '#e74c3c';
+
+      charCountNum.style.color = color;
+      progressBar.style.background = color;
+
+      // Warning
+      if (len === 0) {
+        charWarning.textContent = '';
+      } else if (len >= 35 && len < 40) {
+        charWarning.textContent = `あと${40 - len}文字`;
+        charWarning.style.color = len <= 38 ? '#f39c12' : '#e74c3c';
+      } else if (len === 40) {
+        charWarning.textContent = 'ちょうど上限です';
+        charWarning.style.color = '#e74c3c';
+      } else if (len > 40) {
+        charWarning.textContent = `${len - 40}文字超過しています`;
+        charWarning.style.color = '#e74c3c';
+      } else {
+        charWarning.textContent = '';
+      }
+    }
+
+    titleInput.addEventListener('input', updateTitleCounter);
+
+    function renderKeywordChips() {
+      const cat = keywordCategory.value;
+      const words = KEYWORDS[cat] || [];
+      keywordChips.innerHTML = words.map(w =>
+        `<span class="keyword-chip" data-word="${w}">${w}</span>`
+      ).join('');
+
+      keywordChips.querySelectorAll('.keyword-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const word = chip.dataset.word;
+          const input = titleInput;
+          const start = input.selectionStart;
+          const end = input.selectionEnd;
+          const val = input.value;
+          const newVal = val.substring(0, start) + word + val.substring(end);
+          if (newVal.length <= 60) {
+            input.value = newVal;
+            const newPos = start + word.length;
+            input.setSelectionRange(newPos, newPos);
+            input.focus();
+            updateTitleCounter();
+          } else {
+            showToast('文字数上限を超えるため挿入できません');
+          }
+        });
+      });
+    }
+
+    keywordCategory.addEventListener('change', renderKeywordChips);
+    renderKeywordChips();
+
+    // ============================================================
+    // Tab 5: Photo Trimmer
+    // ============================================================
+    const dropZone = $('#dropZone');
+    const photoFileInput = $('#photoFileInput');
+    const photoGrid = $('#photoGrid');
+    const sliderControls = $('#sliderControls');
+    const downloadActions = $('#downloadActions');
+    const brightnessSlider = $('#brightnessSlider');
+    const saturationSlider = $('#saturationSlider');
+    const brightnessVal = $('#brightnessVal');
+    const saturationVal = $('#saturationVal');
+
+    const MAX_PHOTOS = 10;
+    const OUTPUT_SIZE = 720;
+
+    // State: array of { file, origImg, brightness, saturation, canvas }
+    let photos = [];
+    let selectedPhotoIndex = -1; // -1 = no individual selection (default mode)
+
+    // Mobile text
+    if (isMobile) {
+      $('#dropZoneText').textContent = 'タップして画像を選択';
+    }
+
+    dropZone.addEventListener('click', () => photoFileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    photoFileInput.addEventListener('change', () => {
+      handleFiles(photoFileInput.files);
+      photoFileInput.value = '';
+    });
+
+    function handleFiles(fileList) {
+      const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+      const remaining = MAX_PHOTOS - photos.length;
+      if (remaining <= 0) {
+        showToast(`最大${MAX_PHOTOS}枚までです`);
+        return;
+      }
+      const toAdd = files.slice(0, remaining);
+      if (files.length > remaining) {
+        showToast(`${remaining}枚のみ追加しました（上限${MAX_PHOTOS}枚）`);
+      }
+
+      toAdd.forEach(file => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          img.onload = () => {
+            const photoData = {
+              file,
+              origImg: img,
+              brightness: 100,
+              saturation: 100,
+              canvas: null
+            };
+            photos.push(photoData);
+            processPhoto(photoData);
+            renderPhotoGrid();
+            updatePhotoUI();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function processPhoto(photoData) {
+      const canvas = document.createElement('canvas');
+      canvas.width = OUTPUT_SIZE;
+      canvas.height = OUTPUT_SIZE;
+      const ctx = canvas.getContext('2d');
+
+      const img = photoData.origImg;
+      // Center square crop
+      const size = Math.min(img.width, img.height);
+      const sx = (img.width - size) / 2;
+      const sy = (img.height - size) / 2;
+
+      // Apply filter
+      const filterStr = `brightness(${photoData.brightness}%) saturate(${photoData.saturation}%)`;
+      if (typeof ctx.filter !== 'undefined') {
+        ctx.filter = filterStr;
+      }
+
+      ctx.drawImage(img, sx, sy, size, size, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+      ctx.filter = 'none';
+      photoData.canvas = canvas;
+    }
+
+    function renderPhotoGrid() {
+      photoGrid.innerHTML = '';
+      photos.forEach((p, i) => {
+        const item = document.createElement('div');
+        item.className = 'photo-item' + (i === selectedPhotoIndex ? ' selected' : '');
+        item.appendChild(p.canvas);
+
+        // Apply CSS filter as fallback for display
+        p.canvas.style.filter = `brightness(${p.brightness}%) saturate(${p.saturation}%)`;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'photo-remove';
+        removeBtn.textContent = '\u00d7';
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          photos.splice(i, 1);
+          if (selectedPhotoIndex === i) selectedPhotoIndex = -1;
+          else if (selectedPhotoIndex > i) selectedPhotoIndex--;
+          renderPhotoGrid();
+          updatePhotoUI();
+        });
+        item.appendChild(removeBtn);
+
+        const indexBadge = document.createElement('span');
+        indexBadge.className = 'photo-index';
+        indexBadge.textContent = i + 1;
+        item.appendChild(indexBadge);
+
+        item.addEventListener('click', () => {
+          if (selectedPhotoIndex === i) {
+            selectedPhotoIndex = -1; // deselect
+          } else {
+            selectedPhotoIndex = i;
+          }
+          renderPhotoGrid();
+          syncSliders();
+        });
+
+        photoGrid.appendChild(item);
+      });
+    }
+
+    function syncSliders() {
+      if (selectedPhotoIndex >= 0 && selectedPhotoIndex < photos.length) {
+        const p = photos[selectedPhotoIndex];
+        brightnessSlider.value = p.brightness;
+        saturationSlider.value = p.saturation;
+        brightnessVal.textContent = p.brightness;
+        saturationVal.textContent = p.saturation;
+      }
+    }
+
+    function updatePhotoUI() {
+      const hasPhotos = photos.length > 0;
+      sliderControls.style.display = hasPhotos ? '' : 'none';
+      downloadActions.style.display = hasPhotos ? '' : 'none';
+    }
+
+    brightnessSlider.addEventListener('input', () => {
+      const val = parseInt(brightnessSlider.value);
+      brightnessVal.textContent = val;
+      if (selectedPhotoIndex >= 0 && selectedPhotoIndex < photos.length) {
+        photos[selectedPhotoIndex].brightness = val;
+        processPhoto(photos[selectedPhotoIndex]);
+        renderPhotoGrid();
+      }
+    });
+
+    saturationSlider.addEventListener('input', () => {
+      const val = parseInt(saturationSlider.value);
+      saturationVal.textContent = val;
+      if (selectedPhotoIndex >= 0 && selectedPhotoIndex < photos.length) {
+        photos[selectedPhotoIndex].saturation = val;
+        processPhoto(photos[selectedPhotoIndex]);
+        renderPhotoGrid();
+      }
+    });
+
+    $('#applyAllBtn').addEventListener('click', () => {
+      const b = parseInt(brightnessSlider.value);
+      const s = parseInt(saturationSlider.value);
+      photos.forEach(p => {
+        p.brightness = b;
+        p.saturation = s;
+        processPhoto(p);
+      });
+      renderPhotoGrid();
+      showToast('全画像に適用しました');
+    });
+
+    // Download
+    function getPhotoBlob(photoData) {
+      return new Promise(resolve => {
+        // Re-process to get clean canvas with filter baked in
+        processPhoto(photoData);
+        photoData.canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.92);
+      });
+    }
+
+    $('#downloadZipBtn').addEventListener('click', async () => {
+      if (photos.length === 0) return;
+      const zip = new JSZip();
+      for (let i = 0; i < photos.length; i++) {
+        const blob = await getPhotoBlob(photos[i]);
+        zip.file(`photo_${i + 1}.jpg`, blob);
+      }
+      const content = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(content);
+      a.download = 'mercari_photos.zip';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('ZIPをダウンロードしました');
+    });
+
+    $('#downloadAllIndividual').addEventListener('click', async () => {
+      for (let i = 0; i < photos.length; i++) {
+        const blob = await getPhotoBlob(photos[i]);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `photo_${i + 1}.jpg`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+      showToast('ダウンロードしました');
+    });
+  </script>
+</body>
+</html>
