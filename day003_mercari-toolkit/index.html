@@ -408,7 +408,7 @@
     .mercari-link:hover { background: #c0392b; }
 
     /* ============================================================
-       Tab 2: Profit Calculator
+       Tab 2: Shipping & Profit
        ============================================================ */
     .toggle-row {
       display: flex;
@@ -530,9 +530,6 @@
       color: #555;
     }
 
-    /* ============================================================
-       Tab 3: Size Checker
-       ============================================================ */
     .size-inputs {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -545,32 +542,6 @@
       font-size: 0.75rem;
       color: #888;
       margin-bottom: 0.25rem;
-    }
-
-    .fit-list {
-      list-style: none;
-    }
-
-    .fit-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.6rem 0.75rem;
-      border-bottom: 1px solid #eee;
-      font-size: 0.85rem;
-    }
-
-    .fit-item.not-fit {
-      opacity: 0.4;
-    }
-
-    .fit-item .method-name {
-      font-weight: 500;
-    }
-
-    .fit-item .method-cost {
-      font-weight: 600;
-      color: #4a90d9;
     }
 
     .badge-recommend {
@@ -893,8 +864,7 @@
     <nav class="sidebar" id="sidebar">
       <ul class="sidebar-nav">
         <li><a href="#template" class="active" data-tab="template"><span class="tab-icon">&#128221;</span>テンプレート生成</a></li>
-        <li><a href="#profit" data-tab="profit"><span class="tab-icon">&#128176;</span>送料・利益計算</a></li>
-        <li><a href="#size" data-tab="size"><span class="tab-icon">&#128230;</span>サイズ判定</a></li>
+        <li><a href="#shipping" data-tab="shipping"><span class="tab-icon">&#128230;</span>送料・利益計算</a></li>
         <li><a href="#title" data-tab="title"><span class="tab-icon">&#128394;</span>タイトル文字数</a></li>
         <li><a href="#photo" data-tab="photo"><span class="tab-icon">&#128247;</span>写真トリミング</a></li>
       </ul>
@@ -1004,17 +974,42 @@
       </div>
 
       <!-- ============================================================
-           Tab 2: Profit Calculator
+           Tab 2: Shipping & Profit Calculator (統合)
            ============================================================ -->
-      <div class="tab-panel" id="panel-profit">
+      <div class="tab-panel" id="panel-shipping">
         <div class="card">
           <h3>送料・利益計算</h3>
-          <p style="font-size:0.8rem;color:#888;margin-bottom:1rem;">販売価格を入力すると、配送方法ごとの利益を自動計算します。</p>
+          <p style="font-size:0.8rem;color:#888;margin-bottom:1rem;">販売価格を入力すると利益を計算します。サイズ・重さを入力すると利用可能な配送方法に絞り込めます。</p>
 
           <div class="profit-input-row">
             <label>販売価格</label>
             <input type="number" id="profitPrice" placeholder="0" min="0" step="1">
             <span class="yen-suffix">円</span>
+          </div>
+
+          <div class="profit-input-row">
+            <label>梱包資材</label>
+            <input type="number" id="packagingCost" placeholder="0" min="0" step="1">
+            <span class="yen-suffix">円</span>
+          </div>
+
+          <div class="size-inputs" style="margin-bottom:0.75rem;">
+            <div class="size-input-group">
+              <label>縦 (cm)</label>
+              <input type="number" id="sizeH" placeholder="-" min="0" step="0.1">
+            </div>
+            <div class="size-input-group">
+              <label>横 (cm)</label>
+              <input type="number" id="sizeW" placeholder="-" min="0" step="0.1">
+            </div>
+            <div class="size-input-group">
+              <label>厚さ (cm)</label>
+              <input type="number" id="sizeD" placeholder="-" min="0" step="0.1">
+            </div>
+            <div class="size-input-group">
+              <label>重さ (g)</label>
+              <input type="number" id="sizeWeight" placeholder="-" min="0" step="1">
+            </div>
           </div>
 
           <div class="toggle-row">
@@ -1025,50 +1020,15 @@
             <span class="toggle-label">匿名配送のみ表示</span>
           </div>
 
-          <div style="overflow-x:auto;">
-            <table class="shipping-table" id="profitTable">
-              <thead>
-                <tr>
-                  <th>配送方法</th>
-                  <th>送料</th>
-                  <th>手数料(10%)</th>
-                  <th>利益</th>
-                </tr>
-              </thead>
-              <tbody id="profitTableBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============================================================
-           Tab 3: Size Checker
-           ============================================================ -->
-      <div class="tab-panel" id="panel-size">
-        <div class="card">
-          <h3>サイズ判定</h3>
-          <p style="font-size:0.8rem;color:#888;margin-bottom:1rem;">荷物のサイズと重さを入力すると、利用できる配送方法を判定します。</p>
-
-          <div class="size-inputs">
-            <div class="size-input-group">
-              <label>縦 (cm)</label>
-              <input type="number" id="sizeH" placeholder="0" min="0" step="0.1">
-            </div>
-            <div class="size-input-group">
-              <label>横 (cm)</label>
-              <input type="number" id="sizeW" placeholder="0" min="0" step="0.1">
-            </div>
-            <div class="size-input-group">
-              <label>高さ (cm)</label>
-              <input type="number" id="sizeD" placeholder="0" min="0" step="0.1">
-            </div>
-            <div class="size-input-group">
-              <label>重さ (g)</label>
-              <input type="number" id="sizeWeight" placeholder="0" min="0" step="1">
-            </div>
+          <div class="toggle-row">
+            <label class="toggle-switch">
+              <input type="checkbox" id="promoToggle">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">プロモーション利用（販売価格の5%）</span>
           </div>
 
-          <div id="sizeResults"></div>
+          <div id="shippingResults"></div>
         </div>
       </div>
 
@@ -1205,7 +1165,11 @@
       { name: 'ゆうパケット', cost: 230, anonymous: true, group: 'ゆうゆうメルカリ便',
         maxSize: { w: 34, h: 25, d: 3, sum: null }, maxWeight: 1000 },
       { name: 'ゆうパケットポスト', cost: 215, anonymous: true, group: 'ゆうゆうメルカリ便',
-        maxSize: { w: 32.7, h: 22.8, d: 3, sum: null }, maxWeight: 2000 },
+        maxSize: { w: 32.7, h: 22.8, d: 4, sum: null }, maxWeight: 2000,
+        note: '※厚さは4cmまでで判定していますがポストにより異なります' },
+      { name: 'ゆうパケットポストミニ', cost: 160, anonymous: true, group: 'ゆうゆうメルカリ便',
+        maxSize: { w: 21.6, h: 17, d: 4, sum: null }, maxWeight: 2000,
+        note: '※厚さは4cmまでで判定していますがポストにより異なります' },
       { name: 'ゆうパケットプラス', cost: 455, anonymous: true, group: 'ゆうゆうメルカリ便',
         maxSize: { w: 24, h: 17, d: 7, sum: null }, maxWeight: 2000 },
       { name: 'ゆうパック 60サイズ', cost: 770, anonymous: true, group: 'ゆうゆうメルカリ便',
@@ -1463,209 +1427,186 @@
     }
 
     // ============================================================
-    // Tab 2: Profit Calculator
+    // Tab 2: Shipping & Profit (統合)
     // ============================================================
     const profitPrice = $('#profitPrice');
     const anonymousToggle = $('#anonymousToggle');
-    const profitTableBody = $('#profitTableBody');
-
-    // Deduplicate shipping methods for profit table (use cheapest per group/size category)
-    function getProfitMethods() {
-      const seen = new Set();
-      return SHIPPING_METHODS.filter(m => {
-        // For profit table, show one entry per distinct name-group combination
-        // but merge weight variants of 普通郵便 - only show cheapest weight tier
-        if (m.group === '普通郵便') {
-          // Group by base name (without weight)
-          const baseName = m.name.replace(/\s*\d+g$/, '').replace(/\s*\d+kg$/, '');
-          const key = `${m.group}-${baseName}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        }
-        return true;
-      });
-    }
-
-    let profitDebounceTimer = null;
-
-    function renderProfitTable() {
-      const price = parseInt(profitPrice.value) || 0;
-      const fee = Math.floor(price * 0.1);
-      const onlyAnonymous = anonymousToggle.checked;
-
-      let methods = SHIPPING_METHODS;
-      // For profit table, one row per unique method name
-      const uniqueMethods = [];
-      const seenNames = new Set();
-      for (const m of methods) {
-        if (!seenNames.has(m.name)) {
-          seenNames.add(m.name);
-          uniqueMethods.push(m);
-        }
-      }
-      methods = uniqueMethods;
-
-      if (onlyAnonymous) {
-        methods = methods.filter(m => m.anonymous);
-      }
-
-      // Find best profit
-      let bestProfit = -Infinity;
-      if (price > 0) {
-        methods.forEach(m => {
-          const profit = price - fee - m.cost;
-          if (profit > bestProfit) bestProfit = profit;
-        });
-      }
-
-      let html = '';
-      let currentGroup = '';
-      methods.forEach(m => {
-        if (m.group !== currentGroup) {
-          currentGroup = m.group;
-          const anon = m.anonymous ? '（匿名）' : '（非匿名）';
-          html += `<tr class="group-header"><td colspan="4">${currentGroup} ${anon}</td></tr>`;
-        }
-        const profit = price > 0 ? price - fee - m.cost : 0;
-        const isBest = price > 0 && profit === bestProfit && profit > 0;
-        const profitClass = profit < 0 ? 'negative' : (profit > 0 ? 'positive' : '');
-        const rowClass = isBest ? 'best-profit' : '';
-        html += `<tr class="${rowClass}">`;
-        html += `<td>${m.name}</td>`;
-        html += `<td>${m.cost.toLocaleString()}円</td>`;
-        html += `<td>${price > 0 ? fee.toLocaleString() + '円' : '-'}</td>`;
-        html += `<td class="${profitClass}">${price > 0 ? profit.toLocaleString() + '円' : '-'}</td>`;
-        html += `</tr>`;
-      });
-
-      profitTableBody.innerHTML = html;
-    }
-
-    profitPrice.addEventListener('input', () => {
-      clearTimeout(profitDebounceTimer);
-      profitDebounceTimer = setTimeout(renderProfitTable, 200);
-    });
-
-    anonymousToggle.addEventListener('change', renderProfitTable);
-    renderProfitTable();
-
-    // ============================================================
-    // Tab 3: Size Checker
-    // ============================================================
-    const sizeResults = $('#sizeResults');
+    const shippingResults = $('#shippingResults');
 
     function checkSizeFit(h, w, d, weight, method) {
       const ms = method.maxSize;
-      // Sort dimensions: for box-type checks, assign to w/h/d by descending size
       const dims = [h, w, d].sort((a, b) => b - a);
       const longest = dims[0];
       const mid = dims[1];
       const shortest = dims[2];
       const sum = h + w + d;
 
-      // Sum-based (宅急便/ゆうパック sizes)
       if (ms.sum !== null) {
         if (sum > ms.sum) return false;
-        // Some sum-based also have a longest side limit
         if (ms.w !== null && longest > ms.w) return false;
-        if (method.maxWeight !== null && weight > method.maxWeight) return false;
+        if (method.maxWeight !== null && weight > 0 && weight > method.maxWeight) return false;
         return true;
       }
 
-      // Dimension-based
       if (ms.w !== null && longest > ms.w) return false;
       if (ms.h !== null && mid > ms.h) return false;
       if (ms.d !== null && shortest > ms.d) return false;
-      if (method.maxWeight !== null && weight > method.maxWeight) return false;
+      if (method.maxWeight !== null && weight > 0 && weight > method.maxWeight) return false;
       return true;
     }
 
-    function renderSizeResults() {
+    let shippingDebounceTimer = null;
+
+    function renderShippingResults() {
+      const price = parseInt(profitPrice.value) || 0;
+      const fee = Math.floor(price * 0.1);
+      const promo = $('#promoToggle').checked ? Math.floor(price * 0.05) : 0;
+      const packaging = parseInt($('#packagingCost').value) || 0;
+      const onlyAnonymous = anonymousToggle.checked;
+
       const h = parseFloat($('#sizeH').value) || 0;
       const w = parseFloat($('#sizeW').value) || 0;
       const d = parseFloat($('#sizeD').value) || 0;
       const weight = parseFloat($('#sizeWeight').value) || 0;
+      const hasSize = h > 0 || w > 0 || d > 0 || weight > 0;
 
-      if (h === 0 && w === 0 && d === 0 && weight === 0) {
-        sizeResults.innerHTML = '<p style="color:#888;font-size:0.85rem;">サイズと重さを入力してください。</p>';
-        return;
+      // Deduplicate
+      let methods = [];
+      const seenNames = new Set();
+      for (const m of SHIPPING_METHODS) {
+        if (!seenNames.has(m.name)) {
+          seenNames.add(m.name);
+          methods.push(m);
+        }
       }
 
-      // Deduplicate for size checking: for 普通郵便 weight-based variants, only show matching ones
-      const fitMethods = [];
-      const notFitMethods = [];
+      if (onlyAnonymous) {
+        methods = methods.filter(m => m.anonymous);
+      }
 
-      // Track seen for dedup
-      const processed = new Set();
+      // Split fit / not-fit
+      let fitMethods, notFitMethods;
+      if (hasSize) {
+        fitMethods = [];
+        notFitMethods = [];
+        methods.forEach(m => {
+          if (checkSizeFit(h, w, d, weight, m)) {
+            fitMethods.push(m);
+          } else {
+            notFitMethods.push(m);
+          }
+        });
+      } else {
+        fitMethods = methods;
+        notFitMethods = [];
+      }
 
-      SHIPPING_METHODS.forEach(m => {
-        const key = m.name;
-        if (processed.has(key)) return;
-        processed.add(key);
-
-        if (checkSizeFit(h, w, d, weight, m)) {
-          fitMethods.push(m);
-        } else {
-          notFitMethods.push(m);
-        }
-      });
-
-      // Sort by cost
+      // Sort fit methods by cost
       fitMethods.sort((a, b) => a.cost - b.cost);
       notFitMethods.sort((a, b) => a.cost - b.cost);
 
-      // Find cheapest anonymous
-      const cheapestAnonymous = fitMethods.find(m => m.anonymous);
-
-      let html = '';
-      if (fitMethods.length === 0) {
-        html = '<p style="color:#e74c3c;font-size:0.85rem;">該当する配送方法が見つかりません。サイズを確認してください。</p>';
-      } else {
-        html += '<ul class="fit-list">';
+      // Find best profit & cheapest anonymous
+      let bestProfit = -Infinity;
+      if (price > 0) {
         fitMethods.forEach(m => {
-          const isRecommend = m === cheapestAnonymous;
-          html += `<li class="fit-item">`;
-          html += `<span class="method-name">${m.name}`;
-          if (m.anonymous) html += `<span class="badge-anonymous">匿名</span>`;
-          if (isRecommend) html += `<span class="badge-recommend">オススメ</span>`;
-          html += `</span>`;
-          html += `<span class="method-cost">${m.cost.toLocaleString()}円</span>`;
-          html += `</li>`;
+          const profit = price - fee - promo - m.cost - packaging;
+          if (profit > bestProfit) bestProfit = profit;
         });
-        html += '</ul>';
+      }
+      const cheapestAnonymous = hasSize ? fitMethods.find(m => m.anonymous) : null;
+
+      // Render table
+      let html = '';
+      if (hasSize && fitMethods.length === 0) {
+        html += '<p style="color:#e74c3c;font-size:0.85rem;margin-bottom:0.75rem;">該当する配送方法が見つかりません。サイズを確認してください。</p>';
       }
 
+      if (fitMethods.length > 0) {
+        html += '<div style="overflow-x:auto;">';
+        html += '<table class="shipping-table"><thead><tr>';
+        html += '<th>配送方法</th><th>送料</th>';
+        if (price > 0) {
+          html += '<th>手数料(10%)</th>';
+          if (promo > 0) html += '<th>プロモ(5%)</th>';
+          html += '<th>利益</th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        const cols = 2 + (price > 0 ? 2 + (promo > 0 ? 1 : 0) : 0);
+        let currentGroup = '';
+        fitMethods.forEach(m => {
+          if (m.group !== currentGroup) {
+            currentGroup = m.group;
+            const anon = m.anonymous ? '（匿名）' : '（非匿名）';
+            html += `<tr class="group-header"><td colspan="${cols}">${currentGroup} ${anon}</td></tr>`;
+          }
+          const profit = price > 0 ? price - fee - promo - m.cost - packaging : 0;
+          const isBest = price > 0 && profit === bestProfit && profit > 0;
+          const profitClass = profit < 0 ? 'negative' : (profit > 0 ? 'positive' : '');
+          const rowClass = isBest ? 'best-profit' : '';
+          const isRecommend = hasSize && m === cheapestAnonymous;
+
+          html += `<tr class="${rowClass}">`;
+          html += `<td>${m.name}`;
+          if (isRecommend) html += ` <span class="badge-recommend">オススメ</span>`;
+          if (m.note) html += `<br><span style="font-size:0.7rem;color:#999;">${m.note}</span>`;
+          html += `</td>`;
+          html += `<td>${m.cost.toLocaleString()}円</td>`;
+          if (price > 0) {
+            html += `<td>${fee.toLocaleString()}円</td>`;
+            if (promo > 0) html += `<td>${promo.toLocaleString()}円</td>`;
+            html += `<td class="${profitClass}">${profit.toLocaleString()}円</td>`;
+          }
+          html += `</tr>`;
+        });
+        html += '</tbody></table></div>';
+      }
+
+      // Not-fit section
       if (notFitMethods.length > 0) {
         html += '<div class="not-fit-section">';
-        html += `<button class="not-fit-toggle" id="notFitToggle">&#9660; 利用不可の配送方法（${notFitMethods.length}件）</button>`;
-        html += '<ul class="fit-list not-fit-list" id="notFitList">';
+        html += `<button class="not-fit-toggle" id="notFitToggle">&#9660; サイズ外の配送方法（${notFitMethods.length}件）</button>`;
+        html += '<div class="not-fit-list" id="notFitList" style="overflow-x:auto;">';
+        html += '<table class="shipping-table"><tbody>';
         notFitMethods.forEach(m => {
-          html += `<li class="fit-item not-fit">`;
-          html += `<span class="method-name">${m.name}</span>`;
-          html += `<span class="method-cost">${m.cost.toLocaleString()}円</span>`;
-          html += `</li>`;
+          html += `<tr style="opacity:0.4;"><td>${m.name}</td><td>${m.cost.toLocaleString()}円</td>`;
+          if (price > 0) {
+            const profit = price - fee - promo - m.cost - packaging;
+            html += `<td>${fee.toLocaleString()}円</td>`;
+            if (promo > 0) html += `<td>${promo.toLocaleString()}円</td>`;
+            html += `<td>${profit.toLocaleString()}円</td>`;
+          }
+          html += `</tr>`;
         });
-        html += '</ul></div>';
+        html += '</tbody></table></div></div>';
       }
 
-      sizeResults.innerHTML = html;
+      shippingResults.innerHTML = html;
 
-      // Attach toggle
+      // Toggle listener
       const toggleBtn = $('#notFitToggle');
       if (toggleBtn) {
         toggleBtn.addEventListener('click', () => {
           const list = $('#notFitList');
           const isVisible = list.classList.toggle('visible');
-          toggleBtn.innerHTML = (isVisible ? '&#9650;' : '&#9660;') + ` 利用不可の配送方法（${notFitMethods.length}件）`;
+          toggleBtn.innerHTML = (isVisible ? '&#9650;' : '&#9660;') + ` サイズ外の配送方法（${notFitMethods.length}件）`;
         });
       }
     }
 
+    function onShippingInput() {
+      clearTimeout(shippingDebounceTimer);
+      shippingDebounceTimer = setTimeout(renderShippingResults, 200);
+    }
+
+    profitPrice.addEventListener('input', onShippingInput);
+    $('#packagingCost').addEventListener('input', onShippingInput);
     ['sizeH', 'sizeW', 'sizeD', 'sizeWeight'].forEach(id => {
-      $(`#${id}`).addEventListener('input', renderSizeResults);
+      $(`#${id}`).addEventListener('input', onShippingInput);
     });
-    renderSizeResults();
+    anonymousToggle.addEventListener('change', renderShippingResults);
+    $('#promoToggle').addEventListener('change', renderShippingResults);
+    renderShippingResults();
 
     // ============================================================
     // Tab 4: Title Checker
