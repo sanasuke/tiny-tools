@@ -12,6 +12,8 @@
 | --- | --- | --- |
 | [001](https://tiny-tools-sanasuke.netlify.app/day001_char-counter/) | 文字数カウンター | リアルタイムでテキストの文字数（スペース込み/除外）・行数・単語数・バイト数をカウント |
 | [002](https://tiny-tools-sanasuke.netlify.app/day002_multi-persona-review/) | マルチペルソナレビュー | AIが複数の視点からテキストをレビュー（Gemini API使用） |
+| [003](https://tiny-tools-sanasuke.netlify.app/day003_mercari-toolkit/) | メルカリツールキット | テンプレ生成・送料計算・サイズ判定・タイトルチェック・写真加工 |
+| [004](https://tiny-tools-sanasuke.netlify.app/day004_color-palette/) | カラーパレット生成 | 補色・類似色・モノクロなど5種のパレットを生成・エクスポート |
 
 ## 使い方
 
@@ -33,8 +35,15 @@ tiny-tools/
 │   └── index.html                    # 文字数カウンター
 ├── day002_multi-persona-review/
 │   └── index.html                    # マルチペルソナレビュー
+├── day003_mercari-toolkit/
+│   ├── index.html                    # メルカリツールキット
+│   ├── style.css
+│   └── js/
+├── day004_color-palette/
+│   └── index.html                    # カラーパレット生成
 ├── shared/
 │   └── header.js                     # 共通ヘッダー
+├── .gitignore
 ├── LICENSE
 └── README.md
 ```
