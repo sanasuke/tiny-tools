@@ -503,6 +503,7 @@
     });
 
     searchInput.addEventListener('keydown', function (e) {
+      if (e.isComposing || e.keyCode === 229) return;
       var items = searchResults.querySelectorAll('.tt-search-result');
       if (e.key === 'ArrowDown') {
         e.preventDefault();
