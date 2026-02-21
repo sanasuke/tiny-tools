@@ -13,6 +13,14 @@
 
   const toolName = isTop ? null : document.title.split(' | ')[0].trim();
 
+  /* ---------- tools data ---------- */
+  var TOOLS = [
+    { day: 1, name: '文字数カウンター', desc: '文字数・行数・単語数・バイト数を計測', path: 'day001_char-counter' },
+    { day: 2, name: 'マルチペルソナレビュー', desc: '複数の視点からテキストをAIレビュー', path: 'day002_multi-persona-review' },
+    { day: 3, name: 'メルカリツールキット', desc: 'テンプレ生成・送料計算・サイズ判定・タイトルチェック・写真加工', path: 'day003_mercari-toolkit' },
+    { day: 4, name: 'カラーパレット生成', desc: '補色・類似色・モノクロなど5種のパレットを生成・エクスポート', path: 'day004_color-palette' }
+  ];
+
   /* ---------- dark mode persistence ---------- */
   var DARK_KEY = 'tt-dark-mode';
   function isDarkStored() {
@@ -50,7 +58,28 @@
       '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
     hamburger: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
+    search: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+    close: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
   };
+
+  /* ---------- helpers ---------- */
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function highlightMatch(text, query) {
+    if (!query) return escapeHtml(text);
+    var lower = text.toLowerCase();
+    var lowerQ = query.toLowerCase();
+    var idx = lower.indexOf(lowerQ);
+    if (idx === -1) return escapeHtml(text);
+    var before = text.substring(0, idx);
+    var match  = text.substring(idx, idx + query.length);
+    var after  = text.substring(idx + query.length);
+    return escapeHtml(before) + '<span class="tt-search-highlight">' + escapeHtml(match) + '</span>' + escapeHtml(after);
+  }
 
   /* ---------- inject ---------- */
   function injectHeader() {
@@ -62,7 +91,7 @@
         'background:var(--tt-bg,#fff);border-bottom:1px solid var(--tt-border,#e0e0e0);' +
         'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP",sans-serif;' +
         'transition:background .2s,border-color .2s}' +
-      '#tt-header-inner{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;gap:.5rem}' +
+      '#tt-header-inner{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;gap:.5rem;position:relative}' +
       '#tt-header-left,#tt-header-right{width:120px;flex-shrink:0}' +
       '#tt-header-right{text-align:right;position:relative}' +
       '#tt-header-center{flex:1;text-align:center}' +
@@ -85,6 +114,41 @@
         'width:40px;height:40px;border:none;background:transparent;cursor:pointer;border-radius:8px;' +
         'color:var(--tt-text,#222);transition:background .15s;padding:0}' +
       '#tt-menu-btn:hover{background:var(--tt-hover,#f0f0f0)}' +
+
+      /* search button */
+      '#tt-search-btn{display:inline-flex;align-items:center;justify-content:center;' +
+        'width:40px;height:40px;border:none;background:transparent;cursor:pointer;border-radius:8px;' +
+        'color:var(--tt-text,#222);transition:background .15s;padding:0}' +
+      '#tt-search-btn:hover{background:var(--tt-hover,#f0f0f0)}' +
+
+      /* search bar overlay */
+      '#tt-search-bar{display:none;position:absolute;inset:0;z-index:10;' +
+        'background:var(--tt-bg,#fff);align-items:center;gap:.5rem;padding:.6rem 1rem}' +
+      '#tt-search-bar.tt-open{display:flex}' +
+      '#tt-search-input{flex:1;height:36px;padding:0 12px;border:1px solid var(--tt-border,#e0e0e0);' +
+        'border-radius:8px;font-size:.95rem;outline:none;background:var(--tt-bg,#fff);color:var(--tt-text,#222);' +
+        'font-family:inherit;transition:border-color .15s}' +
+      '#tt-search-input:focus{border-color:#4a90d9}' +
+      '#tt-search-close{display:inline-flex;align-items:center;justify-content:center;' +
+        'width:36px;height:36px;border:none;background:transparent;cursor:pointer;border-radius:8px;' +
+        'color:var(--tt-text,#222);transition:background .15s;padding:0;flex-shrink:0}' +
+      '#tt-search-close:hover{background:var(--tt-hover,#f0f0f0)}' +
+
+      /* search results dropdown */
+      '#tt-search-results{display:none;position:absolute;left:1rem;right:1rem;top:100%;' +
+        'background:var(--tt-bg,#fff);border:1px solid var(--tt-border,#e0e0e0);' +
+        'border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:6px 0;z-index:11;' +
+        'max-height:320px;overflow-y:auto}' +
+      '#tt-search-results.tt-open{display:block}' +
+      '.tt-search-result{display:block;width:100%;padding:10px 16px;' +
+        'border:none;background:none;cursor:pointer;text-decoration:none;color:inherit;' +
+        'text-align:left;box-sizing:border-box;transition:background .12s;font-family:inherit}' +
+      '.tt-search-result:hover,.tt-search-result.tt-active{background:var(--tt-hover,#f5f5f5)}' +
+      '.tt-search-result-name{font-size:.9rem;font-weight:600;color:var(--tt-text,#333)}' +
+      '.tt-search-result-desc{font-size:.78rem;color:var(--tt-sub,#888);margin-top:2px}' +
+      '.tt-search-result-day{font-size:.7rem;color:var(--tt-sub,#aaa);margin-top:2px}' +
+      '.tt-search-highlight{background:#fef08a;color:inherit;border-radius:2px;padding:0 1px}' +
+      '.tt-search-empty{padding:12px 16px;font-size:.85rem;color:var(--tt-sub,#888);text-align:center}' +
 
       /* overlay */
       '#tt-overlay{display:none;position:fixed;inset:0;z-index:999}' +
@@ -119,19 +183,26 @@
       'body.tt-dark *:not(#tt-header):not(#tt-header *){color:inherit}' +
       'body.tt-dark input,body.tt-dark textarea,body.tt-dark select{' +
         'background:#252545!important;color:#e0e0e0!important;border-color:#3a3a5a!important}' +
-      'body.tt-dark button:not(#tt-menu-btn):not(.tt-menu-item){' +
+      'body.tt-dark button:not(#tt-menu-btn):not(#tt-search-btn):not(#tt-search-close):not(.tt-menu-item):not(.tt-search-result){' +
         'background:#252545!important;color:#e0e0e0!important;border-color:#3a3a5a!important}' +
       'body.tt-dark .container,body.tt-dark .card,body.tt-dark [class*="card"],body.tt-dark [class*="panel"],' +
         'body.tt-dark [class*="box"],body.tt-dark [class*="wrapper"]{' +
         'background:#20203a!important;border-color:#2a2a4a!important}' +
-      'body.tt-dark a:not(.tt-menu-item):not(#tt-back-btn):not(#tt-header-title):not(#tt-breadcrumb a){color:#6ab0f3!important}' +
+      'body.tt-dark a:not(.tt-menu-item):not(#tt-back-btn):not(#tt-header-title):not(#tt-breadcrumb a):not(.tt-search-result){color:#6ab0f3!important}' +
       'body.tt-dark h1,body.tt-dark h2,body.tt-dark h3,body.tt-dark h4{color:#f0f0f0!important}' +
       'body.tt-dark hr{border-color:#2a2a4a!important}' +
       'body.tt-dark table,body.tt-dark th,body.tt-dark td{border-color:#2a2a4a!important}' +
       'body.tt-dark th{background:#252545!important}' +
       'body.tt-dark ::placeholder{color:#666!important}' +
+      'body.tt-dark .tt-search-highlight{background:#854d0e;color:#fef08a}' +
       /* note icon in dark mode */
-      'body.tt-dark .tt-menu-item img{filter:invert(1)}';
+      'body.tt-dark .tt-menu-item img{filter:invert(1)}' +
+
+      /* responsive: mobile search */
+      '@media(max-width:480px){' +
+        '#tt-search-bar{padding:.4rem .5rem}' +
+        '#tt-search-results{left:.5rem;right:.5rem}' +
+      '}';
 
     document.head.appendChild(style);
 
@@ -165,9 +236,16 @@
     title.textContent = SITE_NAME;
     center.appendChild(title);
 
-    /* right — hamburger menu */
+    /* right — search button + hamburger menu */
     var right = document.createElement('div');
     right.id = 'tt-header-right';
+
+    var searchBtn = document.createElement('button');
+    searchBtn.id = 'tt-search-btn';
+    searchBtn.type = 'button';
+    searchBtn.setAttribute('aria-label', 'ツールを検索');
+    searchBtn.innerHTML = ICON.search;
+    right.appendChild(searchBtn);
 
     var menuBtn = document.createElement('button');
     menuBtn.id = 'tt-menu-btn';
@@ -254,33 +332,226 @@
 
     right.appendChild(dropdown);
 
+    /* search bar (overlay inside header-inner) */
+    var searchBar = document.createElement('div');
+    searchBar.id = 'tt-search-bar';
+
+    var searchInput = document.createElement('input');
+    searchInput.id = 'tt-search-input';
+    searchInput.type = 'text';
+    searchInput.placeholder = 'ツールを検索… (Ctrl+K)';
+    searchInput.setAttribute('autocomplete', 'off');
+    searchBar.appendChild(searchInput);
+
+    var searchClose = document.createElement('button');
+    searchClose.id = 'tt-search-close';
+    searchClose.type = 'button';
+    searchClose.setAttribute('aria-label', '検索を閉じる');
+    searchClose.innerHTML = ICON.close;
+    searchBar.appendChild(searchClose);
+
+    var searchResults = document.createElement('div');
+    searchResults.id = 'tt-search-results';
+
     /* overlay for closing */
     var overlay = document.createElement('div');
     overlay.id = 'tt-overlay';
-    overlay.addEventListener('click', closeMenu);
+    overlay.addEventListener('click', function () {
+      closeMenu();
+      closeSearch();
+    });
 
     /* menu open / close */
-    var isOpen = false;
+    var isMenuOpen = false;
     function openMenu() {
-      isOpen = true;
+      closeSearch();
+      isMenuOpen = true;
       dropdown.classList.add('tt-open');
       overlay.classList.add('tt-open');
       menuBtn.setAttribute('aria-expanded', 'true');
     }
     function closeMenu() {
-      isOpen = false;
+      isMenuOpen = false;
       dropdown.classList.remove('tt-open');
       overlay.classList.remove('tt-open');
       menuBtn.setAttribute('aria-expanded', 'false');
     }
     menuBtn.addEventListener('click', function (e) {
       e.stopPropagation();
-      if (isOpen) closeMenu(); else openMenu();
+      if (isMenuOpen) closeMenu(); else openMenu();
     });
 
+    /* ---------- search logic ---------- */
+    var isSearchOpen = false;
+    var activeIndex = -1;
+
+    function openSearch() {
+      closeMenu();
+      isSearchOpen = true;
+      searchBar.classList.add('tt-open');
+      overlay.classList.add('tt-open');
+      searchInput.value = '';
+      searchResults.classList.remove('tt-open');
+      searchResults.innerHTML = '';
+      activeIndex = -1;
+      searchInput.focus();
+    }
+
+    function closeSearch() {
+      if (!isSearchOpen) return;
+      isSearchOpen = false;
+      searchBar.classList.remove('tt-open');
+      searchResults.classList.remove('tt-open');
+      searchResults.innerHTML = '';
+      searchInput.value = '';
+      activeIndex = -1;
+      if (!isMenuOpen) {
+        overlay.classList.remove('tt-open');
+      }
+      if (isTop) resetCardFilter();
+    }
+
+    function performSearch(query) {
+      query = query.trim();
+      if (!query) {
+        searchResults.classList.remove('tt-open');
+        searchResults.innerHTML = '';
+        activeIndex = -1;
+        if (isTop) resetCardFilter();
+        return;
+      }
+
+      var lower = query.toLowerCase();
+      var matches = TOOLS.filter(function (t) {
+        return t.name.toLowerCase().indexOf(lower) !== -1 ||
+               t.desc.toLowerCase().indexOf(lower) !== -1 ||
+               ('day ' + t.day).indexOf(lower) !== -1 ||
+               ('day' + t.day).indexOf(lower) !== -1 ||
+               String(t.day) === lower;
+      });
+
+      if (matches.length === 0) {
+        searchResults.innerHTML = '<div class="tt-search-empty">見つかりませんでした</div>';
+        searchResults.classList.add('tt-open');
+        activeIndex = -1;
+        if (isTop) filterCards([]);
+        return;
+      }
+
+      searchResults.innerHTML = '';
+      matches.forEach(function (t) {
+        var a = document.createElement('a');
+        a.className = 'tt-search-result';
+        a.href = (isTop ? './' : '../') + t.path + '/';
+        a.innerHTML =
+          '<div class="tt-search-result-name">' + highlightMatch(t.name, query) + '</div>' +
+          '<div class="tt-search-result-desc">' + highlightMatch(t.desc, query) + '</div>' +
+          '<div class="tt-search-result-day">Day ' + t.day + '</div>';
+        searchResults.appendChild(a);
+      });
+
+      searchResults.classList.add('tt-open');
+      activeIndex = -1;
+
+      if (isTop) {
+        var matchedPaths = matches.map(function (t) { return t.path; });
+        filterCards(matchedPaths);
+      }
+    }
+
+    function filterCards(matchedPaths) {
+      var cards = document.querySelectorAll('.tool-card');
+      cards.forEach(function (card) {
+        var href = card.getAttribute('href') || '';
+        var visible = matchedPaths.some(function (p) {
+          return href.indexOf(p) !== -1;
+        });
+        card.style.display = visible ? '' : 'none';
+      });
+    }
+
+    function resetCardFilter() {
+      var cards = document.querySelectorAll('.tool-card');
+      cards.forEach(function (card) {
+        card.style.display = '';
+      });
+    }
+
+    function updateActiveResult() {
+      var items = searchResults.querySelectorAll('.tt-search-result');
+      items.forEach(function (el, i) {
+        el.classList.toggle('tt-active', i === activeIndex);
+      });
+      if (activeIndex >= 0 && items[activeIndex]) {
+        items[activeIndex].scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    /* search event listeners */
+    searchBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (isSearchOpen) closeSearch(); else openSearch();
+    });
+
+    searchClose.addEventListener('click', function (e) {
+      e.stopPropagation();
+      closeSearch();
+    });
+
+    searchInput.addEventListener('input', function () {
+      performSearch(searchInput.value);
+    });
+
+    searchInput.addEventListener('keydown', function (e) {
+      if (e.isComposing || e.keyCode === 229) return;
+      var items = searchResults.querySelectorAll('.tt-search-result');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (items.length > 0) {
+          activeIndex = (activeIndex + 1) % items.length;
+          updateActiveResult();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (items.length > 0) {
+          activeIndex = (activeIndex - 1 + items.length) % items.length;
+          updateActiveResult();
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (activeIndex >= 0 && items[activeIndex]) {
+          items[activeIndex].click();
+        } else if (items.length === 1) {
+          items[0].click();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSearch();
+      }
+    });
+
+    /* global keyboard shortcuts */
+    document.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        if (isSearchOpen) closeSearch(); else openSearch();
+        return;
+      }
+      if (e.key === '/' && !isSearchOpen) {
+        var tag = (e.target.tagName || '').toLowerCase();
+        if (tag !== 'input' && tag !== 'textarea' && tag !== 'select' && !e.target.isContentEditable) {
+          e.preventDefault();
+          openSearch();
+        }
+      }
+    });
+
+    /* assemble DOM */
     inner.appendChild(left);
     inner.appendChild(center);
     inner.appendChild(right);
+    inner.appendChild(searchBar);
+    inner.appendChild(searchResults);
     header.appendChild(inner);
 
     /* breadcrumb */
