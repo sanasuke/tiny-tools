@@ -10,14 +10,14 @@
 
 | Day | ツール名 | 説明 |
 | --- | --- | --- |
-| [001](https://tiny-tools-sanasuke.netlify.app/day001_char-counter/) | 文字数カウンター | リアルタイムでテキストの文字数（スペース込み/除外）・行数・単語数・バイト数をカウント |
-| [002](https://tiny-tools-sanasuke.netlify.app/day002_multi-persona-review/) | マルチペルソナレビュー | AIが複数の視点からテキストをレビュー（Gemini API使用） |
-| [003](https://tiny-tools-sanasuke.netlify.app/day003_mercari-toolkit/) | メルカリツールキット | テンプレ生成・送料計算・サイズ判定・タイトルチェック・写真加工 |
-| [004](https://tiny-tools-sanasuke.netlify.app/day004_color-palette/) | カラーパレット生成 | 補色・類似色・モノクロなど5種のパレットを生成・エクスポート |
+| [001](https://tiny-tools-cjj.pages.dev/day001_char-counter/) | 文字数カウンター | リアルタイムでテキストの文字数（スペース込み/除外）・行数・単語数・バイト数をカウント |
+| [002](https://tiny-tools-cjj.pages.dev/day002_multi-persona-review/) | マルチペルソナレビュー | AIが複数の視点からテキストをレビュー（Gemini API使用） |
+| [003](https://tiny-tools-cjj.pages.dev/day003_mercari-toolkit/) | メルカリツールキット | テンプレ生成・送料計算・サイズ判定・タイトルチェック・写真加工 |
+| [004](https://tiny-tools-cjj.pages.dev/day004_color-palette/) | カラーパレット生成 | 補色・類似色・モノクロなど5種のパレットを生成・エクスポート |
 
 ## 使い方
 
-公開サイトからすぐに使えます: **https://tiny-tools-sanasuke.netlify.app/**
+公開サイトからすぐに使えます: **https://tiny-tools-cjj.pages.dev/**
 
 ローカルで動かす場合は、リポジトリをクローンしてブラウザで開くだけです。
 
