@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>音楽統計ダッシュボード | tiny-tools Day 5</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+      padding: 0 1rem;
+      margin-top: 1.5rem;
+      padding-bottom: 2rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Upload ── */
+
+    .drop-zone {
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .drop-zone:hover {
+      border-color: #4a90d9;
+    }
+
+    .drop-zone.dragover {
+      border-color: #4a90d9;
+      background: #f0f6ff;
+    }
+
+    .drop-zone-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      line-height: 1;
+    }
+
+    .drop-zone-text {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 0.3rem;
+    }
+
+    .drop-zone-sub {
+      font-size: 0.78rem;
+      color: #999;
+    }
+
+    .drop-zone input[type="file"] {
+      display: none;
+    }
+
+    .upload-hint {
+      font-size: 0.78rem;
+      color: #999;
+      text-align: center;
+      margin-top: 0.75rem;
+      line-height: 1.7;
+    }
+
+    .upload-hint a {
+      color: #4a90d9;
+      text-decoration: none;
+    }
+
+    .upload-hint a:hover {
+      text-decoration: underline;
+    }
+
+    .file-list {
+      margin-top: 0.75rem;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      font-size: 0.8rem;
+      color: #555;
+    }
+
+    .file-item-icon {
+      color: #4a90d9;
+      flex-shrink: 0;
+    }
+
+    .file-item-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-item-count {
+      color: #888;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: #4a90d9;
+      color: #fff;
+      width: 100%;
+      margin-top: 0.75rem;
+      padding: 0.7rem;
+      font-size: 0.95rem;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #357abd;
+    }
+
+    /* ── Filter ── */
+
+    .filter-card {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-card label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #555;
+    }
+
+    .filter-card input[type="date"] {
+      padding: 0.4rem 0.5rem;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.8rem;
+      transition: border-color 0.2s;
+    }
+
+    .filter-card input[type="date"]:focus {
+      outline: none;
+      border-color: #4a90d9;
+    }
+
+    .filter-sep {
+      color: #999;
+      font-size: 0.85rem;
+    }
+
+    .btn-filter {
+      background: #4a90d9;
+      color: #fff;
+      font-size: 0.8rem;
+      padding: 0.4rem 0.75rem;
+    }
+
+    .btn-filter:hover {
+      background: #357abd;
+    }
+
+    .btn-reset {
+      background: #f0f0f0;
+      color: #555;
+      font-size: 0.8rem;
+      padding: 0.4rem 0.75rem;
+    }
+
+    .btn-reset:hover {
+      background: #e0e0e0;
+    }
+
+    /* ── Stats Grid ── */
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .stat-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .stat-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #4a90d9;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: #888;
+      margin-top: 0.25rem;
+    }
+
+    /* ── Charts ── */
+
+    .card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 0.75rem;
+    }
+
+    .card canvas {
+      width: 100%;
+      display: block;
+    }
+
+    /* ── Ranking ── */
+
+    .ranking-list {
+      list-style: none;
+    }
+
+    .ranking-item {
+      display: flex;
+      align-items: center;
+      padding: 0.55rem 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.85rem;
+      gap: 0.5rem;
+    }
+
+    .ranking-item:last-child {
+      border-bottom: none;
+    }
+
+    .ranking-rank {
+      width: 1.8rem;
+      font-weight: 700;
+      color: #4a90d9;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .ranking-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
+    .ranking-artist {
+      font-size: 0.75rem;
+      color: #999;
+    }
+
+    .ranking-meta {
+      font-size: 0.73rem;
+      color: #888;
+      text-align: right;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    /* ── Export ── */
+
+    .export-card {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn-export {
+      flex: 1;
+      background: #f0f0f0;
+      color: #333;
+      padding: 0.6rem 1rem;
+      font-size: 0.8rem;
+    }
+
+    .btn-export:hover {
+      background: #e0e0e0;
+    }
+
+    /* ── Loading ── */
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid #ddd;
+      border-top-color: #4a90d9;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── Toast ── */
+
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(1rem);
+      background: #333;
+      color: #fff;
+      padding: 0.6rem 1.25rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Dark mode ── */
+
+    body.tt-dark .card,
+    body.tt-dark .stat-card {
+      background: #262640;
+    }
+
+    body.tt-dark .drop-zone {
+      border-color: #444;
+    }
+
+    body.tt-dark .drop-zone:hover,
+    body.tt-dark .drop-zone.dragover {
+      border-color: #6ab0f3;
+      background: rgba(74, 144, 217, 0.1);
+    }
+
+    body.tt-dark .drop-zone-text {
+      color: #ddd;
+    }
+
+    body.tt-dark .card h3 {
+      color: #ccc;
+    }
+
+    body.tt-dark .filter-card label {
+      color: #ccc;
+    }
+
+    body.tt-dark .filter-card input[type="date"] {
+      background: #1e1e36;
+      color: #ddd;
+      border-color: #444;
+    }
+
+    body.tt-dark .ranking-item {
+      border-bottom-color: rgba(255, 255, 255, 0.06);
+      color: #ddd;
+    }
+
+    body.tt-dark .ranking-artist {
+      color: #777;
+    }
+
+    body.tt-dark .ranking-meta {
+      color: #777;
+    }
+
+    body.tt-dark .file-item {
+      color: #ccc;
+    }
+
+    body.tt-dark .btn-reset,
+    body.tt-dark .btn-export {
+      background: #333;
+      color: #ddd;
+    }
+
+    body.tt-dark .btn-reset:hover,
+    body.tt-dark .btn-export:hover {
+      background: #444;
+    }
+
+    /* ── Mobile ── */
+
+    @media (max-width: 480px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-card {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .filter-card .filter-sep {
+        text-align: center;
+      }
+
+      .export-card {
+        flex-direction: column;
+      }
+
+      .ranking-item {
+        font-size: 0.8rem;
+      }
+
+      .stat-value {
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+  <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools" data-note="https://note.com/sana_suke"></script>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== UPLOAD SECTION ===== -->
+    <div id="uploadSection">
+      <div class="card">
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-zone-icon">&#127925;</div>
+          <div class="drop-zone-text">Spotifyデータをドロップ</div>
+          <div class="drop-zone-sub">またはクリックしてJSONファイルを選択</div>
+          <input type="file" id="fileInput" multiple accept=".json">
+        </div>
+        <p class="upload-hint">
+          Spotifyの<a href="https://www.spotify.com/account/privacy/" target="_blank" rel="noopener">プライバシー設定</a>から「拡張再生履歴」または「アカウントデータ」をリクエストできます。<br>
+          ダウンロードしたJSONファイルをここに読み込ませてください。データはブラウザ内でのみ処理され、外部に送信されません。
+        </p>
+        <div class="file-list" id="fileList"></div>
+        <button class="btn btn-primary" id="analyzeBtn" disabled>分析する</button>
+      </div>
+    </div>
+
+    <!-- ===== DASHBOARD SECTION ===== -->
+    <div id="dashboardSection" style="display:none">
+
+      <div class="card filter-card">
+        <label>期間</label>
+        <input type="date" id="dateFrom">
+        <span class="filter-sep">〜</span>
+        <input type="date" id="dateTo">
+        <button class="btn btn-filter" id="filterBtn">適用</button>
+        <button class="btn btn-reset" id="resetFilterBtn">リセット</button>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-value" id="statTime">-</div><div class="stat-label">総再生時間</div></div>
+        <div class="stat-card"><div class="stat-value" id="statTracks">-</div><div class="stat-label">ユニーク楽曲数</div></div>
+        <div class="stat-card"><div class="stat-value" id="statArtists">-</div><div class="stat-label">ユニークアーティスト数</div></div>
+        <div class="stat-card"><div class="stat-value" id="statPeriod">-</div><div class="stat-label">データ期間</div></div>
+      </div>
+
+      <div class="card">
+        <h3>月別再生時間</h3>
+        <canvas id="monthlyChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>トップ アーティスト</h3>
+        <canvas id="artistChart"></canvas>
+        <div id="artistList"></div>
+      </div>
+
+      <div class="card">
+        <h3>トップ トラック</h3>
+        <div id="trackList"></div>
+      </div>
+
+      <div class="card">
+        <h3>時間帯別再生</h3>
+        <canvas id="hourChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>曜日別再生</h3>
+        <canvas id="dowChart"></canvas>
+      </div>
+
+      <div class="card export-card">
+        <button class="btn btn-export" id="copyStatsBtn">統計をコピー</button>
+        <button class="btn btn-export" id="downloadPngBtn">PNG保存</button>
+        <button class="btn btn-export" id="resetBtn">データをリセット</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    /* ===== 1. STATE ===== */
+
+    var rawRecords = [];
+    var filteredRecords = [];
+    var loadedFiles = [];
+    var cachedStats = null;
+
+    /* ===== 2. PARSE ===== */
+
+    function detectFormat(item) {
+      if (item.master_metadata_track_name !== undefined) return 'extended';
+      if (item.trackName !== undefined || item.endTime !== undefined) return 'account';
+      return null;
+    }
+
+    function parseExtended(records) {
+      var out = [];
+      for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        if (!r.ms_played || !r.master_metadata_track_name) continue;
+        out.push({
+          ts: new Date(r.ts),
+          msPlayed: r.ms_played,
+          track: r.master_metadata_track_name,
+          artist: r.master_metadata_album_artist_name || '不明',
+          album: r.master_metadata_album_album_name || ''
+        });
+      }
+      return out;
+    }
+
+    function parseAccountData(records) {
+      var out = [];
+      for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        if (!r.msPlayed || !r.trackName) continue;
+        out.push({
+          ts: new Date(r.endTime),
+          msPlayed: r.msPlayed,
+          track: r.trackName,
+          artist: r.artistName || '不明',
+          album: ''
+        });
+      }
+      return out;
+    }
+
+    /* ===== 3. AGGREGATE ===== */
+
+    function aggregate(records) {
+      var artistMap = new Map();
+      var trackMap = new Map();
+      var monthMap = new Map();
+      var hourMap = new Array(24).fill(0);
+      var dowMap = new Array(7).fill(0);
+      var totalMs = 0;
+      var minDate = null;
+      var maxDate = null;
+
+      for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        totalMs += r.msPlayed;
+
+        if (!minDate || r.ts < minDate) minDate = r.ts;
+        if (!maxDate || r.ts > maxDate) maxDate = r.ts;
+
+        // Artist
+        var a = artistMap.get(r.artist);
+        if (a) { a.ms += r.msPlayed; a.count++; }
+        else { artistMap.set(r.artist, { ms: r.msPlayed, count: 1 }); }
+
+        // Track
+        var tKey = r.artist + '\t' + r.track;
+        var t = trackMap.get(tKey);
+        if (t) { t.ms += r.msPlayed; t.count++; }
+        else { trackMap.set(tKey, { ms: r.msPlayed, count: 1, artist: r.artist, track: r.track }); }
+
+        // Monthly
+        var mKey = r.ts.getFullYear() + '-' + String(r.ts.getMonth() + 1).padStart(2, '0');
+        monthMap.set(mKey, (monthMap.get(mKey) || 0) + r.msPlayed);
+
+        // Hour
+        hourMap[r.ts.getHours()] += r.msPlayed;
+
+        // Day of week
+        dowMap[r.ts.getDay()] += r.msPlayed;
+      }
+
+      var topArtists = [];
+      artistMap.forEach(function (d, name) { topArtists.push({ name: name, ms: d.ms, count: d.count }); });
+      topArtists.sort(function (a, b) { return b.ms - a.ms; });
+
+      var topTracks = [];
+      trackMap.forEach(function (d) { topTracks.push(d); });
+      topTracks.sort(function (a, b) { return b.ms - a.ms; });
+
+      var months = [];
+      monthMap.forEach(function (ms, key) { months.push([key, ms]); });
+      months.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+
+      return {
+        totalMs: totalMs,
+        minDate: minDate,
+        maxDate: maxDate,
+        topArtists: topArtists,
+        topTracks: topTracks,
+        months: months,
+        hourMap: hourMap,
+        dowMap: dowMap,
+        uniqueArtists: artistMap.size,
+        uniqueTracks: trackMap.size
+      };
+    }
+
+    /* ===== 4. CHART ===== */
+
+    function setupCanvas(canvas, w, h) {
+      var dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      var ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      return ctx;
+    }
+
+    function chartColors() {
+      var dark = document.body.classList.contains('tt-dark');
+      return {
+        text: dark ? '#ccc' : '#555',
+        sub: dark ? '#888' : '#999',
+        grid: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        bar: '#4a90d9',
+        barAlt: dark ? '#6ab0f3' : '#7db8e8'
+      };
+    }
+
+    function roundedRect(ctx, x, y, w, h, r) {
+      if (h <= 0) return;
+      r = Math.min(r, w / 2, h);
+      ctx.beginPath();
+      ctx.moveTo(x, y + h);
+      ctx.lineTo(x, y + r);
+      ctx.arcTo(x, y, x + r, y, r);
+      ctx.arcTo(x + w, y, x + w, y + r, r);
+      ctx.lineTo(x + w, y + h);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function formatChartVal(v) {
+      if (v >= 1) return v.toFixed(0) + 'h';
+      if (v >= 0.1) return v.toFixed(1) + 'h';
+      return '';
+    }
+
+    function drawBarChart(canvas, labels, values) {
+      var parentW = canvas.parentElement.clientWidth - 40;
+      var W = Math.max(parentW, 280);
+      var H = Math.min(W * 0.55, 280);
+      var ctx = setupCanvas(canvas, W, H);
+      var c = chartColors();
+
+      var pad = { top: 16, right: 12, bottom: 36, left: 44 };
+      var plotW = W - pad.left - pad.right;
+      var plotH = H - pad.top - pad.bottom;
+      var maxVal = Math.max.apply(null, values.concat([0.1]));
+
+      // Grid
+      ctx.strokeStyle = c.grid;
+      ctx.lineWidth = 1;
+      ctx.font = '10px -apple-system, sans-serif';
+      ctx.fillStyle = c.sub;
+      ctx.textAlign = 'right';
+      for (var g = 0; g <= 4; g++) {
+        var gy = pad.top + plotH - (plotH * g / 4);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, gy);
+        ctx.lineTo(W - pad.right, gy);
+        ctx.stroke();
+        ctx.fillText(formatChartVal(maxVal * g / 4), pad.left - 6, gy + 3);
+      }
+
+      // Bars
+      var gap = Math.max(1, Math.min(3, plotW / labels.length * 0.15));
+      var barW = (plotW - gap * labels.length) / labels.length;
+      ctx.fillStyle = c.bar;
+      for (var i = 0; i < labels.length; i++) {
+        var barH = (values[i] / maxVal) * plotH;
+        var bx = pad.left + i * (barW + gap);
+        var by = pad.top + plotH - barH;
+        roundedRect(ctx, bx, by, barW, barH, Math.min(3, barW / 2));
+      }
+
+      // X labels
+      ctx.fillStyle = c.text;
+      ctx.textAlign = 'center';
+      ctx.font = '10px -apple-system, sans-serif';
+      var skip = Math.ceil(labels.length / Math.floor(W / 50));
+      for (var i = 0; i < labels.length; i++) {
+        if (labels.length > 12 && i % skip !== 0 && i !== labels.length - 1) continue;
+        var lx = pad.left + i * (barW + gap) + barW / 2;
+        ctx.fillText(labels[i], lx, H - pad.bottom + 14);
+      }
+    }
+
+    function drawHorizontalBarChart(canvas, labels, values) {
+      var parentW = canvas.parentElement.clientWidth - 40;
+      var W = Math.max(parentW, 280);
+      var barH = 26;
+      var gap = 5;
+      var H = labels.length * (barH + gap) + 16;
+      var ctx = setupCanvas(canvas, W, H);
+      var c = chartColors();
+      var maxVal = Math.max.apply(null, values.concat([0.1]));
+      var labelW = Math.min(120, W * 0.25);
+
+      for (var i = 0; i < labels.length; i++) {
+        var y = i * (barH + gap) + 8;
+
+        // Label
+        ctx.fillStyle = c.text;
+        ctx.font = '11px -apple-system, sans-serif';
+        ctx.textAlign = 'left';
+        var lbl = labels[i];
+        // Truncate
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, y, labelW - 4, barH);
+        ctx.clip();
+        ctx.fillText(lbl, 2, y + barH / 2 + 4);
+        ctx.restore();
+
+        // Bar
+        var barMaxW = W - labelW - 60;
+        var bw = (values[i] / maxVal) * barMaxW;
+        ctx.fillStyle = c.bar;
+        var r = 3;
+        ctx.beginPath();
+        ctx.moveTo(labelW, y);
+        ctx.lineTo(labelW + bw - r, y);
+        ctx.arcTo(labelW + bw, y, labelW + bw, y + r, r);
+        ctx.arcTo(labelW + bw, y + barH, labelW + bw - r, y + barH, r);
+        ctx.lineTo(labelW, y + barH);
+        ctx.closePath();
+        ctx.fill();
+
+        // Value
+        ctx.fillStyle = c.sub;
+        ctx.font = '10px -apple-system, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(values[i].toFixed(1) + 'h', labelW + bw + 6, y + barH / 2 + 4);
+      }
+    }
+
+    /* ===== 5. RENDER ===== */
+
+    function formatDuration(ms) {
+      var totalMin = Math.floor(ms / 60000);
+      var h = Math.floor(totalMin / 60);
+      var m = totalMin % 60;
+      if (h > 0) return h.toLocaleString() + '時間' + m + '分';
+      return m + '分';
+    }
+
+    function formatDate(d) {
+      if (!d) return '-';
+      return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+    }
+
+    function renderDashboard(stats) {
+      cachedStats = stats;
+
+      document.getElementById('uploadSection').style.display = 'none';
+      document.getElementById('dashboardSection').style.display = '';
+
+      // Summary
+      document.getElementById('statTime').textContent = formatDuration(stats.totalMs);
+      document.getElementById('statTracks').textContent = stats.uniqueTracks.toLocaleString();
+      document.getElementById('statArtists').textContent = stats.uniqueArtists.toLocaleString();
+      document.getElementById('statPeriod').textContent = formatDate(stats.minDate) + ' 〜 ' + formatDate(stats.maxDate);
+
+      // Date filter defaults
+      if (stats.minDate) {
+        document.getElementById('dateFrom').value = toDateStr(stats.minDate);
+        document.getElementById('dateTo').value = toDateStr(stats.maxDate);
+      }
+
+      // Charts
+      redrawCharts(stats);
+
+      // Rankings
+      renderRankingList('artistList', stats.topArtists.slice(0, 20), 'artist');
+      renderRankingList('trackList', stats.topTracks.slice(0, 20), 'track');
+    }
+
+    function redrawCharts(stats) {
+      // Monthly
+      drawBarChart(
+        document.getElementById('monthlyChart'),
+        stats.months.map(function (m) { return m[0].slice(2); }),
+        stats.months.map(function (m) { return m[1] / 3600000; })
+      );
+
+      // Top 10 artists
+      var top10 = stats.topArtists.slice(0, 10);
+      drawHorizontalBarChart(
+        document.getElementById('artistChart'),
+        top10.map(function (a) { return a.name; }),
+        top10.map(function (a) { return a.ms / 3600000; })
+      );
+
+      // Hour of day
+      var hourLabels = [];
+      for (var h = 0; h < 24; h++) hourLabels.push(h + '時');
+      drawBarChart(
+        document.getElementById('hourChart'),
+        hourLabels,
+        stats.hourMap.map(function (ms) { return ms / 3600000; })
+      );
+
+      // Day of week
+      var DOW = ['日', '月', '火', '水', '木', '金', '土'];
+      drawBarChart(
+        document.getElementById('dowChart'),
+        DOW,
+        stats.dowMap.map(function (ms) { return ms / 3600000; })
+      );
+    }
+
+    function renderRankingList(containerId, items, type) {
+      var container = document.getElementById(containerId);
+      container.innerHTML = '';
+      var ol = document.createElement('ol');
+      ol.className = 'ranking-list';
+
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        var li = document.createElement('li');
+        li.className = 'ranking-item';
+
+        var rank = document.createElement('span');
+        rank.className = 'ranking-rank';
+        rank.textContent = i + 1;
+
+        var name = document.createElement('span');
+        name.className = 'ranking-name';
+
+        if (type === 'track') {
+          var trackSpan = document.createElement('span');
+          trackSpan.textContent = item.track;
+          var artistSpan = document.createElement('span');
+          artistSpan.className = 'ranking-artist';
+          artistSpan.textContent = ' - ' + item.artist;
+          name.appendChild(trackSpan);
+          name.appendChild(artistSpan);
+        } else {
+          name.textContent = item.name;
+        }
+
+        var meta = document.createElement('span');
+        meta.className = 'ranking-meta';
+        var hours = (item.ms / 3600000);
+        meta.textContent = item.count.toLocaleString() + '回 / ' + (hours >= 1 ? hours.toFixed(1) + 'h' : Math.round(hours * 60) + 'm');
+
+        li.appendChild(rank);
+        li.appendChild(name);
+        li.appendChild(meta);
+        ol.appendChild(li);
+      }
+
+      container.appendChild(ol);
+    }
+
+    /* ===== 6. FILE HANDLING ===== */
+
+    function renderFileList() {
+      var el = document.getElementById('fileList');
+      el.innerHTML = '';
+      for (var i = 0; i < loadedFiles.length; i++) {
+        var f = loadedFiles[i];
+        var div = document.createElement('div');
+        div.className = 'file-item';
+        div.innerHTML = '<span class="file-item-icon">&#9834;</span>' +
+          '<span class="file-item-name">' + escapeHtml(f.name) + '</span>' +
+          '<span class="file-item-count">' + f.count.toLocaleString() + '件</span>';
+        el.appendChild(div);
+      }
+    }
+
+    async function handleFiles(files) {
+      var jsonFiles = [];
+      for (var i = 0; i < files.length; i++) {
+        if (files[i].name.endsWith('.json')) jsonFiles.push(files[i]);
+      }
+      if (jsonFiles.length === 0) {
+        showToast('JSONファイルを選択してください');
+        return;
+      }
+
+      for (var i = 0; i < jsonFiles.length; i++) {
+        var file = jsonFiles[i];
+        try {
+          var text = await file.text();
+          var data = JSON.parse(text);
+          if (!Array.isArray(data) || data.length === 0) {
+            showToast(file.name + ': データが空です');
+            continue;
+          }
+          var format = detectFormat(data[0]);
+          if (!format) {
+            showToast(file.name + ': 未対応のフォーマットです');
+            continue;
+          }
+          var parsed = format === 'extended' ? parseExtended(data) : parseAccountData(data);
+          rawRecords = rawRecords.concat(parsed);
+          loadedFiles.push({ name: file.name, count: parsed.length, format: format });
+        } catch (e) {
+          showToast(file.name + ': 読み込みエラー');
+        }
+      }
+
+      renderFileList();
+      document.getElementById('analyzeBtn').disabled = rawRecords.length === 0;
+    }
+
+    function startAnalysis() {
+      if (rawRecords.length === 0) return;
+      filteredRecords = rawRecords;
+      var stats = aggregate(filteredRecords);
+      renderDashboard(stats);
+    }
+
+    /* ===== 7. FILTER ===== */
+
+    function toDateStr(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function applyFilter() {
+      var from = document.getElementById('dateFrom').value;
+      var to = document.getElementById('dateTo').value;
+      var fromDate = from ? new Date(from) : null;
+      var toDate = to ? new Date(to + 'T23:59:59') : null;
+
+      filteredRecords = rawRecords.filter(function (r) {
+        if (fromDate && r.ts < fromDate) return false;
+        if (toDate && r.ts > toDate) return false;
+        return true;
+      });
+
+      var stats = aggregate(filteredRecords);
+      renderDashboard(stats);
+      showToast(filteredRecords.length.toLocaleString() + '件を表示中');
+    }
+
+    function resetFilter() {
+      filteredRecords = rawRecords;
+      var stats = aggregate(filteredRecords);
+      renderDashboard(stats);
+      showToast('フィルターをリセットしました');
+    }
+
+    /* ===== 8. EXPORT ===== */
+
+    function copyStatsAsText() {
+      if (!cachedStats) return;
+      var s = cachedStats;
+      var lines = [
+        '## 音楽統計レポート',
+        '期間: ' + formatDate(s.minDate) + ' ~ ' + formatDate(s.maxDate),
+        '総再生時間: ' + formatDuration(s.totalMs),
+        'ユニーク楽曲数: ' + s.uniqueTracks.toLocaleString(),
+        'ユニークアーティスト数: ' + s.uniqueArtists.toLocaleString(),
+        '',
+        '### トップアーティスト'
+      ];
+      s.topArtists.slice(0, 10).forEach(function (a, i) {
+        lines.push((i + 1) + '. ' + a.name + ' - ' + formatDuration(a.ms) + ' (' + a.count.toLocaleString() + '回)');
+      });
+      lines.push('');
+      lines.push('### トップ楽曲');
+      s.topTracks.slice(0, 10).forEach(function (t, i) {
+        lines.push((i + 1) + '. ' + t.track + ' / ' + t.artist + ' - ' + formatDuration(t.ms) + ' (' + t.count.toLocaleString() + '回)');
+      });
+
+      navigator.clipboard.writeText(lines.join('\n'))
+        .then(function () { showToast('統計をコピーしました'); })
+        .catch(function () { showToast('コピーに失敗しました'); });
+    }
+
+    function downloadAsPng() {
+      if (!cachedStats) return;
+      var s = cachedStats;
+      var dpr = window.devicePixelRatio || 1;
+
+      var charts = ['monthlyChart', 'artistChart', 'hourChart', 'dowChart'];
+      var chartTitles = ['月別再生時間', 'トップ アーティスト', '時間帯別再生', '曜日別再生'];
+      var canvases = charts.map(function (id) { return document.getElementById(id); });
+
+      var W = 720;
+      var headerH = 140;
+      var totalH = headerH;
+      canvases.forEach(function (c) {
+        totalH += c.height / dpr + 50;
+      });
+
+      var expCanvas = document.createElement('canvas');
+      expCanvas.width = W * dpr;
+      expCanvas.height = totalH * dpr;
+      var ctx = expCanvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+
+      // Background
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, W, totalH);
+
+      // Title
+      ctx.fillStyle = '#222';
+      ctx.font = 'bold 18px -apple-system, sans-serif';
+      ctx.fillText('Music Stats Dashboard', 24, 36);
+
+      // Summary
+      ctx.font = '13px -apple-system, sans-serif';
+      ctx.fillStyle = '#555';
+      ctx.fillText('期間: ' + formatDate(s.minDate) + ' ~ ' + formatDate(s.maxDate), 24, 62);
+      ctx.fillText('総再生時間: ' + formatDuration(s.totalMs) + '  /  楽曲数: ' + s.uniqueTracks.toLocaleString() + '  /  アーティスト数: ' + s.uniqueArtists.toLocaleString(), 24, 82);
+
+      // Top 5
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 12px -apple-system, sans-serif';
+      ctx.fillText('Top 5 Artists:', 24, 108);
+      ctx.font = '12px -apple-system, sans-serif';
+      ctx.fillStyle = '#555';
+      s.topArtists.slice(0, 5).forEach(function (a, i) {
+        ctx.fillText((i + 1) + '. ' + a.name + ' (' + (a.ms / 3600000).toFixed(1) + 'h)', 24, 124 + i * 16);
+      });
+
+      // Charts
+      var y = headerH + 80;
+      canvases.forEach(function (c, idx) {
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 13px -apple-system, sans-serif';
+        ctx.fillText(chartTitles[idx], 24, y - 8);
+        var cH = c.height / dpr;
+        ctx.drawImage(c, 0, 0, c.width, c.height, 0, y, W, cH);
+        y += cH + 50;
+      });
+
+      expCanvas.toBlob(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'music-stats.png';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+      showToast('PNG画像を保存しました');
+    }
+
+    function resetData() {
+      rawRecords = [];
+      filteredRecords = [];
+      loadedFiles = [];
+      cachedStats = null;
+      document.getElementById('fileList').innerHTML = '';
+      document.getElementById('analyzeBtn').disabled = true;
+      document.getElementById('dashboardSection').style.display = 'none';
+      document.getElementById('uploadSection').style.display = '';
+      showToast('データをリセットしました');
+    }
+
+    /* ===== 9. UTILS & INIT ===== */
+
+    var toastTimer;
+    function showToast(msg) {
+      var el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2000);
+    }
+
+    function escapeHtml(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // Dark mode observer — redraw charts
+    var darkObserver = new MutationObserver(function () {
+      if (cachedStats && document.getElementById('dashboardSection').style.display !== 'none') {
+        redrawCharts(cachedStats);
+      }
+    });
+    darkObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+    // Resize handler
+    var resizeTimer;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        if (cachedStats && document.getElementById('dashboardSection').style.display !== 'none') {
+          redrawCharts(cachedStats);
+        }
+      }, 200);
+    });
+
+    // File handling events
+    (function () {
+      var dropZone = document.getElementById('dropZone');
+      var fileInput = document.getElementById('fileInput');
+
+      dropZone.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+      dropZone.addEventListener('dragleave', function () {
+        dropZone.classList.remove('dragover');
+      });
+      dropZone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+      });
+      dropZone.addEventListener('click', function () {
+        fileInput.click();
+      });
+      fileInput.addEventListener('change', function () {
+        handleFiles(fileInput.files);
+      });
+
+      document.getElementById('analyzeBtn').addEventListener('click', startAnalysis);
+      document.getElementById('filterBtn').addEventListener('click', applyFilter);
+      document.getElementById('resetFilterBtn').addEventListener('click', resetFilter);
+      document.getElementById('copyStatsBtn').addEventListener('click', copyStatsAsText);
+      document.getElementById('downloadPngBtn').addEventListener('click', downloadAsPng);
+      document.getElementById('resetBtn').addEventListener('click', resetData);
+    })();
+  </script>
+</body>
+</html>
