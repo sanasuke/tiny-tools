@@ -529,6 +529,18 @@
         <button class="tb-btn" id="btnLoad">読込</button>
         <button class="tb-btn" id="btnImport">画像読込</button>
       </div>
+      <div class="toolbar-sep"></div>
+      <div class="toolbar-group">
+        <select id="genAlgo">
+          <option value="noise">ノイズ</option>
+          <option value="symmetric">対称パターン</option>
+          <option value="plasma">プラズマ</option>
+          <option value="maze">迷路</option>
+          <option value="terrain">地形</option>
+          <option value="life">ライフゲーム</option>
+        </select>
+        <button class="tb-btn" id="btnGenerate">🎲 生成</button>
+      </div>
     </div>
 
     <!-- ── Tool Panel (Left) ── -->
@@ -2427,6 +2439,298 @@
       overlay.addEventListener('click', function(e) {
         if (e.target === overlay) overlay.classList.add('hidden');
       });
+    });
+
+    /* ================================================================
+       RANDOM ART GENERATORS
+       ================================================================ */
+    var generators = {
+      noise: function() {
+        var layer = getActiveLayer();
+        var pal = PALETTES[S.palette];
+        if (!pal || pal.length === 0) pal = PALETTES.nes;
+        var diffs = [];
+        for (var y = 0; y < S.h; y++) {
+          for (var x = 0; x < S.w; x++) {
+            var idx = y * S.w + x;
+            var oldColor = layer.data[idx];
+            var newColor = hexToABGR(pal[Math.floor(Math.random() * pal.length)]);
+            if (oldColor !== newColor) {
+              diffs.push({ x: x, y: y, oldColor: oldColor, newColor: newColor });
+              layer.data[idx] = newColor;
+            }
+          }
+        }
+        return diffs;
+      },
+
+      symmetric: function() {
+        var layer = getActiveLayer();
+        var pal = PALETTES[S.palette];
+        if (!pal || pal.length === 0) pal = PALETTES.nes;
+        var diffs = [];
+        var halfW = Math.ceil(S.w / 2);
+        for (var y = 0; y < S.h; y++) {
+          for (var x = 0; x < halfW; x++) {
+            var useColor = Math.random() < 0.4;
+            var newColor = useColor ? hexToABGR(pal[Math.floor(Math.random() * pal.length)]) : 0;
+            var idx = y * S.w + x;
+            var oldColor = layer.data[idx];
+            if (oldColor !== newColor) {
+              diffs.push({ x: x, y: y, oldColor: oldColor, newColor: newColor });
+              layer.data[idx] = newColor;
+            }
+            var mx = S.w - 1 - x;
+            if (mx !== x) {
+              var midx = y * S.w + mx;
+              var mold = layer.data[midx];
+              if (mold !== newColor) {
+                diffs.push({ x: mx, y: y, oldColor: mold, newColor: newColor });
+                layer.data[midx] = newColor;
+              }
+            }
+          }
+        }
+        return diffs;
+      },
+
+      plasma: function() {
+        var layer = getActiveLayer();
+        var diffs = [];
+        var freqX1 = 0.05 + Math.random() * 0.1;
+        var freqY1 = 0.05 + Math.random() * 0.1;
+        var freqX2 = 0.08 + Math.random() * 0.15;
+        var freqY2 = 0.08 + Math.random() * 0.15;
+        var phase1 = Math.random() * Math.PI * 2;
+        var phase2 = Math.random() * Math.PI * 2;
+        var phase3 = Math.random() * Math.PI * 2;
+        for (var y = 0; y < S.h; y++) {
+          for (var x = 0; x < S.w; x++) {
+            var v1 = Math.sin(x * freqX1 + phase1);
+            var v2 = Math.sin(y * freqY1 + phase2);
+            var v3 = Math.sin((x * freqX2 + y * freqY2) + phase3);
+            var v4 = Math.sin(Math.sqrt(x * x + y * y) * 0.1);
+            var v = (v1 + v2 + v3 + v4) / 4;
+            var t = (v + 1) / 2;
+            var r = Math.floor(Math.sin(t * Math.PI * 2) * 127 + 128);
+            var g = Math.floor(Math.sin(t * Math.PI * 2 + 2.094) * 127 + 128);
+            var b = Math.floor(Math.sin(t * Math.PI * 2 + 4.189) * 127 + 128);
+            var newColor = rgbaToABGR(r, g, b, 255);
+            var idx = y * S.w + x;
+            var oldColor = layer.data[idx];
+            if (oldColor !== newColor) {
+              diffs.push({ x: x, y: y, oldColor: oldColor, newColor: newColor });
+              layer.data[idx] = newColor;
+            }
+          }
+        }
+        return diffs;
+      },
+
+      maze: function() {
+        var layer = getActiveLayer();
+        var pal = PALETTES[S.palette];
+        if (!pal || pal.length === 0) pal = PALETTES.nes;
+        var wallColor = hexToABGR(pal[Math.floor(Math.random() * pal.length)]);
+        var pathColor = 0;
+        var diffs = [];
+        // Fill with wall
+        var grid = [];
+        for (var i = 0; i < S.w * S.h; i++) grid[i] = 1;
+        // Recursive division
+        function carve(x1, y1, x2, y2) {
+          var w = x2 - x1;
+          var h = y2 - y1;
+          if (w < 2 || h < 2) return;
+          if (w > h) {
+            // Vertical wall
+            var wx = x1 + 1 + Math.floor(Math.random() * (w - 1));
+            var passage = y1 + Math.floor(Math.random() * h);
+            for (var y = y1; y < y2; y++) {
+              if (y !== passage) grid[y * S.w + wx] = 1;
+              else grid[y * S.w + wx] = 0;
+            }
+            // Clear non-wall areas
+            for (var yy = y1; yy < y2; yy++) {
+              for (var xx = x1; xx < wx; xx++) if (grid[yy * S.w + xx] === 1 && Math.random() < 0.6) grid[yy * S.w + xx] = 0;
+              for (var xx2 = wx + 1; xx2 < x2; xx2++) if (grid[yy * S.w + xx2] === 1 && Math.random() < 0.6) grid[yy * S.w + xx2] = 0;
+            }
+          } else {
+            var wy = y1 + 1 + Math.floor(Math.random() * (h - 1));
+            var passage2 = x1 + Math.floor(Math.random() * w);
+            for (var x = x1; x < x2; x++) {
+              if (x !== passage2) grid[wy * S.w + x] = 1;
+              else grid[wy * S.w + x] = 0;
+            }
+            for (var xx3 = x1; xx3 < x2; xx3++) {
+              for (var yy2 = y1; yy2 < wy; yy2++) if (grid[yy2 * S.w + xx3] === 1 && Math.random() < 0.6) grid[yy2 * S.w + xx3] = 0;
+              for (var yy3 = wy + 1; yy3 < y2; yy3++) if (grid[yy3 * S.w + xx3] === 1 && Math.random() < 0.6) grid[yy3 * S.w + xx3] = 0;
+            }
+          }
+        }
+        // Start with all walls, then carve paths
+        for (var ci = 0; ci < S.w * S.h; ci++) grid[ci] = 0;
+        // Draw borders
+        for (var bx = 0; bx < S.w; bx++) { grid[bx] = 1; grid[(S.h - 1) * S.w + bx] = 1; }
+        for (var by = 0; by < S.h; by++) { grid[by * S.w] = 1; grid[by * S.w + S.w - 1] = 1; }
+        // Recursive division walls
+        function divide(x1, y1, x2, y2) {
+          var dw = x2 - x1;
+          var dh = y2 - y1;
+          if (dw < 3 || dh < 3) return;
+          var horiz = dw < dh ? true : dh < dw ? false : Math.random() < 0.5;
+          if (horiz) {
+            var wy2 = y1 + 2 + Math.floor(Math.random() * (dh - 3));
+            if (wy2 % 2 === 0) wy2 = Math.min(wy2 + 1, y2 - 2);
+            var px = x1 + 1 + Math.floor(Math.random() * (dw - 2));
+            if (px % 2 === 1) px = Math.min(px + 1, x2 - 2);
+            for (var wx2 = x1; wx2 <= x2; wx2++) grid[wy2 * S.w + wx2] = 1;
+            grid[wy2 * S.w + px] = 0;
+            divide(x1, y1, x2, wy2 - 1);
+            divide(x1, wy2 + 1, x2, y2);
+          } else {
+            var wx3 = x1 + 2 + Math.floor(Math.random() * (dw - 3));
+            if (wx3 % 2 === 0) wx3 = Math.min(wx3 + 1, x2 - 2);
+            var py = y1 + 1 + Math.floor(Math.random() * (dh - 2));
+            if (py % 2 === 1) py = Math.min(py + 1, y2 - 2);
+            for (var wy3 = y1; wy3 <= y2; wy3++) grid[wy3 * S.w + wx3] = 1;
+            grid[py * S.w + wx3] = 0;
+            divide(x1, y1, wx3 - 1, y2);
+            divide(wx3 + 1, y1, x2, y2);
+          }
+        }
+        divide(1, 1, S.w - 2, S.h - 2);
+        // Apply grid to layer
+        for (var gy = 0; gy < S.h; gy++) {
+          for (var gx = 0; gx < S.w; gx++) {
+            var gidx = gy * S.w + gx;
+            var nc = grid[gidx] ? wallColor : pathColor;
+            var oc = layer.data[gidx];
+            if (oc !== nc) {
+              diffs.push({ x: gx, y: gy, oldColor: oc, newColor: nc });
+              layer.data[gidx] = nc;
+            }
+          }
+        }
+        return diffs;
+      },
+
+      terrain: function() {
+        var layer = getActiveLayer();
+        var diffs = [];
+        // Midpoint displacement for heightmap
+        var size = Math.max(S.w, S.h);
+        var mapW = S.w;
+        var heights = new Float32Array(mapW);
+        // Initialize endpoints
+        heights[0] = 0.3 + Math.random() * 0.4;
+        heights[mapW - 1] = 0.3 + Math.random() * 0.4;
+        // Midpoint displacement
+        function displace(l, r, rough) {
+          if (r - l < 2) return;
+          var mid = Math.floor((l + r) / 2);
+          heights[mid] = (heights[l] + heights[r]) / 2 + (Math.random() - 0.5) * rough;
+          heights[mid] = Math.max(0.05, Math.min(0.95, heights[mid]));
+          displace(l, mid, rough * 0.55);
+          displace(mid, r, rough * 0.55);
+        }
+        displace(0, mapW - 1, 0.4);
+        // Color terrain layers
+        var skyTop = rgbaToABGR(100, 180, 255, 255);
+        var skyBot = rgbaToABGR(180, 220, 255, 255);
+        var snow = rgbaToABGR(240, 240, 255, 255);
+        var rock = rgbaToABGR(120, 100, 90, 255);
+        var grass = rgbaToABGR(80, 160, 60, 255);
+        var dirt = rgbaToABGR(140, 110, 70, 255);
+        var water = rgbaToABGR(60, 120, 200, 255);
+        for (var x = 0; x < S.w; x++) {
+          var groundY = Math.floor(heights[x] * S.h);
+          for (var y = 0; y < S.h; y++) {
+            var idx = y * S.w + x;
+            var oldColor = layer.data[idx];
+            var newColor;
+            if (y < groundY) {
+              // Sky gradient
+              var skyT = y / Math.max(groundY, 1);
+              var sr = Math.floor(100 + skyT * 80);
+              var sg = Math.floor(180 + skyT * 40);
+              var sb = 255;
+              newColor = rgbaToABGR(sr, sg, sb, 255);
+            } else if (y === groundY) {
+              newColor = heights[x] < 0.25 ? snow : heights[x] < 0.55 ? grass : dirt;
+            } else if (y === groundY + 1) {
+              newColor = heights[x] < 0.25 ? rock : heights[x] < 0.55 ? grass : dirt;
+            } else if (y > S.h * 0.85) {
+              newColor = water;
+            } else {
+              newColor = y - groundY < 4 ? dirt : rock;
+            }
+            if (oldColor !== newColor) {
+              diffs.push({ x: x, y: y, oldColor: oldColor, newColor: newColor });
+              layer.data[idx] = newColor;
+            }
+          }
+        }
+        return diffs;
+      },
+
+      life: function() {
+        var layer = getActiveLayer();
+        var pal = PALETTES[S.palette];
+        if (!pal || pal.length === 0) pal = PALETTES.nes;
+        var diffs = [];
+        // Initialize random grid
+        var curr = new Uint8Array(S.w * S.h);
+        for (var i = 0; i < curr.length; i++) curr[i] = Math.random() < 0.4 ? 1 : 0;
+        // Run Game of Life for several generations
+        var generations = 8 + Math.floor(Math.random() * 8);
+        for (var gen = 0; gen < generations; gen++) {
+          var next = new Uint8Array(S.w * S.h);
+          for (var y = 0; y < S.h; y++) {
+            for (var x = 0; x < S.w; x++) {
+              var neighbors = 0;
+              for (var dy = -1; dy <= 1; dy++) {
+                for (var dx = -1; dx <= 1; dx++) {
+                  if (dx === 0 && dy === 0) continue;
+                  var nx = (x + dx + S.w) % S.w;
+                  var ny = (y + dy + S.h) % S.h;
+                  neighbors += curr[ny * S.w + nx];
+                }
+              }
+              var alive = curr[y * S.w + x];
+              if (alive && (neighbors === 2 || neighbors === 3)) next[y * S.w + x] = 1;
+              else if (!alive && neighbors === 3) next[y * S.w + x] = 1;
+            }
+          }
+          curr = next;
+        }
+        // Apply to layer
+        var aliveColor = hexToABGR(pal[Math.floor(Math.random() * pal.length)]);
+        var deadColor = 0;
+        for (var ly = 0; ly < S.h; ly++) {
+          for (var lx = 0; lx < S.w; lx++) {
+            var lidx = ly * S.w + lx;
+            var nc = curr[lidx] ? aliveColor : deadColor;
+            var oc = layer.data[lidx];
+            if (oc !== nc) {
+              diffs.push({ x: lx, y: ly, oldColor: oc, newColor: nc });
+              layer.data[lidx] = nc;
+            }
+          }
+        }
+        return diffs;
+      }
+    };
+
+    document.getElementById('btnGenerate').addEventListener('click', function() {
+      var algo = document.getElementById('genAlgo').value;
+      if (generators[algo]) {
+        var diffs = generators[algo]();
+        if (diffs && diffs.length > 0) {
+          pushUndo(diffs, S.activeLayer);
+        }
+        scheduleRender();
+      }
     });
 
     /* ================================================================
