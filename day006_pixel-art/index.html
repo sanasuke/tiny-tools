@@ -1,0 +1,2760 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ピクセルアートエディタ | tiny-tools Day 6</title>
+  <style>
+    /* ── Reset & Base ── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── App Shell ── */
+    .app {
+      display: grid;
+      grid-template-columns: 52px 1fr 240px;
+      grid-template-rows: 40px 1fr 28px;
+      flex: 1;
+      min-height: 0;
+      margin-top: 44px;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      grid-column: 1 / -1;
+      background: #16213e;
+      border-bottom: 1px solid #0f3460;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 6px;
+      overflow-x: auto;
+      z-index: 10;
+    }
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .toolbar-sep {
+      width: 1px;
+      height: 20px;
+      background: #0f3460;
+      margin: 0 4px;
+    }
+    .toolbar label {
+      font-size: 11px;
+      color: #aaa;
+      margin-right: 2px;
+    }
+    .toolbar select, .toolbar input[type="number"] {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      padding: 2px 4px;
+      font-size: 11px;
+      height: 26px;
+    }
+    .toolbar select { padding-right: 16px; }
+    .toolbar input[type="number"] { width: 52px; }
+    .tb-btn {
+      background: none;
+      border: 1px solid transparent;
+      color: #ccc;
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 12px;
+      white-space: nowrap;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .tb-btn:hover { background: #0f3460; color: #fff; }
+    .tb-btn:disabled { opacity: 0.3; cursor: default; }
+    .tb-btn:disabled:hover { background: none; color: #ccc; }
+    .tb-chk { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #aaa; cursor: pointer; }
+    .tb-chk input { cursor: pointer; }
+
+    /* ── Tool Panel (Left) ── */
+    .tool-panel {
+      background: #16213e;
+      border-right: 1px solid #0f3460;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px 0;
+      gap: 2px;
+      overflow-y: auto;
+    }
+    .tool-btn {
+      width: 38px;
+      height: 34px;
+      background: none;
+      border: 2px solid transparent;
+      color: #aaa;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .tool-btn:hover { background: #0f3460; color: #fff; }
+    .tool-btn.active { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.1); }
+    .tool-btn[title]::after { content: attr(data-key); font-size: 8px; position: absolute; }
+    .tool-sep { width: 28px; height: 1px; background: #0f3460; margin: 4px 0; }
+
+    /* ── Canvas Area ── */
+    .canvas-area {
+      background: #111;
+      position: relative;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    .canvas-area canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* ── Right Sidebar ── */
+    .sidebar {
+      background: #16213e;
+      border-left: 1px solid #0f3460;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .sb-section {
+      border-bottom: 1px solid #0f3460;
+      padding: 8px;
+    }
+    .sb-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ── Color Section ── */
+    .color-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .color-swatch-wrap {
+      position: relative;
+      width: 48px;
+      height: 48px;
+    }
+    .color-primary, .color-secondary {
+      position: absolute;
+      border: 2px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .color-primary {
+      width: 34px; height: 34px;
+      top: 0; left: 0;
+      z-index: 2;
+    }
+    .color-secondary {
+      width: 34px; height: 34px;
+      bottom: 0; right: 0;
+      z-index: 1;
+    }
+    .color-swap {
+      position: absolute;
+      top: -2px; right: -2px;
+      width: 16px; height: 16px;
+      background: #333;
+      border: 1px solid #555;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ccc;
+      z-index: 3;
+    }
+    .color-swap:hover { background: #555; }
+    .color-picker-hidden { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+    .color-info {
+      font-size: 11px;
+      color: #aaa;
+    }
+    .color-info span { display: block; margin-top: 2px; }
+    .color-hex-input {
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      border-radius: 3px;
+      color: #e0e0e0;
+      font-size: 11px;
+      font-family: monospace;
+      width: 70px;
+      padding: 2px 4px;
+      margin-top: 2px;
+    }
+
+    /* ── Palette ── */
+    .palette-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+    }
+    .palette-color {
+      width: 18px;
+      height: 18px;
+      border-radius: 3px;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: transform 0.1s;
+    }
+    .palette-color:hover { transform: scale(1.3); z-index: 1; border-color: #fff; }
+    .palette-select {
+      width: 100%;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      padding: 3px 4px;
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Recent Colors ── */
+    .recent-colors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      margin-top: 6px;
+    }
+
+    /* ── Layer List ── */
+    .layer-actions {
+      display: flex;
+      gap: 3px;
+    }
+    .layer-actions button {
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      color: #ccc;
+      cursor: pointer;
+      border-radius: 3px;
+      font-size: 12px;
+      width: 24px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .layer-actions button:hover { background: #0f3460; color: #fff; }
+    .layer-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .layer-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      background: #1a1a2e;
+      cursor: pointer;
+      border: 2px solid transparent;
+      font-size: 11px;
+    }
+    .layer-item.active { border-color: #e94560; }
+    .layer-item:hover { background: #0f3460; }
+    .layer-thumb {
+      width: 28px;
+      height: 28px;
+      border-radius: 3px;
+      background: repeating-conic-gradient(#444 0% 25%, #333 0% 50%) 50% / 8px 8px;
+      flex-shrink: 0;
+      image-rendering: pixelated;
+    }
+    .layer-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #ddd;
+    }
+    .layer-name-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #e94560;
+      color: #e0e0e0;
+      font-size: 11px;
+      width: 100%;
+      outline: none;
+    }
+    .layer-vis {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      color: #aaa;
+      padding: 0 2px;
+    }
+    .layer-vis:hover { color: #fff; }
+    .layer-opacity {
+      width: 50px;
+      height: 3px;
+      cursor: pointer;
+      accent-color: #e94560;
+    }
+
+    /* ── Animation Section ── */
+    .anim-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .anim-controls button {
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      color: #ccc;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 13px;
+      width: 28px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .anim-controls button:hover { background: #0f3460; color: #fff; }
+    .anim-controls button.active { border-color: #e94560; color: #e94560; }
+    .anim-fps {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: #aaa;
+    }
+    .anim-fps input {
+      width: 40px;
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      border-radius: 3px;
+      color: #e0e0e0;
+      font-size: 11px;
+      padding: 2px 3px;
+      text-align: center;
+    }
+    .onion-chk { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #aaa; cursor: pointer; }
+    .onion-chk input { cursor: pointer; accent-color: #e94560; }
+
+    /* ── Status Bar ── */
+    .statusbar {
+      grid-column: 1 / -1;
+      background: #16213e;
+      border-top: 1px solid #0f3460;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 16px;
+      font-size: 11px;
+      color: #888;
+    }
+    .statusbar span { white-space: nowrap; }
+
+    /* ── Selection marching ants ── */
+    @keyframes march {
+      to { stroke-dashoffset: -8; }
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 20px;
+      min-width: 300px;
+      max-width: 400px;
+    }
+    .modal h3 { font-size: 14px; color: #e0e0e0; margin-bottom: 12px; }
+    .modal label { font-size: 12px; color: #aaa; display: block; margin-bottom: 4px; }
+    .modal input, .modal select {
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      color: #e0e0e0;
+      padding: 4px 8px;
+      font-size: 12px;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+    .modal-btns button {
+      padding: 5px 14px;
+      border-radius: 4px;
+      border: 1px solid #0f3460;
+      background: #1a1a2e;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .modal-btns button:hover { background: #0f3460; color: #fff; }
+    .modal-btns .btn-primary { background: #e94560; border-color: #e94560; color: #fff; }
+    .modal-btns .btn-primary:hover { background: #c73550; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1a1a2e; }
+    ::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #1a5276; }
+
+    /* ── Light mode overrides ── */
+    body:not(.tt-dark) { background: #f0f0f0; color: #333; }
+    body:not(.tt-dark) .app { background: #f0f0f0; }
+    body:not(.tt-dark) .toolbar { background: #fff; border-bottom-color: #ddd; }
+    body:not(.tt-dark) .toolbar select,
+    body:not(.tt-dark) .toolbar input[type="number"] { background: #f5f5f5; color: #333; border-color: #ddd; }
+    body:not(.tt-dark) .toolbar label { color: #666; }
+    body:not(.tt-dark) .tb-btn { color: #555; }
+    body:not(.tt-dark) .tb-btn:hover { background: #e8e8e8; color: #222; }
+    body:not(.tt-dark) .tool-panel { background: #fff; border-right-color: #ddd; }
+    body:not(.tt-dark) .tool-btn { color: #666; }
+    body:not(.tt-dark) .tool-btn:hover { background: #e8e8e8; color: #333; }
+    body:not(.tt-dark) .tool-btn.active { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.08); }
+    body:not(.tt-dark) .canvas-area { background: #d0d0d0; }
+    body:not(.tt-dark) .sidebar { background: #fff; border-left-color: #ddd; }
+    body:not(.tt-dark) .sb-section { border-bottom-color: #ddd; }
+    body:not(.tt-dark) .sb-title { color: #888; }
+    body:not(.tt-dark) .layer-item { background: #f5f5f5; }
+    body:not(.tt-dark) .layer-item:hover { background: #e8e8e8; }
+    body:not(.tt-dark) .layer-name { color: #333; }
+    body:not(.tt-dark) .color-info { color: #666; }
+    body:not(.tt-dark) .color-hex-input { background: #f5f5f5; color: #333; border-color: #ddd; }
+    body:not(.tt-dark) .palette-select { background: #f5f5f5; color: #333; border-color: #ddd; }
+    body:not(.tt-dark) .statusbar { background: #fff; border-top-color: #ddd; color: #666; }
+    body:not(.tt-dark) .toolbar-sep, body:not(.tt-dark) .tool-sep { background: #ddd; }
+    body:not(.tt-dark) .layer-actions button,
+    body:not(.tt-dark) .anim-controls button { background: #f5f5f5; border-color: #ddd; color: #555; }
+    body:not(.tt-dark) .layer-actions button:hover,
+    body:not(.tt-dark) .anim-controls button:hover { background: #e8e8e8; color: #222; }
+    body:not(.tt-dark) .anim-fps input { background: #f5f5f5; border-color: #ddd; color: #333; }
+    body:not(.tt-dark) .modal { background: #fff; border-color: #ddd; }
+    body:not(.tt-dark) .modal h3 { color: #333; }
+    body:not(.tt-dark) .modal label { color: #666; }
+    body:not(.tt-dark) .modal input, body:not(.tt-dark) .modal select { background: #f5f5f5; color: #333; border-color: #ddd; }
+    body:not(.tt-dark) .modal-btns button { background: #f5f5f5; border-color: #ddd; color: #555; }
+    body:not(.tt-dark) .modal-btns button:hover { background: #e8e8e8; color: #222; }
+    body:not(.tt-dark) .color-swap { background: #e0e0e0; border-color: #bbb; color: #555; }
+    body:not(.tt-dark) .layer-opacity { accent-color: #e94560; }
+    body:not(.tt-dark) .onion-chk { color: #666; }
+    body:not(.tt-dark) .tb-chk { color: #666; }
+    body:not(.tt-dark) .anim-fps { color: #666; }
+  </style>
+  <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools" data-note="https://note.com/sana_suke"></script>
+</head>
+<body>
+  <!-- ── App Shell ── -->
+  <div class="app">
+    <!-- ── Toolbar ── -->
+    <div class="toolbar">
+      <div class="toolbar-group">
+        <label>W</label>
+        <input type="number" id="canvasW" value="32" min="1" max="256">
+        <label>H</label>
+        <input type="number" id="canvasH" value="32" min="1" max="256">
+        <button class="tb-btn" id="btnResize">適用</button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <div class="toolbar-group">
+        <button class="tb-btn" id="btnZoomIn" title="ズームイン">+</button>
+        <button class="tb-btn" id="btnZoomOut" title="ズームアウト">-</button>
+        <button class="tb-btn" id="btnFitView" title="フィット">⊞</button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <label class="tb-chk">
+        <input type="checkbox" id="chkGrid" checked> Grid
+      </label>
+      <label class="tb-chk">
+        <input type="checkbox" id="chkMirrorH"> 左右対称
+      </label>
+      <label class="tb-chk">
+        <input type="checkbox" id="chkMirrorV"> 上下対称
+      </label>
+      <label class="tb-chk">
+        <input type="checkbox" id="chkRectFill"> 四角塗り
+      </label>
+      <div class="toolbar-sep"></div>
+      <div class="toolbar-group">
+        <button class="tb-btn" id="btnUndo" title="Undo (Ctrl+Z)">↩ Undo</button>
+        <button class="tb-btn" id="btnRedo" title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <div class="toolbar-group">
+        <button class="tb-btn" id="btnExport">PNG出力</button>
+        <button class="tb-btn" id="btnCopy">コピー</button>
+        <button class="tb-btn" id="btnSpriteSheet">スプライト</button>
+        <button class="tb-btn" id="btnSave">保存</button>
+        <button class="tb-btn" id="btnLoad">読込</button>
+        <button class="tb-btn" id="btnImport">画像読込</button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <div class="toolbar-group">
+        <select id="genAlgo">
+          <option value="noise">ノイズ</option>
+          <option value="symmetric">対称パターン</option>
+          <option value="plasma">プラズマ</option>
+          <option value="maze">迷路</option>
+          <option value="terrain">地形</option>
+          <option value="life">ライフゲーム</option>
+        </select>
+        <button class="tb-btn" id="btnGenerate">🎲 生成</button>
+      </div>
+    </div>
+
+    <!-- ── Tool Panel (Left) ── -->
+    <div class="tool-panel">
+      <button class="tool-btn active" data-tool="pen" title="ペン (B)">✏</button>
+      <button class="tool-btn" data-tool="eraser" title="消しゴム (E)">◻</button>
+      <button class="tool-btn" data-tool="fill" title="塗りつぶし (G)">🪣</button>
+      <button class="tool-btn" data-tool="line" title="ライン (L)">╱</button>
+      <button class="tool-btn" data-tool="rect" title="四角形 (R)">▭</button>
+      <button class="tool-btn" data-tool="eyedropper" title="スポイト (I)">💧</button>
+      <button class="tool-btn" data-tool="select" title="選択 (M)">⬚</button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" data-tool="pan" title="パン (Space)">✋</button>
+    </div>
+
+    <!-- ── Canvas Area ── -->
+    <div class="canvas-area" id="canvasArea">
+      <canvas id="displayCanvas"></canvas>
+    </div>
+
+    <!-- ── Right Sidebar ── -->
+    <div class="sidebar">
+      <!-- Color -->
+      <div class="sb-section">
+        <div class="sb-title">カラー</div>
+        <div class="color-main">
+          <div class="color-swatch-wrap">
+            <div class="color-primary" id="colorPrimary" style="background:#000000;"></div>
+            <div class="color-secondary" id="colorSecondary" style="background:#ffffff;"></div>
+            <div class="color-swap" id="colorSwap" title="色を入れ替え (X)">⇄</div>
+            <input type="color" class="color-picker-hidden" id="pickerPrimary" value="#000000">
+            <input type="color" class="color-picker-hidden" id="pickerSecondary" value="#ffffff">
+          </div>
+          <div class="color-info">
+            <input type="text" class="color-hex-input" id="hexInput" value="#000000" maxlength="7" spellcheck="false">
+            <span id="rgbInfo">R:0 G:0 B:0</span>
+          </div>
+        </div>
+        <div class="sb-title" style="margin-top:4px;">最近の色</div>
+        <div class="recent-colors" id="recentColors"></div>
+      </div>
+
+      <!-- Palette -->
+      <div class="sb-section">
+        <div class="sb-title">パレット</div>
+        <select class="palette-select" id="paletteSelect">
+          <option value="nes">NES (54色)</option>
+          <option value="gameboy">Game Boy (4色)</option>
+          <option value="pastel">パステル (16色)</option>
+          <option value="endesga32">ENDESGA 32</option>
+          <option value="custom">カスタム</option>
+        </select>
+        <div class="palette-grid" id="paletteGrid"></div>
+      </div>
+
+      <!-- Layers -->
+      <div class="sb-section">
+        <div class="sb-title">
+          レイヤー
+          <div class="layer-actions">
+            <button id="btnAddLayer" title="追加">+</button>
+            <button id="btnDelLayer" title="削除">-</button>
+            <button id="btnMergeLayer" title="結合">⊕</button>
+            <button id="btnLayerUp" title="上へ">↑</button>
+            <button id="btnLayerDown" title="下へ">↓</button>
+          </div>
+        </div>
+        <div class="layer-list" id="layerList"></div>
+      </div>
+
+      <!-- Animation -->
+      <div class="sb-section">
+        <div class="sb-title">アニメーション</div>
+        <div class="anim-controls">
+          <button id="btnAnimPlay" title="再生/停止">▶</button>
+          <div class="anim-fps">
+            <label>FPS</label>
+            <input type="number" id="animFps" value="6" min="1" max="30">
+          </div>
+        </div>
+        <label class="onion-chk">
+          <input type="checkbox" id="chkOnion"> オニオンスキン
+        </label>
+      </div>
+    </div>
+
+    <!-- ── Status Bar ── -->
+    <div class="statusbar">
+      <span id="stPos">0, 0</span>
+      <span id="stZoom">100%</span>
+      <span id="stSize">32×32</span>
+      <span id="stLayer">レイヤー 1</span>
+      <span id="stTool">ペン</span>
+    </div>
+  </div>
+
+  <!-- ── Export Modal ── -->
+  <div class="modal-overlay hidden" id="exportModal">
+    <div class="modal">
+      <h3>PNG エクスポート</h3>
+      <label>スケール</label>
+      <select id="exportScale">
+        <option value="1">1x</option>
+        <option value="2">2x</option>
+        <option value="4" selected>4x</option>
+        <option value="8">8x</option>
+        <option value="16">16x</option>
+      </select>
+      <div class="modal-btns">
+        <button id="exportCancel">キャンセル</button>
+        <button id="exportOk" class="btn-primary">ダウンロード</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Resize Modal ── -->
+  <div class="modal-overlay hidden" id="resizeModal">
+    <div class="modal">
+      <h3>キャンバスサイズ変更</h3>
+      <p style="font-size:12px;color:#e94560;margin-bottom:8px;">※ 新しいサイズに変更すると、はみ出た部分は削除されます</p>
+      <label>幅</label>
+      <input type="number" id="resizeW" min="1" max="256">
+      <label>高さ</label>
+      <input type="number" id="resizeH" min="1" max="256">
+      <div class="modal-btns">
+        <button id="resizeCancel">キャンセル</button>
+        <button id="resizeOk" class="btn-primary">変更</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file inputs -->
+  <input type="file" id="fileLoad" accept=".json" style="display:none">
+  <input type="file" id="fileImport" accept="image/*" style="display:none">
+
+  <script>
+  (function() {
+    'use strict';
+
+    /* ================================================================
+       PALETTES
+       ================================================================ */
+    var PALETTES = {
+      nes: [
+        '#7C7C7C','#0000FC','#0000BC','#4428BC','#940084','#A80020','#A81000','#881400',
+        '#503000','#007800','#006800','#005800','#004058','#000000','#000000','#000000',
+        '#BCBCBC','#0078F8','#0058F8','#6844FC','#D800CC','#E40058','#F83800','#E45C10',
+        '#AC7C00','#00B800','#00A800','#00A844','#008888','#000000','#000000','#000000',
+        '#F8F8F8','#3CBCFC','#6888FC','#9878F8','#F878F8','#F85898','#F87858','#FCA044',
+        '#F8B800','#B8F818','#58D854','#58F898','#00E8D8','#787878','#000000','#000000',
+        '#FCFCFC','#A4E4FC','#B8B8F8','#D8B8F8','#F8B8F8','#F8A4C0','#F0D0B0','#FCE0A8',
+        '#F8D878','#D8F878','#B8F8B8','#B8F8D8','#00FCFC','#F8D8F8','#000000','#000000'
+      ].filter(function(c, i, a) { return a.indexOf(c) === i; }),
+      gameboy: ['#0f380f','#306230','#8bac0f','#9bbc0f'],
+      pastel: [
+        '#FFB3BA','#FFDFBA','#FFFFBA','#BAFFC9','#BAE1FF','#D4BAFF','#FFBAF2','#FFE4BA',
+        '#E8BAFF','#BAFFF5','#C9FFBA','#FFD4BA','#BAC9FF','#F5BAFF','#BAFFDF','#FFBADF'
+      ],
+      endesga32: [
+        '#be4a2f','#d77643','#ead4aa','#e4a672','#b86f50','#733e39','#3e2731','#a22633',
+        '#e43b44','#f77622','#feae34','#fee761','#63c74d','#3e8948','#265c42','#193c3e',
+        '#124e89','#0099db','#2ce8f5','#ffffff','#c0cbdc','#8b9bb4','#5a6988','#3a4466',
+        '#262b44','#181425','#ff0044','#68386c','#b55088','#f6757a','#e8b796','#c28569'
+      ],
+      custom: []
+    };
+
+    /* ================================================================
+       STATE
+       ================================================================ */
+    var S = {
+      w: 32,
+      h: 32,
+      zoom: 10,
+      panX: 0,
+      panY: 0,
+      tool: 'pen',
+      primaryColor: 0xFF000000,   // ABGR (black, fully opaque)
+      secondaryColor: 0xFFFFFFFF, // ABGR (white, fully opaque)
+      layers: [],
+      activeLayer: 0,
+      undoStack: [],
+      redoStack: [],
+      maxUndo: 50,
+      showGrid: true,
+      mirrorH: false,
+      mirrorV: false,
+      recentColors: [],
+      maxRecent: 16,
+      palette: 'nes',
+      customPalette: [],
+      // interaction state
+      isDrawing: false,
+      isPanning: false,
+      spaceDown: false,
+      lastGridX: -1,
+      lastGridY: -1,
+      dragStartX: -1,
+      dragStartY: -1,
+      previewLayer: null,
+      // selection
+      selection: null, // {x, y, w, h, data: Uint32Array|null, moving: false, offsetX, offsetY}
+      selectionAntsOffset: 0,
+      // animation
+      animPlaying: false,
+      animFrame: 0,
+      animTimer: null,
+      animFps: 6,
+      onionSkin: false,
+      // rect tool mode
+      rectFilled: false
+    };
+
+    /* ================================================================
+       CANVAS REFS
+       ================================================================ */
+    var canvasArea = document.getElementById('canvasArea');
+    var displayCanvas = document.getElementById('displayCanvas');
+    var displayCtx = displayCanvas.getContext('2d');
+    var compositeCanvas = document.createElement('canvas');
+    var compositeCtx = compositeCanvas.getContext('2d');
+
+    /* ================================================================
+       HELPERS
+       ================================================================ */
+    function hexToABGR(hex) {
+      var r = parseInt(hex.slice(1,3), 16);
+      var g = parseInt(hex.slice(3,5), 16);
+      var b = parseInt(hex.slice(5,7), 16);
+      return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
+    }
+
+    function abgrToHex(c) {
+      var r = c & 0xFF;
+      var g = (c >> 8) & 0xFF;
+      var b = (c >> 16) & 0xFF;
+      return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+    }
+
+    function abgrToRGB(c) {
+      return { r: c & 0xFF, g: (c >> 8) & 0xFF, b: (c >> 16) & 0xFF, a: (c >> 24) & 0xFF };
+    }
+
+    function rgbaToABGR(r, g, b, a) {
+      return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+    }
+
+    function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }
+
+    /* ================================================================
+       LAYER MANAGEMENT
+       ================================================================ */
+    function createLayer(name) {
+      var data = new Uint32Array(S.w * S.h);
+      var canvas = document.createElement('canvas');
+      canvas.width = S.w;
+      canvas.height = S.h;
+      return { name: name, visible: true, opacity: 1, data: data, canvas: canvas };
+    }
+
+    function initLayers() {
+      S.layers = [createLayer('レイヤー 1')];
+      S.activeLayer = 0;
+    }
+
+    function getActiveLayer() {
+      return S.layers[S.activeLayer];
+    }
+
+    function setPixel(layer, x, y, color) {
+      if (x < 0 || x >= S.w || y < 0 || y >= S.h) return;
+      layer.data[y * S.w + x] = color;
+    }
+
+    function getPixel(layer, x, y) {
+      if (x < 0 || x >= S.w || y < 0 || y >= S.h) return 0;
+      return layer.data[y * S.w + x];
+    }
+
+    /* ================================================================
+       LAYER -> CANVAS SYNC
+       ================================================================ */
+    function syncLayerCanvas(layer) {
+      var ctx = layer.canvas.getContext('2d');
+      var imgData = ctx.createImageData(S.w, S.h);
+      var buf = new Uint32Array(imgData.data.buffer);
+      buf.set(layer.data);
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    function syncAllLayerCanvases() {
+      for (var i = 0; i < S.layers.length; i++) {
+        syncLayerCanvas(S.layers[i]);
+      }
+    }
+
+    /* ================================================================
+       COMPOSITE
+       ================================================================ */
+    function composite() {
+      compositeCanvas.width = S.w;
+      compositeCanvas.height = S.h;
+      compositeCtx.clearRect(0, 0, S.w, S.h);
+
+      // draw checkerboard for transparency
+      var sz = 1;
+      for (var cy = 0; cy < S.h; cy++) {
+        for (var cx = 0; cx < S.w; cx++) {
+          compositeCtx.fillStyle = ((cx + cy) % 2 === 0) ? '#cccccc' : '#999999';
+          compositeCtx.fillRect(cx, cy, sz, sz);
+        }
+      }
+
+      // onion skin: draw previous frame if animation is not playing
+      if (S.onionSkin && !S.animPlaying && S.activeLayer > 0) {
+        var prevLayer = S.layers[S.activeLayer - 1];
+        if (prevLayer.visible || true) { // show onion skin even if layer hidden
+          compositeCtx.globalAlpha = 0.25;
+          syncLayerCanvas(prevLayer);
+          compositeCtx.drawImage(prevLayer.canvas, 0, 0);
+          compositeCtx.globalAlpha = 1;
+        }
+      }
+
+      for (var i = 0; i < S.layers.length; i++) {
+        var l = S.layers[i];
+        if (!l.visible) continue;
+        syncLayerCanvas(l);
+        compositeCtx.globalAlpha = l.opacity;
+        compositeCtx.drawImage(l.canvas, 0, 0);
+      }
+      compositeCtx.globalAlpha = 1;
+
+      // draw preview layer (for line/rect tool)
+      if (S.previewLayer) {
+        syncLayerCanvas(S.previewLayer);
+        compositeCtx.drawImage(S.previewLayer.canvas, 0, 0);
+      }
+
+      // draw lifted selection data
+      if (S.selection && S.selection.data) {
+        var sel = S.selection;
+        var selCanvas = document.createElement('canvas');
+        selCanvas.width = sel.w;
+        selCanvas.height = sel.h;
+        var selCtx = selCanvas.getContext('2d');
+        var selImg = selCtx.createImageData(sel.w, sel.h);
+        new Uint32Array(selImg.data.buffer).set(sel.data);
+        selCtx.putImageData(selImg, 0, 0);
+        compositeCtx.drawImage(selCanvas, sel.x, sel.y);
+      }
+    }
+
+    /* ================================================================
+       RENDER PIPELINE
+       ================================================================ */
+    var dpr = window.devicePixelRatio || 1;
+    var renderScheduled = false;
+
+    function scheduleRender() {
+      if (!renderScheduled) {
+        renderScheduled = true;
+        requestAnimationFrame(render);
+      }
+    }
+
+    function render() {
+      renderScheduled = false;
+      var area = canvasArea.getBoundingClientRect();
+      var cw = area.width;
+      var ch = area.height;
+
+      displayCanvas.style.width = cw + 'px';
+      displayCanvas.style.height = ch + 'px';
+      displayCanvas.width = Math.round(cw * dpr);
+      displayCanvas.height = Math.round(ch * dpr);
+
+      var ctx = displayCtx;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+
+      // background
+      var isDark = document.body.classList.contains('tt-dark');
+      ctx.fillStyle = isDark ? '#111' : '#d0d0d0';
+      ctx.fillRect(0, 0, cw, ch);
+
+      // composite all layers
+      composite();
+
+      // draw composite canvas zoomed + panned
+      var drawW = S.w * S.zoom;
+      var drawH = S.h * S.zoom;
+      var ox = S.panX + (cw - drawW) / 2;
+      var oy = S.panY + (ch - drawH) / 2;
+
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(compositeCanvas, ox, oy, drawW, drawH);
+
+      // grid
+      if (S.showGrid && S.zoom >= 4) {
+        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        for (var gx = 0; gx <= S.w; gx++) {
+          var x = ox + gx * S.zoom;
+          ctx.moveTo(x, oy);
+          ctx.lineTo(x, oy + drawH);
+        }
+        for (var gy = 0; gy <= S.h; gy++) {
+          var y = oy + gy * S.zoom;
+          ctx.moveTo(ox, y);
+          ctx.lineTo(ox + drawW, y);
+        }
+        ctx.stroke();
+
+        // canvas border
+        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(ox, oy, drawW, drawH);
+      }
+
+      // hover highlight
+      if (S.lastGridX >= 0 && S.lastGridX < S.w && S.lastGridY >= 0 && S.lastGridY < S.h && !S.isPanning) {
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.fillRect(ox + S.lastGridX * S.zoom, oy + S.lastGridY * S.zoom, S.zoom, S.zoom);
+      }
+
+      // selection marching ants
+      if (S.selection) {
+        var sel = S.selection;
+        var sx = ox + sel.x * S.zoom;
+        var sy = oy + sel.y * S.zoom;
+        var sw = sel.w * S.zoom;
+        var sh = sel.h * S.zoom;
+        ctx.save();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.lineDashOffset = -S.selectionAntsOffset;
+        ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1);
+        ctx.strokeStyle = '#000';
+        ctx.lineDashOffset = -(S.selectionAntsOffset + 4);
+        ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1);
+        ctx.restore();
+      }
+
+      updateStatus();
+    }
+
+    /* ================================================================
+       COORDINATE TRANSFORMS
+       ================================================================ */
+    function screenToGrid(screenX, screenY) {
+      var area = canvasArea.getBoundingClientRect();
+      var cw = area.width;
+      var ch = area.height;
+      var drawW = S.w * S.zoom;
+      var drawH = S.h * S.zoom;
+      var ox = S.panX + (cw - drawW) / 2;
+      var oy = S.panY + (ch - drawH) / 2;
+
+      var lx = screenX - area.left;
+      var ly = screenY - area.top;
+
+      return {
+        x: Math.floor((lx - ox) / S.zoom),
+        y: Math.floor((ly - oy) / S.zoom)
+      };
+    }
+
+    function isInBounds(gx, gy) {
+      return gx >= 0 && gx < S.w && gy >= 0 && gy < S.h;
+    }
+
+    /* ================================================================
+       ZOOM & PAN
+       ================================================================ */
+    var ZOOM_LEVELS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64];
+
+    function zoomIn() {
+      for (var i = 0; i < ZOOM_LEVELS.length; i++) {
+        if (ZOOM_LEVELS[i] > S.zoom) { S.zoom = ZOOM_LEVELS[i]; scheduleRender(); return; }
+      }
+    }
+
+    function zoomOut() {
+      for (var i = ZOOM_LEVELS.length - 1; i >= 0; i--) {
+        if (ZOOM_LEVELS[i] < S.zoom) { S.zoom = ZOOM_LEVELS[i]; scheduleRender(); return; }
+      }
+    }
+
+    function zoomToFit() {
+      var area = canvasArea.getBoundingClientRect();
+      var zx = (area.width - 40) / S.w;
+      var zy = (area.height - 40) / S.h;
+      var z = Math.max(1, Math.floor(Math.min(zx, zy)));
+      S.zoom = z;
+      S.panX = 0;
+      S.panY = 0;
+      scheduleRender();
+    }
+
+    function zoomAtPoint(screenX, screenY, delta) {
+      var area = canvasArea.getBoundingClientRect();
+      var lx = screenX - area.left;
+      var ly = screenY - area.top;
+      var cw = area.width;
+      var ch = area.height;
+
+      var oldZoom = S.zoom;
+      if (delta < 0) {
+        for (var i = 0; i < ZOOM_LEVELS.length; i++) {
+          if (ZOOM_LEVELS[i] > S.zoom) { S.zoom = ZOOM_LEVELS[i]; break; }
+        }
+      } else {
+        for (var j = ZOOM_LEVELS.length - 1; j >= 0; j--) {
+          if (ZOOM_LEVELS[j] < S.zoom) { S.zoom = ZOOM_LEVELS[j]; break; }
+        }
+      }
+
+      if (S.zoom !== oldZoom) {
+        // adjust pan so the point under cursor stays fixed
+        var drawW0 = S.w * oldZoom;
+        var drawH0 = S.h * oldZoom;
+        var ox0 = S.panX + (cw - drawW0) / 2;
+        var oy0 = S.panY + (ch - drawH0) / 2;
+        var gxf = (lx - ox0) / oldZoom;
+        var gyf = (ly - oy0) / oldZoom;
+
+        var drawW1 = S.w * S.zoom;
+        var drawH1 = S.h * S.zoom;
+        var ox1 = lx - gxf * S.zoom;
+        var oy1 = ly - gyf * S.zoom;
+        S.panX = ox1 - (cw - drawW1) / 2;
+        S.panY = oy1 - (ch - drawH1) / 2;
+      }
+      scheduleRender();
+    }
+
+    /* ================================================================
+       UNDO / REDO
+       ================================================================ */
+    function pushUndo(diffs, layerIndex) {
+      if (diffs.length === 0) return;
+      S.undoStack.push({ layerIndex: layerIndex, diffs: diffs });
+      if (S.undoStack.length > S.maxUndo) S.undoStack.shift();
+      S.redoStack = [];
+      updateUndoButtons();
+    }
+
+    function undo() {
+      if (S.undoStack.length === 0) return;
+      var cmd = S.undoStack.pop();
+      var layer = S.layers[cmd.layerIndex];
+      if (!layer) { updateUndoButtons(); return; }
+      var redoDiffs = [];
+      for (var i = 0; i < cmd.diffs.length; i++) {
+        var d = cmd.diffs[i];
+        redoDiffs.push({ x: d.x, y: d.y, oldColor: layer.data[d.y * S.w + d.x], newColor: d.oldColor });
+        layer.data[d.y * S.w + d.x] = d.oldColor;
+      }
+      S.redoStack.push({ layerIndex: cmd.layerIndex, diffs: redoDiffs });
+      scheduleRender();
+      updateUndoButtons();
+    }
+
+    function redo() {
+      if (S.redoStack.length === 0) return;
+      var cmd = S.redoStack.pop();
+      var layer = S.layers[cmd.layerIndex];
+      if (!layer) { updateUndoButtons(); return; }
+      var undoDiffs = [];
+      for (var i = 0; i < cmd.diffs.length; i++) {
+        var d = cmd.diffs[i];
+        undoDiffs.push({ x: d.x, y: d.y, oldColor: layer.data[d.y * S.w + d.x], newColor: d.oldColor });
+        layer.data[d.y * S.w + d.x] = d.oldColor;
+      }
+      S.undoStack.push({ layerIndex: cmd.layerIndex, diffs: undoDiffs });
+      scheduleRender();
+      updateUndoButtons();
+    }
+
+    function updateUndoButtons() {
+      document.getElementById('btnUndo').disabled = S.undoStack.length === 0;
+      document.getElementById('btnRedo').disabled = S.redoStack.length === 0;
+    }
+
+    /* ================================================================
+       BRESENHAM'S LINE
+       ================================================================ */
+    function bresenhamLine(x0, y0, x1, y1, callback) {
+      var dx = Math.abs(x1 - x0);
+      var dy = Math.abs(y1 - y0);
+      var sx = x0 < x1 ? 1 : -1;
+      var sy = y0 < y1 ? 1 : -1;
+      var err = dx - dy;
+
+      while (true) {
+        callback(x0, y0);
+        if (x0 === x1 && y0 === y1) break;
+        var e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; x0 += sx; }
+        if (e2 < dx) { err += dx; y0 += sy; }
+      }
+    }
+
+    /* ================================================================
+       FLOOD FILL (BFS)
+       ================================================================ */
+    function floodFill(layer, startX, startY, fillColor) {
+      if (!isInBounds(startX, startY)) return [];
+      var targetColor = layer.data[startY * S.w + startX];
+      if (targetColor === fillColor) return [];
+
+      var diffs = [];
+      var visited = new Uint8Array(S.w * S.h);
+      var queue = [[startX, startY]];
+      visited[startY * S.w + startX] = 1;
+
+      while (queue.length > 0) {
+        var p = queue.shift();
+        var px = p[0], py = p[1];
+        var idx = py * S.w + px;
+
+        if (layer.data[idx] !== targetColor) continue;
+
+        diffs.push({ x: px, y: py, oldColor: layer.data[idx], newColor: fillColor });
+        layer.data[idx] = fillColor;
+
+        var neighbors = [[px-1,py],[px+1,py],[px,py-1],[px,py+1]];
+        for (var i = 0; i < neighbors.length; i++) {
+          var nx = neighbors[i][0], ny = neighbors[i][1];
+          if (isInBounds(nx, ny) && !visited[ny * S.w + nx]) {
+            visited[ny * S.w + nx] = 1;
+            queue.push([nx, ny]);
+          }
+        }
+      }
+      return diffs;
+    }
+
+    /* ================================================================
+       TOOL SYSTEM
+       ================================================================ */
+    var currentDiffs = [];
+
+    function drawPixelWithMirror(layer, x, y, color, diffs) {
+      if (!isInBounds(x, y)) return;
+      var idx = y * S.w + x;
+      if (layer.data[idx] !== color) {
+        diffs.push({ x: x, y: y, oldColor: layer.data[idx], newColor: color });
+        layer.data[idx] = color;
+      }
+      if (S.mirrorH) {
+        var mx = S.w - 1 - x;
+        if (mx !== x && isInBounds(mx, y)) {
+          var midx = y * S.w + mx;
+          if (layer.data[midx] !== color) {
+            diffs.push({ x: mx, y: y, oldColor: layer.data[midx], newColor: color });
+            layer.data[midx] = color;
+          }
+        }
+      }
+      if (S.mirrorV) {
+        var my = S.h - 1 - y;
+        if (my !== y && isInBounds(x, my)) {
+          var vidx = my * S.w + x;
+          if (layer.data[vidx] !== color) {
+            diffs.push({ x: x, y: my, oldColor: layer.data[vidx], newColor: color });
+            layer.data[vidx] = color;
+          }
+        }
+      }
+      if (S.mirrorH && S.mirrorV) {
+        var cmx = S.w - 1 - x;
+        var cmy = S.h - 1 - y;
+        if ((cmx !== x || cmy !== y) && isInBounds(cmx, cmy)) {
+          var cidx = cmy * S.w + cmx;
+          if (layer.data[cidx] !== color) {
+            diffs.push({ x: cmx, y: cmy, oldColor: layer.data[cidx], newColor: color });
+            layer.data[cidx] = color;
+          }
+        }
+      }
+    }
+
+    var tools = {
+      pen: {
+        onMouseDown: function(gx, gy, button) {
+          var layer = getActiveLayer();
+          var color = button === 2 ? S.secondaryColor : S.primaryColor;
+          currentDiffs = [];
+          drawPixelWithMirror(layer, gx, gy, color, currentDiffs);
+          S.lastGridX = gx;
+          S.lastGridY = gy;
+          scheduleRender();
+        },
+        onMouseMove: function(gx, gy, button) {
+          if (!S.isDrawing) return;
+          var layer = getActiveLayer();
+          var color = button === 2 ? S.secondaryColor : S.primaryColor;
+          bresenhamLine(S.lastGridX, S.lastGridY, gx, gy, function(px, py) {
+            drawPixelWithMirror(layer, px, py, color, currentDiffs);
+          });
+          S.lastGridX = gx;
+          S.lastGridY = gy;
+          scheduleRender();
+        },
+        onMouseUp: function() {
+          if (currentDiffs.length > 0) {
+            pushUndo(currentDiffs, S.activeLayer);
+            addRecentColor(S.primaryColor);
+          }
+          currentDiffs = [];
+        }
+      },
+
+      eraser: {
+        onMouseDown: function(gx, gy) {
+          var layer = getActiveLayer();
+          currentDiffs = [];
+          drawPixelWithMirror(layer, gx, gy, 0, currentDiffs);
+          S.lastGridX = gx;
+          S.lastGridY = gy;
+          scheduleRender();
+        },
+        onMouseMove: function(gx, gy) {
+          if (!S.isDrawing) return;
+          var layer = getActiveLayer();
+          bresenhamLine(S.lastGridX, S.lastGridY, gx, gy, function(px, py) {
+            drawPixelWithMirror(layer, px, py, 0, currentDiffs);
+          });
+          S.lastGridX = gx;
+          S.lastGridY = gy;
+          scheduleRender();
+        },
+        onMouseUp: function() {
+          if (currentDiffs.length > 0) pushUndo(currentDiffs, S.activeLayer);
+          currentDiffs = [];
+        }
+      },
+
+      fill: {
+        onMouseDown: function(gx, gy, button) {
+          var layer = getActiveLayer();
+          var color = button === 2 ? S.secondaryColor : S.primaryColor;
+          var diffs = floodFill(layer, gx, gy, color);
+          if (diffs.length > 0) {
+            pushUndo(diffs, S.activeLayer);
+            addRecentColor(color);
+          }
+          scheduleRender();
+        },
+        onMouseMove: function() {},
+        onMouseUp: function() {}
+      },
+
+      line: {
+        onMouseDown: function(gx, gy, button) {
+          S.dragStartX = gx;
+          S.dragStartY = gy;
+          S.previewLayer = createLayer('__preview');
+          currentDiffs = [];
+        },
+        onMouseMove: function(gx, gy, button) {
+          if (!S.isDrawing) return;
+          S.previewLayer.data.fill(0);
+          var color = button === 2 ? S.secondaryColor : S.primaryColor;
+          bresenhamLine(S.dragStartX, S.dragStartY, gx, gy, function(px, py) {
+            if (isInBounds(px, py)) S.previewLayer.data[py * S.w + px] = color;
+          });
+          scheduleRender();
+        },
+        onMouseUp: function(gx, gy, button) {
+          var layer = getActiveLayer();
+          var color = button === 2 ? S.secondaryColor : S.primaryColor;
+          var diffs = [];
+          bresenhamLine(S.dragStartX, S.dragStartY, gx, gy, function(px, py) {
+            if (isInBounds(px, py)) {
+              var idx = py * S.w + px;
+              if (layer.data[idx] !== color) {
+                diffs.push({ x: px, y: py, oldColor: layer.data[idx], newColor: color });
+                layer.data[idx] = color;
+              }
+            }
+          });
+          if (diffs.length > 0) { pushUndo(diffs, S.activeLayer); addRecentColor(color); }
+          S.previewLayer = null;
+          scheduleRender();
+        }
+      },
+
+      rect: {
+        onMouseDown: function(gx, gy, button) {
+          S.dragStartX = gx;
+          S.dragStartY = gy;
+          S.previewLayer = createLayer('__preview');
+        },
+        onMouseMove: function(gx, gy, button) {
+          if (!S.isDrawing) return;
+          S.previewLayer.data.fill(0);
+          var color = button === 2 ? S.secondaryColor : S.primaryColor;
+          drawRect(S.previewLayer, S.dragStartX, S.dragStartY, gx, gy, color, S.rectFilled);
+          scheduleRender();
+        },
+        onMouseUp: function(gx, gy, button) {
+          var layer = getActiveLayer();
+          var color = button === 2 ? S.secondaryColor : S.primaryColor;
+          var diffs = [];
+          drawRectWithDiffs(layer, S.dragStartX, S.dragStartY, gx, gy, color, S.rectFilled, diffs);
+          if (diffs.length > 0) { pushUndo(diffs, S.activeLayer); addRecentColor(color); }
+          S.previewLayer = null;
+          scheduleRender();
+        }
+      },
+
+      eyedropper: {
+        onMouseDown: function(gx, gy, button) {
+          if (!isInBounds(gx, gy)) return;
+          // sample from composite
+          composite();
+          var imgData = compositeCtx.getImageData(gx, gy, 1, 1);
+          var d = imgData.data;
+          var color = rgbaToABGR(d[0], d[1], d[2], d[3]);
+          if (button === 2) {
+            S.secondaryColor = color;
+          } else {
+            S.primaryColor = color;
+          }
+          updateColorUI();
+          addRecentColor(color);
+        },
+        onMouseMove: function(gx, gy, button) {
+          if (S.isDrawing) this.onMouseDown(gx, gy, button);
+        },
+        onMouseUp: function() {}
+      },
+
+      select: {
+        onMouseDown: function(gx, gy) {
+          // if clicking inside existing selection while it has data, start move
+          if (S.selection && S.selection.data && !S.selection.moving) {
+            var sel = S.selection;
+            if (gx >= sel.x && gx < sel.x + sel.w && gy >= sel.y && gy < sel.y + sel.h) {
+              if (!S.selection.data) liftSelection();
+              S.selection.moving = true;
+              S.selection.offsetX = gx - sel.x;
+              S.selection.offsetY = gy - sel.y;
+              return;
+            }
+          }
+          // commit any existing selection
+          commitSelection();
+          S.dragStartX = gx;
+          S.dragStartY = gy;
+          S.selection = null;
+        },
+        onMouseMove: function(gx, gy) {
+          if (!S.isDrawing) return;
+          if (S.selection && S.selection.moving) {
+            S.selection.x = gx - S.selection.offsetX;
+            S.selection.y = gy - S.selection.offsetY;
+            scheduleRender();
+            return;
+          }
+          var x0 = Math.min(S.dragStartX, gx);
+          var y0 = Math.min(S.dragStartY, gy);
+          var x1 = Math.max(S.dragStartX, gx);
+          var y1 = Math.max(S.dragStartY, gy);
+          S.selection = {
+            x: x0, y: y0,
+            w: x1 - x0 + 1, h: y1 - y0 + 1,
+            data: null, moving: false, offsetX: 0, offsetY: 0
+          };
+          scheduleRender();
+        },
+        onMouseUp: function(gx, gy) {
+          if (S.selection && S.selection.moving) {
+            S.selection.moving = false;
+            return;
+          }
+          // if selection is too small, clear it
+          if (S.selection && (S.selection.w <= 0 || S.selection.h <= 0)) {
+            S.selection = null;
+          }
+          scheduleRender();
+        }
+      },
+
+      pan: {
+        onMouseDown: function() {},
+        onMouseMove: function() {},
+        onMouseUp: function() {}
+      }
+    };
+
+    function drawRect(layer, x0, y0, x1, y1, color, filled) {
+      var minX = Math.max(0, Math.min(x0, x1));
+      var maxX = Math.min(S.w - 1, Math.max(x0, x1));
+      var minY = Math.max(0, Math.min(y0, y1));
+      var maxY = Math.min(S.h - 1, Math.max(y0, y1));
+
+      if (filled) {
+        for (var ry = minY; ry <= maxY; ry++) {
+          for (var rx = minX; rx <= maxX; rx++) {
+            layer.data[ry * S.w + rx] = color;
+          }
+        }
+      } else {
+        for (var rx2 = minX; rx2 <= maxX; rx2++) {
+          if (isInBounds(rx2, minY)) layer.data[minY * S.w + rx2] = color;
+          if (isInBounds(rx2, maxY)) layer.data[maxY * S.w + rx2] = color;
+        }
+        for (var ry2 = minY; ry2 <= maxY; ry2++) {
+          if (isInBounds(minX, ry2)) layer.data[ry2 * S.w + minX] = color;
+          if (isInBounds(maxX, ry2)) layer.data[ry2 * S.w + maxX] = color;
+        }
+      }
+    }
+
+    function drawRectWithDiffs(layer, x0, y0, x1, y1, color, filled, diffs) {
+      var minX = Math.max(0, Math.min(x0, x1));
+      var maxX = Math.min(S.w - 1, Math.max(x0, x1));
+      var minY = Math.max(0, Math.min(y0, y1));
+      var maxY = Math.min(S.h - 1, Math.max(y0, y1));
+
+      function setDiff(px, py) {
+        if (!isInBounds(px, py)) return;
+        var idx = py * S.w + px;
+        if (layer.data[idx] !== color) {
+          diffs.push({ x: px, y: py, oldColor: layer.data[idx], newColor: color });
+          layer.data[idx] = color;
+        }
+      }
+
+      if (filled) {
+        for (var ry = minY; ry <= maxY; ry++) {
+          for (var rx = minX; rx <= maxX; rx++) setDiff(rx, ry);
+        }
+      } else {
+        for (var rx2 = minX; rx2 <= maxX; rx2++) { setDiff(rx2, minY); setDiff(rx2, maxY); }
+        for (var ry2 = minY + 1; ry2 < maxY; ry2++) { setDiff(minX, ry2); setDiff(maxX, ry2); }
+      }
+    }
+
+    function commitSelection() {
+      if (!S.selection || !S.selection.data) return;
+      var sel = S.selection;
+      var layer = getActiveLayer();
+      var diffs = [];
+      for (var sy = 0; sy < sel.h; sy++) {
+        for (var sx = 0; sx < sel.w; sx++) {
+          var c = sel.data[sy * sel.w + sx];
+          if (c === 0) continue;
+          var tx = sel.x + sx;
+          var ty = sel.y + sy;
+          if (!isInBounds(tx, ty)) continue;
+          var idx = ty * S.w + tx;
+          if (layer.data[idx] !== c) {
+            diffs.push({ x: tx, y: ty, oldColor: layer.data[idx], newColor: c });
+            layer.data[idx] = c;
+          }
+        }
+      }
+      if (diffs.length > 0) pushUndo(diffs, S.activeLayer);
+      S.selection = null;
+      scheduleRender();
+    }
+
+    function liftSelection() {
+      if (!S.selection || S.selection.data) return;
+      var sel = S.selection;
+      var layer = getActiveLayer();
+      sel.data = new Uint32Array(sel.w * sel.h);
+      var diffs = [];
+      for (var sy = 0; sy < sel.h; sy++) {
+        for (var sx = 0; sx < sel.w; sx++) {
+          var tx = sel.x + sx;
+          var ty = sel.y + sy;
+          if (!isInBounds(tx, ty)) continue;
+          var idx = ty * S.w + tx;
+          sel.data[sy * sel.w + sx] = layer.data[idx];
+          if (layer.data[idx] !== 0) {
+            diffs.push({ x: tx, y: ty, oldColor: layer.data[idx], newColor: 0 });
+            layer.data[idx] = 0;
+          }
+        }
+      }
+      if (diffs.length > 0) pushUndo(diffs, S.activeLayer);
+      scheduleRender();
+    }
+
+    /* ================================================================
+       COLOR SYSTEM
+       ================================================================ */
+    function updateColorUI() {
+      var hexP = abgrToHex(S.primaryColor);
+      var hexS = abgrToHex(S.secondaryColor);
+      document.getElementById('colorPrimary').style.background = hexP;
+      document.getElementById('colorSecondary').style.background = hexS;
+      document.getElementById('pickerPrimary').value = hexP;
+      document.getElementById('pickerSecondary').value = hexS;
+      document.getElementById('hexInput').value = hexP;
+      var rgb = abgrToRGB(S.primaryColor);
+      document.getElementById('rgbInfo').textContent = 'R:' + rgb.r + ' G:' + rgb.g + ' B:' + rgb.b;
+    }
+
+    function addRecentColor(color) {
+      if (color === 0) return;
+      var idx = S.recentColors.indexOf(color);
+      if (idx >= 0) S.recentColors.splice(idx, 1);
+      S.recentColors.unshift(color);
+      if (S.recentColors.length > S.maxRecent) S.recentColors.pop();
+      renderRecentColors();
+    }
+
+    function renderRecentColors() {
+      var el = document.getElementById('recentColors');
+      el.innerHTML = '';
+      for (var i = 0; i < S.recentColors.length; i++) {
+        var div = document.createElement('div');
+        div.className = 'palette-color';
+        div.style.background = abgrToHex(S.recentColors[i]);
+        div.dataset.color = S.recentColors[i];
+        div.addEventListener('click', function(e) {
+          S.primaryColor = parseInt(this.dataset.color);
+          updateColorUI();
+        });
+        div.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          S.secondaryColor = parseInt(this.dataset.color);
+          updateColorUI();
+        });
+        el.appendChild(div);
+      }
+    }
+
+    /* ================================================================
+       PALETTE
+       ================================================================ */
+    function renderPalette() {
+      var grid = document.getElementById('paletteGrid');
+      grid.innerHTML = '';
+      var colors = PALETTES[S.palette] || [];
+      for (var i = 0; i < colors.length; i++) {
+        var div = document.createElement('div');
+        div.className = 'palette-color';
+        div.style.background = colors[i];
+        div.dataset.hex = colors[i];
+        div.addEventListener('click', function() {
+          S.primaryColor = hexToABGR(this.dataset.hex);
+          updateColorUI();
+          addRecentColor(S.primaryColor);
+        });
+        div.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          S.secondaryColor = hexToABGR(this.dataset.hex);
+          updateColorUI();
+        });
+        grid.appendChild(div);
+      }
+
+      // For custom palette: add button
+      if (S.palette === 'custom') {
+        var addBtn = document.createElement('div');
+        addBtn.className = 'palette-color';
+        addBtn.style.background = 'transparent';
+        addBtn.style.border = '1px dashed #555';
+        addBtn.style.display = 'flex';
+        addBtn.style.alignItems = 'center';
+        addBtn.style.justifyContent = 'center';
+        addBtn.style.fontSize = '12px';
+        addBtn.style.color = '#888';
+        addBtn.textContent = '+';
+        addBtn.title = '現在の色をパレットに追加';
+        addBtn.addEventListener('click', function() {
+          var hex = abgrToHex(S.primaryColor);
+          if (S.customPalette.indexOf(hex) < 0) {
+            S.customPalette.push(hex);
+            PALETTES.custom = S.customPalette;
+            renderPalette();
+          }
+        });
+        grid.appendChild(addBtn);
+      }
+    }
+
+    /* ================================================================
+       LAYER UI
+       ================================================================ */
+    function renderLayerList() {
+      var list = document.getElementById('layerList');
+      list.innerHTML = '';
+      for (var i = S.layers.length - 1; i >= 0; i--) {
+        var l = S.layers[i];
+        var item = document.createElement('div');
+        item.className = 'layer-item' + (i === S.activeLayer ? ' active' : '');
+        item.dataset.index = i;
+
+        // thumbnail
+        var thumb = document.createElement('canvas');
+        thumb.className = 'layer-thumb';
+        thumb.width = 28;
+        thumb.height = 28;
+        var tctx = thumb.getContext('2d');
+        tctx.imageSmoothingEnabled = false;
+        syncLayerCanvas(l);
+        tctx.drawImage(l.canvas, 0, 0, 28, 28);
+
+        // visibility
+        var vis = document.createElement('button');
+        vis.className = 'layer-vis';
+        vis.textContent = l.visible ? '👁' : '—';
+        vis.dataset.index = i;
+        vis.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var idx = parseInt(this.dataset.index);
+          S.layers[idx].visible = !S.layers[idx].visible;
+          renderLayerList();
+          scheduleRender();
+        });
+
+        // name
+        var name = document.createElement('span');
+        name.className = 'layer-name';
+        name.textContent = l.name;
+        name.addEventListener('dblclick', function(e) {
+          e.stopPropagation();
+          var span = this;
+          var parentItem = span.parentElement;
+          var idx = parseInt(parentItem.dataset.index);
+          var input = document.createElement('input');
+          input.className = 'layer-name-input';
+          input.value = S.layers[idx].name;
+          span.replaceWith(input);
+          input.focus();
+          input.select();
+          function commit() {
+            S.layers[idx].name = input.value || S.layers[idx].name;
+            renderLayerList();
+          }
+          input.addEventListener('blur', commit);
+          input.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Enter') commit();
+            if (ev.key === 'Escape') renderLayerList();
+          });
+        });
+
+        // opacity
+        var opacity = document.createElement('input');
+        opacity.type = 'range';
+        opacity.className = 'layer-opacity';
+        opacity.min = '0';
+        opacity.max = '1';
+        opacity.step = '0.05';
+        opacity.value = l.opacity;
+        opacity.dataset.index = i;
+        opacity.addEventListener('input', function(e) {
+          e.stopPropagation();
+          var idx = parseInt(this.dataset.index);
+          S.layers[idx].opacity = parseFloat(this.value);
+          scheduleRender();
+        });
+        opacity.addEventListener('click', function(e) { e.stopPropagation(); });
+
+        item.appendChild(vis);
+        item.appendChild(thumb);
+        item.appendChild(name);
+        item.appendChild(opacity);
+
+        item.addEventListener('click', function() {
+          S.activeLayer = parseInt(this.dataset.index);
+          renderLayerList();
+          scheduleRender();
+        });
+
+        list.appendChild(item);
+      }
+    }
+
+    function addLayer() {
+      var name = 'レイヤー ' + (S.layers.length + 1);
+      S.layers.splice(S.activeLayer + 1, 0, createLayer(name));
+      S.activeLayer = S.activeLayer + 1;
+      renderLayerList();
+      scheduleRender();
+    }
+
+    function deleteLayer() {
+      if (S.layers.length <= 1) return;
+      S.layers.splice(S.activeLayer, 1);
+      if (S.activeLayer >= S.layers.length) S.activeLayer = S.layers.length - 1;
+      renderLayerList();
+      scheduleRender();
+    }
+
+    function mergeLayer() {
+      if (S.activeLayer <= 0) return;
+      var top = S.layers[S.activeLayer];
+      var bottom = S.layers[S.activeLayer - 1];
+
+      // merge top onto bottom
+      syncLayerCanvas(bottom);
+      syncLayerCanvas(top);
+      var ctx = bottom.canvas.getContext('2d');
+      ctx.globalAlpha = top.opacity;
+      ctx.drawImage(top.canvas, 0, 0);
+      ctx.globalAlpha = 1;
+
+      // read back
+      var imgData = ctx.getImageData(0, 0, S.w, S.h);
+      bottom.data = new Uint32Array(imgData.data.buffer);
+
+      S.layers.splice(S.activeLayer, 1);
+      S.activeLayer = S.activeLayer - 1;
+      renderLayerList();
+      scheduleRender();
+    }
+
+    function moveLayerUp() {
+      if (S.activeLayer >= S.layers.length - 1) return;
+      var tmp = S.layers[S.activeLayer];
+      S.layers[S.activeLayer] = S.layers[S.activeLayer + 1];
+      S.layers[S.activeLayer + 1] = tmp;
+      S.activeLayer++;
+      renderLayerList();
+      scheduleRender();
+    }
+
+    function moveLayerDown() {
+      if (S.activeLayer <= 0) return;
+      var tmp = S.layers[S.activeLayer];
+      S.layers[S.activeLayer] = S.layers[S.activeLayer - 1];
+      S.layers[S.activeLayer - 1] = tmp;
+      S.activeLayer--;
+      renderLayerList();
+      scheduleRender();
+    }
+
+    /* ================================================================
+       ANIMATION
+       ================================================================ */
+    function startAnimation() {
+      if (S.layers.length < 2) return;
+      S.animPlaying = true;
+      S.animFrame = 0;
+      document.getElementById('btnAnimPlay').textContent = '⏹';
+      document.getElementById('btnAnimPlay').classList.add('active');
+      animTick();
+    }
+
+    function stopAnimation() {
+      S.animPlaying = false;
+      if (S.animTimer) { clearTimeout(S.animTimer); S.animTimer = null; }
+      document.getElementById('btnAnimPlay').textContent = '▶';
+      document.getElementById('btnAnimPlay').classList.remove('active');
+      // restore layer visibility
+      for (var i = 0; i < S.layers.length; i++) S.layers[i].visible = true;
+      renderLayerList();
+      scheduleRender();
+    }
+
+    function animTick() {
+      if (!S.animPlaying) return;
+      // show only current frame layer
+      for (var i = 0; i < S.layers.length; i++) {
+        S.layers[i].visible = (i === S.animFrame);
+      }
+      renderLayerList();
+      scheduleRender();
+      S.animFrame = (S.animFrame + 1) % S.layers.length;
+      S.animTimer = setTimeout(animTick, 1000 / S.animFps);
+    }
+
+    /* ================================================================
+       SELECTION ANIMATION (marching ants)
+       ================================================================ */
+    var antsTimer = null;
+    function startAnts() {
+      if (antsTimer) return;
+      antsTimer = setInterval(function() {
+        S.selectionAntsOffset = (S.selectionAntsOffset + 1) % 8;
+        if (S.selection) scheduleRender();
+      }, 120);
+    }
+    startAnts();
+
+    /* ================================================================
+       EXPORT / IMPORT
+       ================================================================ */
+    function exportPNG(scale) {
+      var c = document.createElement('canvas');
+      c.width = S.w * scale;
+      c.height = S.h * scale;
+      var ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+
+      // composite without checkerboard
+      var tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = S.w;
+      tmpCanvas.height = S.h;
+      var tmpCtx = tmpCanvas.getContext('2d');
+      tmpCtx.clearRect(0, 0, S.w, S.h);
+      for (var i = 0; i < S.layers.length; i++) {
+        var l = S.layers[i];
+        if (!l.visible) continue;
+        syncLayerCanvas(l);
+        tmpCtx.globalAlpha = l.opacity;
+        tmpCtx.drawImage(l.canvas, 0, 0);
+      }
+      tmpCtx.globalAlpha = 1;
+
+      ctx.drawImage(tmpCanvas, 0, 0, S.w * scale, S.h * scale);
+      return c;
+    }
+
+    function downloadPNG(scale) {
+      var c = exportPNG(scale);
+      c.toBlob(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'pixel-art-' + S.w + 'x' + S.h + '-' + scale + 'x.png';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    function copyToClipboard() {
+      var c = exportPNG(4);
+      c.toBlob(function(blob) {
+        navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]).then(function() {
+          showToast('クリップボードにコピーしました');
+        }).catch(function() {
+          showToast('コピーに失敗しました');
+        });
+      });
+    }
+
+    function exportSpriteSheet() {
+      var totalW = S.w * S.layers.length;
+      var c = document.createElement('canvas');
+      c.width = totalW;
+      c.height = S.h;
+      var ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+
+      for (var i = 0; i < S.layers.length; i++) {
+        syncLayerCanvas(S.layers[i]);
+        ctx.drawImage(S.layers[i].canvas, i * S.w, 0);
+      }
+
+      c.toBlob(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'sprite-sheet-' + S.layers.length + 'frames.png';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    function saveProject() {
+      var data = {
+        version: 1,
+        w: S.w,
+        h: S.h,
+        layers: S.layers.map(function(l) {
+          return {
+            name: l.name,
+            visible: l.visible,
+            opacity: l.opacity,
+            data: Array.from(l.data)
+          };
+        }),
+        primaryColor: S.primaryColor,
+        secondaryColor: S.secondaryColor,
+        recentColors: S.recentColors.slice(),
+        customPalette: S.customPalette.slice()
+      };
+      var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'pixel-art-project.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function loadProject(file) {
+      var reader = new FileReader();
+      reader.onload = function() {
+        try {
+          var data = JSON.parse(reader.result);
+          S.w = data.w;
+          S.h = data.h;
+          S.layers = data.layers.map(function(l) {
+            var layer = createLayer(l.name);
+            layer.visible = l.visible;
+            layer.opacity = l.opacity;
+            layer.data = new Uint32Array(l.data);
+            layer.canvas.width = S.w;
+            layer.canvas.height = S.h;
+            return layer;
+          });
+          S.activeLayer = 0;
+          S.primaryColor = data.primaryColor || 0xFF000000;
+          S.secondaryColor = data.secondaryColor || 0xFFFFFFFF;
+          S.recentColors = data.recentColors || [];
+          S.customPalette = data.customPalette || [];
+          PALETTES.custom = S.customPalette;
+          S.undoStack = [];
+          S.redoStack = [];
+
+          document.getElementById('canvasW').value = S.w;
+          document.getElementById('canvasH').value = S.h;
+
+          compositeCanvas.width = S.w;
+          compositeCanvas.height = S.h;
+
+          updateColorUI();
+          renderRecentColors();
+          renderPalette();
+          renderLayerList();
+          updateUndoButtons();
+          zoomToFit();
+          showToast('プロジェクトを読み込みました');
+        } catch (e) {
+          showToast('読み込みに失敗しました');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function importImage(file) {
+      var reader = new FileReader();
+      reader.onload = function() {
+        var img = new Image();
+        img.onload = function() {
+          // resize to canvas size
+          var tmpCanvas = document.createElement('canvas');
+          tmpCanvas.width = S.w;
+          tmpCanvas.height = S.h;
+          var tmpCtx = tmpCanvas.getContext('2d');
+          tmpCtx.imageSmoothingEnabled = false;
+          tmpCtx.drawImage(img, 0, 0, S.w, S.h);
+          var imgData = tmpCtx.getImageData(0, 0, S.w, S.h);
+          var buf = new Uint32Array(imgData.data.buffer);
+
+          var layer = createLayer('インポート');
+          layer.data = buf;
+          S.layers.push(layer);
+          S.activeLayer = S.layers.length - 1;
+
+          renderLayerList();
+          scheduleRender();
+          showToast('画像をインポートしました');
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /* ================================================================
+       RESIZE CANVAS
+       ================================================================ */
+    function resizeCanvas(newW, newH) {
+      for (var i = 0; i < S.layers.length; i++) {
+        var l = S.layers[i];
+        var newData = new Uint32Array(newW * newH);
+        var copyW = Math.min(S.w, newW);
+        var copyH = Math.min(S.h, newH);
+        for (var y = 0; y < copyH; y++) {
+          for (var x = 0; x < copyW; x++) {
+            newData[y * newW + x] = l.data[y * S.w + x];
+          }
+        }
+        l.data = newData;
+        l.canvas.width = newW;
+        l.canvas.height = newH;
+      }
+      S.w = newW;
+      S.h = newH;
+      compositeCanvas.width = newW;
+      compositeCanvas.height = newH;
+      S.undoStack = [];
+      S.redoStack = [];
+      updateUndoButtons();
+      document.getElementById('canvasW').value = newW;
+      document.getElementById('canvasH').value = newH;
+      renderLayerList();
+      zoomToFit();
+    }
+
+    /* ================================================================
+       STATUS BAR
+       ================================================================ */
+    function updateStatus() {
+      var gx = S.lastGridX;
+      var gy = S.lastGridY;
+      document.getElementById('stPos').textContent = (isInBounds(gx, gy) ? gx + ', ' + gy : '—');
+      document.getElementById('stZoom').textContent = S.zoom + 'x';
+      document.getElementById('stSize').textContent = S.w + '×' + S.h;
+      var layer = getActiveLayer();
+      document.getElementById('stLayer').textContent = layer ? layer.name : '—';
+      var toolNames = {
+        pen: 'ペン', eraser: '消しゴム', fill: '塗りつぶし',
+        line: 'ライン', rect: '四角形', eyedropper: 'スポイト',
+        select: '選択', pan: 'パン'
+      };
+      document.getElementById('stTool').textContent = toolNames[S.tool] || S.tool;
+    }
+
+    /* ================================================================
+       TOAST
+       ================================================================ */
+    function showToast(msg) {
+      var existing = document.querySelector('.pxe-toast');
+      if (existing) existing.remove();
+      var div = document.createElement('div');
+      div.className = 'pxe-toast';
+      div.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:8px 16px;border-radius:6px;font-size:12px;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.3s;';
+      div.textContent = msg;
+      document.body.appendChild(div);
+      requestAnimationFrame(function() { div.style.opacity = '1'; });
+      setTimeout(function() {
+        div.style.opacity = '0';
+        setTimeout(function() { div.remove(); }, 300);
+      }, 2000);
+    }
+
+    /* ================================================================
+       SET TOOL
+       ================================================================ */
+    function setTool(toolName) {
+      if (S.animPlaying) return;
+      commitSelection();
+      S.tool = toolName;
+      var btns = document.querySelectorAll('.tool-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.toggle('active', btns[i].dataset.tool === toolName);
+      }
+      // update cursor
+      if (toolName === 'pan') {
+        canvasArea.style.cursor = 'grab';
+      } else if (toolName === 'eyedropper') {
+        canvasArea.style.cursor = 'copy';
+      } else {
+        canvasArea.style.cursor = 'crosshair';
+      }
+      scheduleRender();
+    }
+
+    /* ================================================================
+       MOUSE / POINTER EVENTS
+       ================================================================ */
+    var lastButton = 0;
+
+    canvasArea.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      var g = screenToGrid(e.clientX, e.clientY);
+      lastButton = e.button;
+
+      // space+click = pan
+      if (S.spaceDown || S.tool === 'pan' || e.button === 1) {
+        S.isPanning = true;
+        S.dragStartX = e.clientX;
+        S.dragStartY = e.clientY;
+        canvasArea.style.cursor = 'grabbing';
+        return;
+      }
+
+      if (S.animPlaying) return;
+
+      S.isDrawing = true;
+      S.lastGridX = g.x;
+      S.lastGridY = g.y;
+
+      var tool = tools[S.tool];
+      if (tool && tool.onMouseDown) tool.onMouseDown(g.x, g.y, e.button);
+    });
+
+    canvasArea.addEventListener('mousemove', function(e) {
+      var g = screenToGrid(e.clientX, e.clientY);
+
+      if (S.isPanning) {
+        var dx = e.clientX - S.dragStartX;
+        var dy = e.clientY - S.dragStartY;
+        S.panX += dx;
+        S.panY += dy;
+        S.dragStartX = e.clientX;
+        S.dragStartY = e.clientY;
+        scheduleRender();
+        return;
+      }
+
+      S.lastGridX = g.x;
+      S.lastGridY = g.y;
+
+      if (S.isDrawing) {
+        var tool = tools[S.tool];
+        if (tool && tool.onMouseMove) tool.onMouseMove(g.x, g.y, lastButton);
+      }
+
+      scheduleRender();
+    });
+
+    window.addEventListener('mouseup', function(e) {
+      if (S.isPanning) {
+        S.isPanning = false;
+        canvasArea.style.cursor = S.spaceDown ? 'grab' : (S.tool === 'pan' ? 'grab' : 'crosshair');
+        return;
+      }
+
+      if (S.isDrawing) {
+        var g = screenToGrid(e.clientX, e.clientY);
+        var tool = tools[S.tool];
+        if (tool && tool.onMouseUp) tool.onMouseUp(g.x, g.y, lastButton);
+        S.isDrawing = false;
+      }
+    });
+
+    // prevent context menu on canvas
+    canvasArea.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+    // wheel zoom
+    canvasArea.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      zoomAtPoint(e.clientX, e.clientY, e.deltaY);
+    }, { passive: false });
+
+    /* ================================================================
+       KEYBOARD SHORTCUTS
+       ================================================================ */
+    window.addEventListener('keydown', function(e) {
+      // don't intercept if typing in input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+      if (e.key === ' ') {
+        e.preventDefault();
+        if (!S.spaceDown) {
+          S.spaceDown = true;
+          canvasArea.style.cursor = 'grab';
+        }
+        return;
+      }
+
+      // Ctrl shortcuts
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+        if (e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); return; }
+        if (e.key === 'Z') { e.preventDefault(); redo(); return; }
+        if (e.key === 's') { e.preventDefault(); saveProject(); return; }
+        if (e.key === 'c' && S.selection) {
+          e.preventDefault();
+          copyToClipboard();
+          return;
+        }
+        return;
+      }
+
+      var keyMap = {
+        'b': 'pen', 'e': 'eraser', 'g': 'fill', 'l': 'line',
+        'r': 'rect', 'i': 'eyedropper', 'm': 'select'
+      };
+
+      var lower = e.key.toLowerCase();
+      if (keyMap[lower]) { setTool(keyMap[lower]); return; }
+
+      if (lower === 'x') {
+        var tmp = S.primaryColor;
+        S.primaryColor = S.secondaryColor;
+        S.secondaryColor = tmp;
+        updateColorUI();
+        return;
+      }
+
+      if (e.key === '[' || e.key === '-') { zoomOut(); return; }
+      if (e.key === ']' || e.key === '=' || e.key === '+') { zoomIn(); return; }
+
+      // Delete selection
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (S.selection && !S.selection.data) {
+          // clear pixels in selection
+          var sel = S.selection;
+          var layer = getActiveLayer();
+          var diffs = [];
+          for (var sy = 0; sy < sel.h; sy++) {
+            for (var sx = 0; sx < sel.w; sx++) {
+              var tx = sel.x + sx;
+              var ty = sel.y + sy;
+              if (!isInBounds(tx, ty)) continue;
+              var idx = ty * S.w + tx;
+              if (layer.data[idx] !== 0) {
+                diffs.push({ x: tx, y: ty, oldColor: layer.data[idx], newColor: 0 });
+                layer.data[idx] = 0;
+              }
+            }
+          }
+          if (diffs.length > 0) pushUndo(diffs, S.activeLayer);
+          S.selection = null;
+          scheduleRender();
+        } else if (S.selection && S.selection.data) {
+          S.selection = null;
+          scheduleRender();
+        }
+        return;
+      }
+
+      // Escape deselect
+      if (e.key === 'Escape') {
+        if (S.selection) {
+          commitSelection();
+          S.selection = null;
+          scheduleRender();
+        }
+        return;
+      }
+    });
+
+    window.addEventListener('keyup', function(e) {
+      if (e.key === ' ') {
+        S.spaceDown = false;
+        if (!S.isPanning) {
+          canvasArea.style.cursor = S.tool === 'pan' ? 'grab' : 'crosshair';
+        }
+      }
+    });
+
+    /* ================================================================
+       UI EVENT BINDINGS
+       ================================================================ */
+
+    // Tool buttons
+    var toolBtns = document.querySelectorAll('.tool-btn');
+    for (var i = 0; i < toolBtns.length; i++) {
+      toolBtns[i].addEventListener('click', function() {
+        if (this.dataset.tool) setTool(this.dataset.tool);
+      });
+    }
+
+    // Toolbar buttons
+    document.getElementById('btnZoomIn').addEventListener('click', zoomIn);
+    document.getElementById('btnZoomOut').addEventListener('click', zoomOut);
+    document.getElementById('btnFitView').addEventListener('click', zoomToFit);
+    document.getElementById('btnUndo').addEventListener('click', undo);
+    document.getElementById('btnRedo').addEventListener('click', redo);
+
+    // Grid / Mirror
+    document.getElementById('chkGrid').addEventListener('change', function() {
+      S.showGrid = this.checked;
+      scheduleRender();
+    });
+    document.getElementById('chkMirrorH').addEventListener('change', function() {
+      S.mirrorH = this.checked;
+    });
+    document.getElementById('chkMirrorV').addEventListener('change', function() {
+      S.mirrorV = this.checked;
+    });
+    document.getElementById('chkRectFill').addEventListener('change', function() {
+      S.rectFilled = this.checked;
+    });
+
+    // Resize
+    document.getElementById('btnResize').addEventListener('click', function() {
+      var modal = document.getElementById('resizeModal');
+      document.getElementById('resizeW').value = S.w;
+      document.getElementById('resizeH').value = S.h;
+      modal.classList.remove('hidden');
+    });
+    document.getElementById('resizeCancel').addEventListener('click', function() {
+      document.getElementById('resizeModal').classList.add('hidden');
+    });
+    document.getElementById('resizeOk').addEventListener('click', function() {
+      var w = parseInt(document.getElementById('resizeW').value) || S.w;
+      var h = parseInt(document.getElementById('resizeH').value) || S.h;
+      w = clamp(w, 1, 256);
+      h = clamp(h, 1, 256);
+      document.getElementById('resizeModal').classList.add('hidden');
+      resizeCanvas(w, h);
+    });
+
+    // Export
+    document.getElementById('btnExport').addEventListener('click', function() {
+      document.getElementById('exportModal').classList.remove('hidden');
+    });
+    document.getElementById('exportCancel').addEventListener('click', function() {
+      document.getElementById('exportModal').classList.add('hidden');
+    });
+    document.getElementById('exportOk').addEventListener('click', function() {
+      var scale = parseInt(document.getElementById('exportScale').value);
+      document.getElementById('exportModal').classList.add('hidden');
+      downloadPNG(scale);
+    });
+
+    // Copy
+    document.getElementById('btnCopy').addEventListener('click', copyToClipboard);
+
+    // Sprite sheet
+    document.getElementById('btnSpriteSheet').addEventListener('click', exportSpriteSheet);
+
+    // Save/Load
+    document.getElementById('btnSave').addEventListener('click', saveProject);
+    document.getElementById('btnLoad').addEventListener('click', function() {
+      document.getElementById('fileLoad').click();
+    });
+    document.getElementById('fileLoad').addEventListener('change', function() {
+      if (this.files[0]) loadProject(this.files[0]);
+      this.value = '';
+    });
+
+    // Import image
+    document.getElementById('btnImport').addEventListener('click', function() {
+      document.getElementById('fileImport').click();
+    });
+    document.getElementById('fileImport').addEventListener('change', function() {
+      if (this.files[0]) importImage(this.files[0]);
+      this.value = '';
+    });
+
+    // Color
+    document.getElementById('colorPrimary').addEventListener('click', function() {
+      document.getElementById('pickerPrimary').click();
+    });
+    document.getElementById('colorSecondary').addEventListener('click', function() {
+      document.getElementById('pickerSecondary').click();
+    });
+    document.getElementById('pickerPrimary').addEventListener('input', function() {
+      S.primaryColor = hexToABGR(this.value);
+      updateColorUI();
+    });
+    document.getElementById('pickerSecondary').addEventListener('input', function() {
+      S.secondaryColor = hexToABGR(this.value);
+      updateColorUI();
+    });
+    document.getElementById('colorSwap').addEventListener('click', function() {
+      var tmp = S.primaryColor;
+      S.primaryColor = S.secondaryColor;
+      S.secondaryColor = tmp;
+      updateColorUI();
+    });
+    document.getElementById('hexInput').addEventListener('change', function() {
+      var val = this.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+        S.primaryColor = hexToABGR(val);
+        updateColorUI();
+      } else {
+        this.value = abgrToHex(S.primaryColor);
+      }
+    });
+
+    // Palette select
+    document.getElementById('paletteSelect').addEventListener('change', function() {
+      S.palette = this.value;
+      renderPalette();
+    });
+
+    // Layer actions
+    document.getElementById('btnAddLayer').addEventListener('click', addLayer);
+    document.getElementById('btnDelLayer').addEventListener('click', deleteLayer);
+    document.getElementById('btnMergeLayer').addEventListener('click', mergeLayer);
+    document.getElementById('btnLayerUp').addEventListener('click', moveLayerUp);
+    document.getElementById('btnLayerDown').addEventListener('click', moveLayerDown);
+
+    // Animation
+    document.getElementById('btnAnimPlay').addEventListener('click', function() {
+      if (S.animPlaying) stopAnimation();
+      else startAnimation();
+    });
+    document.getElementById('animFps').addEventListener('change', function() {
+      S.animFps = clamp(parseInt(this.value) || 6, 1, 30);
+      this.value = S.animFps;
+    });
+    document.getElementById('chkOnion').addEventListener('change', function() {
+      S.onionSkin = this.checked;
+      scheduleRender();
+    });
+
+    // ResizeObserver
+    var resizeObs = new ResizeObserver(function() {
+      dpr = window.devicePixelRatio || 1;
+      scheduleRender();
+    });
+    resizeObs.observe(canvasArea);
+
+    // Dark mode observer
+    var darkObs = new MutationObserver(function() {
+      scheduleRender();
+    });
+    darkObs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+    // Close modal on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) overlay.classList.add('hidden');
+      });
+    });
+
+    /* ================================================================
+       RANDOM ART GENERATORS
+       ================================================================ */
+    var generators = {
+      noise: function() {
+        var layer = getActiveLayer();
+        var pal = PALETTES[S.palette];
+        if (!pal || pal.length === 0) pal = PALETTES.nes;
+        var diffs = [];
+        for (var y = 0; y < S.h; y++) {
+          for (var x = 0; x < S.w; x++) {
+            var idx = y * S.w + x;
+            var oldColor = layer.data[idx];
+            var newColor = hexToABGR(pal[Math.floor(Math.random() * pal.length)]);
+            if (oldColor !== newColor) {
+              diffs.push({ x: x, y: y, oldColor: oldColor, newColor: newColor });
+              layer.data[idx] = newColor;
+            }
+          }
+        }
+        return diffs;
+      },
+
+      symmetric: function() {
+        var layer = getActiveLayer();
+        var pal = PALETTES[S.palette];
+        if (!pal || pal.length === 0) pal = PALETTES.nes;
+        var diffs = [];
+        var halfW = Math.ceil(S.w / 2);
+        for (var y = 0; y < S.h; y++) {
+          for (var x = 0; x < halfW; x++) {
+            var useColor = Math.random() < 0.4;
+            var newColor = useColor ? hexToABGR(pal[Math.floor(Math.random() * pal.length)]) : 0;
+            var idx = y * S.w + x;
+            var oldColor = layer.data[idx];
+            if (oldColor !== newColor) {
+              diffs.push({ x: x, y: y, oldColor: oldColor, newColor: newColor });
+              layer.data[idx] = newColor;
+            }
+            var mx = S.w - 1 - x;
+            if (mx !== x) {
+              var midx = y * S.w + mx;
+              var mold = layer.data[midx];
+              if (mold !== newColor) {
+                diffs.push({ x: mx, y: y, oldColor: mold, newColor: newColor });
+                layer.data[midx] = newColor;
+              }
+            }
+          }
+        }
+        return diffs;
+      },
+
+      plasma: function() {
+        var layer = getActiveLayer();
+        var diffs = [];
+        var freqX1 = 0.05 + Math.random() * 0.1;
+        var freqY1 = 0.05 + Math.random() * 0.1;
+        var freqX2 = 0.08 + Math.random() * 0.15;
+        var freqY2 = 0.08 + Math.random() * 0.15;
+        var phase1 = Math.random() * Math.PI * 2;
+        var phase2 = Math.random() * Math.PI * 2;
+        var phase3 = Math.random() * Math.PI * 2;
+        for (var y = 0; y < S.h; y++) {
+          for (var x = 0; x < S.w; x++) {
+            var v1 = Math.sin(x * freqX1 + phase1);
+            var v2 = Math.sin(y * freqY1 + phase2);
+            var v3 = Math.sin((x * freqX2 + y * freqY2) + phase3);
+            var v4 = Math.sin(Math.sqrt(x * x + y * y) * 0.1);
+            var v = (v1 + v2 + v3 + v4) / 4;
+            var t = (v + 1) / 2;
+            var r = Math.floor(Math.sin(t * Math.PI * 2) * 127 + 128);
+            var g = Math.floor(Math.sin(t * Math.PI * 2 + 2.094) * 127 + 128);
+            var b = Math.floor(Math.sin(t * Math.PI * 2 + 4.189) * 127 + 128);
+            var newColor = rgbaToABGR(r, g, b, 255);
+            var idx = y * S.w + x;
+            var oldColor = layer.data[idx];
+            if (oldColor !== newColor) {
+              diffs.push({ x: x, y: y, oldColor: oldColor, newColor: newColor });
+              layer.data[idx] = newColor;
+            }
+          }
+        }
+        return diffs;
+      },
+
+      maze: function() {
+        var layer = getActiveLayer();
+        var pal = PALETTES[S.palette];
+        if (!pal || pal.length === 0) pal = PALETTES.nes;
+        var wallColor = hexToABGR(pal[Math.floor(Math.random() * pal.length)]);
+        var pathColor = 0;
+        var diffs = [];
+        // Fill with wall
+        var grid = [];
+        for (var i = 0; i < S.w * S.h; i++) grid[i] = 1;
+        // Recursive division
+        function carve(x1, y1, x2, y2) {
+          var w = x2 - x1;
+          var h = y2 - y1;
+          if (w < 2 || h < 2) return;
+          if (w > h) {
+            // Vertical wall
+            var wx = x1 + 1 + Math.floor(Math.random() * (w - 1));
+            var passage = y1 + Math.floor(Math.random() * h);
+            for (var y = y1; y < y2; y++) {
+              if (y !== passage) grid[y * S.w + wx] = 1;
+              else grid[y * S.w + wx] = 0;
+            }
+            // Clear non-wall areas
+            for (var yy = y1; yy < y2; yy++) {
+              for (var xx = x1; xx < wx; xx++) if (grid[yy * S.w + xx] === 1 && Math.random() < 0.6) grid[yy * S.w + xx] = 0;
+              for (var xx2 = wx + 1; xx2 < x2; xx2++) if (grid[yy * S.w + xx2] === 1 && Math.random() < 0.6) grid[yy * S.w + xx2] = 0;
+            }
+          } else {
+            var wy = y1 + 1 + Math.floor(Math.random() * (h - 1));
+            var passage2 = x1 + Math.floor(Math.random() * w);
+            for (var x = x1; x < x2; x++) {
+              if (x !== passage2) grid[wy * S.w + x] = 1;
+              else grid[wy * S.w + x] = 0;
+            }
+            for (var xx3 = x1; xx3 < x2; xx3++) {
+              for (var yy2 = y1; yy2 < wy; yy2++) if (grid[yy2 * S.w + xx3] === 1 && Math.random() < 0.6) grid[yy2 * S.w + xx3] = 0;
+              for (var yy3 = wy + 1; yy3 < y2; yy3++) if (grid[yy3 * S.w + xx3] === 1 && Math.random() < 0.6) grid[yy3 * S.w + xx3] = 0;
+            }
+          }
+        }
+        // Start with all walls, then carve paths
+        for (var ci = 0; ci < S.w * S.h; ci++) grid[ci] = 0;
+        // Draw borders
+        for (var bx = 0; bx < S.w; bx++) { grid[bx] = 1; grid[(S.h - 1) * S.w + bx] = 1; }
+        for (var by = 0; by < S.h; by++) { grid[by * S.w] = 1; grid[by * S.w + S.w - 1] = 1; }
+        // Recursive division walls
+        function divide(x1, y1, x2, y2) {
+          var dw = x2 - x1;
+          var dh = y2 - y1;
+          if (dw < 3 || dh < 3) return;
+          var horiz = dw < dh ? true : dh < dw ? false : Math.random() < 0.5;
+          if (horiz) {
+            var wy2 = y1 + 2 + Math.floor(Math.random() * (dh - 3));
+            if (wy2 % 2 === 0) wy2 = Math.min(wy2 + 1, y2 - 2);
+            var px = x1 + 1 + Math.floor(Math.random() * (dw - 2));
+            if (px % 2 === 1) px = Math.min(px + 1, x2 - 2);
+            for (var wx2 = x1; wx2 <= x2; wx2++) grid[wy2 * S.w + wx2] = 1;
+            grid[wy2 * S.w + px] = 0;
+            divide(x1, y1, x2, wy2 - 1);
+            divide(x1, wy2 + 1, x2, y2);
+          } else {
+            var wx3 = x1 + 2 + Math.floor(Math.random() * (dw - 3));
+            if (wx3 % 2 === 0) wx3 = Math.min(wx3 + 1, x2 - 2);
+            var py = y1 + 1 + Math.floor(Math.random() * (dh - 2));
+            if (py % 2 === 1) py = Math.min(py + 1, y2 - 2);
+            for (var wy3 = y1; wy3 <= y2; wy3++) grid[wy3 * S.w + wx3] = 1;
+            grid[py * S.w + wx3] = 0;
+            divide(x1, y1, wx3 - 1, y2);
+            divide(wx3 + 1, y1, x2, y2);
+          }
+        }
+        divide(1, 1, S.w - 2, S.h - 2);
+        // Apply grid to layer
+        for (var gy = 0; gy < S.h; gy++) {
+          for (var gx = 0; gx < S.w; gx++) {
+            var gidx = gy * S.w + gx;
+            var nc = grid[gidx] ? wallColor : pathColor;
+            var oc = layer.data[gidx];
+            if (oc !== nc) {
+              diffs.push({ x: gx, y: gy, oldColor: oc, newColor: nc });
+              layer.data[gidx] = nc;
+            }
+          }
+        }
+        return diffs;
+      },
+
+      terrain: function() {
+        var layer = getActiveLayer();
+        var diffs = [];
+        // Midpoint displacement for heightmap
+        var size = Math.max(S.w, S.h);
+        var mapW = S.w;
+        var heights = new Float32Array(mapW);
+        // Initialize endpoints
+        heights[0] = 0.3 + Math.random() * 0.4;
+        heights[mapW - 1] = 0.3 + Math.random() * 0.4;
+        // Midpoint displacement
+        function displace(l, r, rough) {
+          if (r - l < 2) return;
+          var mid = Math.floor((l + r) / 2);
+          heights[mid] = (heights[l] + heights[r]) / 2 + (Math.random() - 0.5) * rough;
+          heights[mid] = Math.max(0.05, Math.min(0.95, heights[mid]));
+          displace(l, mid, rough * 0.55);
+          displace(mid, r, rough * 0.55);
+        }
+        displace(0, mapW - 1, 0.4);
+        // Color terrain layers
+        var skyTop = rgbaToABGR(100, 180, 255, 255);
+        var skyBot = rgbaToABGR(180, 220, 255, 255);
+        var snow = rgbaToABGR(240, 240, 255, 255);
+        var rock = rgbaToABGR(120, 100, 90, 255);
+        var grass = rgbaToABGR(80, 160, 60, 255);
+        var dirt = rgbaToABGR(140, 110, 70, 255);
+        var water = rgbaToABGR(60, 120, 200, 255);
+        for (var x = 0; x < S.w; x++) {
+          var groundY = Math.floor(heights[x] * S.h);
+          for (var y = 0; y < S.h; y++) {
+            var idx = y * S.w + x;
+            var oldColor = layer.data[idx];
+            var newColor;
+            if (y < groundY) {
+              // Sky gradient
+              var skyT = y / Math.max(groundY, 1);
+              var sr = Math.floor(100 + skyT * 80);
+              var sg = Math.floor(180 + skyT * 40);
+              var sb = 255;
+              newColor = rgbaToABGR(sr, sg, sb, 255);
+            } else if (y === groundY) {
+              newColor = heights[x] < 0.25 ? snow : heights[x] < 0.55 ? grass : dirt;
+            } else if (y === groundY + 1) {
+              newColor = heights[x] < 0.25 ? rock : heights[x] < 0.55 ? grass : dirt;
+            } else if (y > S.h * 0.85) {
+              newColor = water;
+            } else {
+              newColor = y - groundY < 4 ? dirt : rock;
+            }
+            if (oldColor !== newColor) {
+              diffs.push({ x: x, y: y, oldColor: oldColor, newColor: newColor });
+              layer.data[idx] = newColor;
+            }
+          }
+        }
+        return diffs;
+      },
+
+      life: function() {
+        var layer = getActiveLayer();
+        var pal = PALETTES[S.palette];
+        if (!pal || pal.length === 0) pal = PALETTES.nes;
+        var diffs = [];
+        // Initialize random grid
+        var curr = new Uint8Array(S.w * S.h);
+        for (var i = 0; i < curr.length; i++) curr[i] = Math.random() < 0.4 ? 1 : 0;
+        // Run Game of Life for several generations
+        var generations = 8 + Math.floor(Math.random() * 8);
+        for (var gen = 0; gen < generations; gen++) {
+          var next = new Uint8Array(S.w * S.h);
+          for (var y = 0; y < S.h; y++) {
+            for (var x = 0; x < S.w; x++) {
+              var neighbors = 0;
+              for (var dy = -1; dy <= 1; dy++) {
+                for (var dx = -1; dx <= 1; dx++) {
+                  if (dx === 0 && dy === 0) continue;
+                  var nx = (x + dx + S.w) % S.w;
+                  var ny = (y + dy + S.h) % S.h;
+                  neighbors += curr[ny * S.w + nx];
+                }
+              }
+              var alive = curr[y * S.w + x];
+              if (alive && (neighbors === 2 || neighbors === 3)) next[y * S.w + x] = 1;
+              else if (!alive && neighbors === 3) next[y * S.w + x] = 1;
+            }
+          }
+          curr = next;
+        }
+        // Apply to layer
+        var aliveColor = hexToABGR(pal[Math.floor(Math.random() * pal.length)]);
+        var deadColor = 0;
+        for (var ly = 0; ly < S.h; ly++) {
+          for (var lx = 0; lx < S.w; lx++) {
+            var lidx = ly * S.w + lx;
+            var nc = curr[lidx] ? aliveColor : deadColor;
+            var oc = layer.data[lidx];
+            if (oc !== nc) {
+              diffs.push({ x: lx, y: ly, oldColor: oc, newColor: nc });
+              layer.data[lidx] = nc;
+            }
+          }
+        }
+        return diffs;
+      }
+    };
+
+    document.getElementById('btnGenerate').addEventListener('click', function() {
+      var algo = document.getElementById('genAlgo').value;
+      if (generators[algo]) {
+        var diffs = generators[algo]();
+        if (diffs && diffs.length > 0) {
+          pushUndo(diffs, S.activeLayer);
+        }
+        scheduleRender();
+      }
+    });
+
+    /* ================================================================
+       INIT
+       ================================================================ */
+    function init() {
+      initLayers();
+      compositeCanvas.width = S.w;
+      compositeCanvas.height = S.h;
+      updateColorUI();
+      renderRecentColors();
+      renderPalette();
+      renderLayerList();
+      updateUndoButtons();
+
+      // defer zoom to fit
+      requestAnimationFrame(function() {
+        zoomToFit();
+      });
+    }
+
+    init();
+
+  })();
+  </script>
+</body>
+</html>

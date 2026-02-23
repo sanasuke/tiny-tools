@@ -19,7 +19,8 @@
     { day: 2, name: 'マルチペルソナレビュー', desc: '複数の視点からテキストをAIレビュー', path: 'day002_multi-persona-review' },
     { day: 3, name: 'メルカリツールキット', desc: 'テンプレ生成・送料計算・サイズ判定・タイトルチェック・写真加工', path: 'day003_mercari-toolkit' },
     { day: 4, name: 'カラーパレット生成', desc: '補色・類似色・モノクロなど5種のパレットを生成・エクスポート', path: 'day004_color-palette' },
-    { day: 5, name: '音楽統計ダッシュボード', desc: 'Spotifyデータから再生履歴を可視化・分析', path: 'day005_music-stats' }
+    { day: 5, name: '音楽統計ダッシュボード', desc: 'Spotifyデータから再生履歴を可視化・分析', path: 'day005_music-stats' },
+    { day: 6, name: 'ピクセルアートエディタ', desc: 'Canvas ベースの本格ドット絵エディタ', path: 'day006_pixel-art' }
   ];
 
   /* ---------- dark mode persistence ---------- */
