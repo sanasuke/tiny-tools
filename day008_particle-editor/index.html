@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>パーティクルエフェクトエディタ | tiny-tools Day 8</title>
+  <style>
+    /* ── Reset & Base ── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top Bar ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: #16162a;
+      border-bottom: 1px solid #2a2a4a;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      margin-top: 44px;
+      min-height: 44px;
+    }
+    .topbar-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .topbar-sep {
+      width: 1px;
+      height: 24px;
+      background: #2a2a4a;
+      margin: 0 4px;
+    }
+    .preset-btn {
+      padding: 4px 10px;
+      border: 1px solid #3a3a5a;
+      background: #252545;
+      color: #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .preset-btn:hover { background: #35356a; color: #fff; }
+    .preset-btn.active { background: #4a90d9; border-color: #4a90d9; color: #fff; }
+    .ctrl-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #3a3a5a;
+      background: #252545;
+      color: #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.15s;
+    }
+    .ctrl-btn:hover { background: #35356a; color: #fff; }
+    .ctrl-btn.playing { background: #e74c3c; border-color: #e74c3c; color: #fff; }
+    .topbar-stats {
+      margin-left: auto;
+      font-size: 0.75rem;
+      color: #888;
+      white-space: nowrap;
+    }
+    .topbar-stats span { color: #aaa; font-weight: 600; }
+
+    /* ── Main Layout ── */
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ── Canvas Area ── */
+    .canvas-wrap {
+      position: relative;
+      background: #0d0d1a;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    .canvas-wrap canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .emitter-indicator {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(74, 144, 217, 0.8);
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      transition: left 0.05s, top 0.05s;
+    }
+    .emitter-indicator::after {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      background: rgba(74, 144, 217, 0.4);
+      border-radius: 50%;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: #16162a;
+      border-left: 1px solid #2a2a4a;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 8px 0;
+    }
+    .panel {
+      border-bottom: 1px solid #2a2a4a;
+    }
+    .panel:last-child { border-bottom: none; }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #bbb;
+      transition: background 0.12s;
+    }
+    .panel-header:hover { background: rgba(255,255,255,0.04); }
+    .panel-header .arrow {
+      font-size: 0.7rem;
+      transition: transform 0.2s;
+      color: #666;
+    }
+    .panel.collapsed .panel-header .arrow { transform: rotate(-90deg); }
+    .panel-body {
+      padding: 4px 12px 12px;
+    }
+    .panel.collapsed .panel-body { display: none; }
+
+    /* ── Controls ── */
+    .control {
+      margin-bottom: 8px;
+    }
+    .control:last-child { margin-bottom: 0; }
+    .control label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: #999;
+      margin-bottom: 3px;
+    }
+    .control label .val {
+      color: #bbb;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .control input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: #2a2a4a;
+      border-radius: 3px;
+      outline: none;
+    }
+    .control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #4a90d9;
+      cursor: pointer;
+      border: none;
+    }
+    .control input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #4a90d9;
+      cursor: pointer;
+      border: none;
+    }
+    .control select {
+      width: 100%;
+      padding: 4px 8px;
+      background: #252545;
+      color: #ccc;
+      border: 1px solid #3a3a5a;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      outline: none;
+      cursor: pointer;
+    }
+    .control-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .control-row .control { flex: 1; margin-bottom: 0; }
+    .color-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .color-input-wrap input[type="color"] {
+      width: 32px;
+      height: 24px;
+      border: 1px solid #3a3a5a;
+      border-radius: 4px;
+      background: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    .color-input-wrap input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+    .color-input-wrap input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
+    .color-hex {
+      font-size: 0.75rem;
+      color: #999;
+      font-family: monospace;
+    }
+
+    /* ── Export Buttons ── */
+    .export-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .export-btn {
+      padding: 6px 12px;
+      border: 1px solid #3a3a5a;
+      background: #252545;
+      color: #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .export-btn:hover { background: #35356a; color: #fff; }
+    .import-label {
+      padding: 6px 12px;
+      border: 1px solid #3a3a5a;
+      background: #252545;
+      color: #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      text-align: center;
+      transition: all 0.15s;
+      display: block;
+    }
+    .import-label:hover { background: #35356a; color: #fff; }
+    .import-label input { display: none; }
+
+    /* ── Toast ── */
+    .app-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #333;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 2000;
+    }
+    .app-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+      }
+      .sidebar {
+        border-left: none;
+        border-top: 1px solid #2a2a4a;
+        max-height: 40vh;
+      }
+      .topbar { gap: 4px; }
+      .preset-btn { font-size: 0.72rem; padding: 3px 7px; }
+    }
+
+    /* ── Keyboard hints ── */
+    .kbd-hint {
+      font-size: 0.68rem;
+      color: #555;
+      text-align: center;
+      padding: 6px 12px;
+    }
+    .kbd-hint kbd {
+      background: #252545;
+      border: 1px solid #3a3a5a;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-size: 0.68rem;
+      color: #999;
+    }
+  </style>
+  <script src="../shared/header.js"
+    data-repo="https://github.com/sanasuke/tiny-tools"
+    data-note="https://note.com/sana_suke"></script>
+</head>
+<body>
+
+<!-- ── Top Bar ── -->
+<div class="topbar">
+  <div class="topbar-group" id="presets">
+    <button class="preset-btn active" data-preset="firework">花火</button>
+    <button class="preset-btn" data-preset="snow">雪</button>
+    <button class="preset-btn" data-preset="fire">炎</button>
+    <button class="preset-btn" data-preset="smoke">煙</button>
+    <button class="preset-btn" data-preset="star">星</button>
+    <button class="preset-btn" data-preset="bubble">泡</button>
+  </div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-group">
+    <button class="ctrl-btn playing" id="btnPlay" title="再生/停止 (Space)">▶</button>
+    <button class="ctrl-btn" id="btnReset" title="リセット (R)">↺</button>
+  </div>
+  <div class="topbar-stats">
+    パーティクル: <span id="statCount">0</span> ｜ FPS: <span id="statFps">0</span>
+  </div>
+</div>
+
+<!-- ── Main ── -->
+<div class="main">
+  <!-- Canvas -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="canvas"></canvas>
+    <div class="emitter-indicator" id="emitterIndicator"></div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <!-- Emitter Panel -->
+    <div class="panel" id="panelEmitter">
+      <div class="panel-header">エミッター設定 <span class="arrow">▼</span></div>
+      <div class="panel-body">
+        <div class="control">
+          <label>発生数/フレーム <span class="val" id="valSpawnRate">5</span></label>
+          <input type="range" id="spawnRate" min="1" max="50" step="1" value="5">
+        </div>
+        <div class="control">
+          <label>形状</label>
+          <select id="emitterShape">
+            <option value="point">ポイント</option>
+            <option value="circle">サークル</option>
+            <option value="line">ライン</option>
+          </select>
+        </div>
+        <div class="control">
+          <label>半径 <span class="val" id="valEmitterRadius">0</span></label>
+          <input type="range" id="emitterRadius" min="0" max="200" step="1" value="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- Particle Panel -->
+    <div class="panel" id="panelParticle">
+      <div class="panel-header">パーティクル設定 <span class="arrow">▼</span></div>
+      <div class="panel-body">
+        <div class="control-row">
+          <div class="control">
+            <label>速度 min <span class="val" id="valSpeedMin">2</span></label>
+            <input type="range" id="speedMin" min="0" max="20" step="0.1" value="2">
+          </div>
+          <div class="control">
+            <label>速度 max <span class="val" id="valSpeedMax">6</span></label>
+            <input type="range" id="speedMax" min="0" max="20" step="0.1" value="6">
+          </div>
+        </div>
+        <div class="control">
+          <label>方向角度 <span class="val" id="valDirection">270</span>°</label>
+          <input type="range" id="direction" min="0" max="360" step="1" value="270">
+        </div>
+        <div class="control">
+          <label>拡散角度 <span class="val" id="valSpread">360</span>°</label>
+          <input type="range" id="spread" min="0" max="360" step="1" value="360">
+        </div>
+        <div class="control-row">
+          <div class="control">
+            <label>寿命 min <span class="val" id="valLifeMin">30</span></label>
+            <input type="range" id="lifeMin" min="5" max="300" step="1" value="30">
+          </div>
+          <div class="control">
+            <label>寿命 max <span class="val" id="valLifeMax">60</span></label>
+            <input type="range" id="lifeMax" min="5" max="300" step="1" value="60">
+          </div>
+        </div>
+        <div class="control-row">
+          <div class="control">
+            <label>サイズ開始 <span class="val" id="valSizeStart">4</span></label>
+            <input type="range" id="sizeStart" min="1" max="50" step="0.5" value="4">
+          </div>
+          <div class="control">
+            <label>サイズ終了 <span class="val" id="valSizeEnd">0</span></label>
+            <input type="range" id="sizeEnd" min="0" max="50" step="0.5" value="0">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Color Panel -->
+    <div class="panel" id="panelColor">
+      <div class="panel-header">カラー設定 <span class="arrow">▼</span></div>
+      <div class="panel-body">
+        <div class="control-row" style="margin-bottom:8px">
+          <div class="control">
+            <label>開始色</label>
+            <div class="color-input-wrap">
+              <input type="color" id="colorStart" value="#ff6600">
+              <span class="color-hex" id="hexStart">#ff6600</span>
+            </div>
+          </div>
+          <div class="control">
+            <label>終了色</label>
+            <div class="color-input-wrap">
+              <input type="color" id="colorEnd" value="#ff0000">
+              <span class="color-hex" id="hexEnd">#ff0000</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-row">
+          <div class="control">
+            <label>不透明度 開始 <span class="val" id="valAlphaStart">1.0</span></label>
+            <input type="range" id="alphaStart" min="0" max="1" step="0.05" value="1">
+          </div>
+          <div class="control">
+            <label>不透明度 終了 <span class="val" id="valAlphaEnd">0.0</span></label>
+            <input type="range" id="alphaEnd" min="0" max="1" step="0.05" value="0">
+          </div>
+        </div>
+        <div class="control">
+          <label>ブレンドモード</label>
+          <select id="blendMode">
+            <option value="normal">ノーマル</option>
+            <option value="additive">加算合成</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Physics Panel -->
+    <div class="panel" id="panelPhysics">
+      <div class="panel-header">物理設定 <span class="arrow">▼</span></div>
+      <div class="panel-body">
+        <div class="control-row">
+          <div class="control">
+            <label>重力 X <span class="val" id="valGravityX">0</span></label>
+            <input type="range" id="gravityX" min="-0.5" max="0.5" step="0.01" value="0">
+          </div>
+          <div class="control">
+            <label>重力 Y <span class="val" id="valGravityY">0.1</span></label>
+            <input type="range" id="gravityY" min="-0.5" max="0.5" step="0.01" value="0.1">
+          </div>
+        </div>
+        <div class="control">
+          <label>風 <span class="val" id="valWind">0</span></label>
+          <input type="range" id="wind" min="-0.5" max="0.5" step="0.01" value="0">
+        </div>
+        <div class="control">
+          <label>摩擦 <span class="val" id="valFriction">0.99</span></label>
+          <input type="range" id="friction" min="0.9" max="1" step="0.005" value="0.99">
+        </div>
+        <div class="control">
+          <label>乱流 <span class="val" id="valTurbulence">0</span></label>
+          <input type="range" id="turbulence" min="0" max="2" step="0.05" value="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Panel -->
+    <div class="panel" id="panelExport">
+      <div class="panel-header">エクスポート <span class="arrow">▼</span></div>
+      <div class="panel-body">
+        <div class="export-btns">
+          <button class="export-btn" id="btnExportJson">JSON書き出し</button>
+          <label class="import-label">
+            JSON読み込み
+            <input type="file" id="fileImport" accept=".json">
+          </label>
+          <button class="export-btn" id="btnCopyClipboard">クリップボードにコピー</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Keyboard Hints -->
+    <div class="kbd-hint">
+      <kbd>Space</kbd> 再生/停止　<kbd>R</kbd> リセット　<kbd>1</kbd>-<kbd>6</kbd> プリセット
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="app-toast" id="appToast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+   * Constants & Pool
+   * ============================================================ */
+  var MAX_PARTICLES = 5000;
+
+  // Struct-of-arrays for GC-free particle pool
+  var pool = {
+    x:       new Float32Array(MAX_PARTICLES),
+    y:       new Float32Array(MAX_PARTICLES),
+    vx:      new Float32Array(MAX_PARTICLES),
+    vy:      new Float32Array(MAX_PARTICLES),
+    life:    new Float32Array(MAX_PARTICLES),  // remaining
+    maxLife: new Float32Array(MAX_PARTICLES),
+    sizeS:   new Float32Array(MAX_PARTICLES),  // start size
+    sizeE:   new Float32Array(MAX_PARTICLES),  // end size
+    rS:      new Uint8Array(MAX_PARTICLES),    // start color R
+    gS:      new Uint8Array(MAX_PARTICLES),
+    bS:      new Uint8Array(MAX_PARTICLES),
+    rE:      new Uint8Array(MAX_PARTICLES),    // end color R
+    gE:      new Uint8Array(MAX_PARTICLES),
+    bE:      new Uint8Array(MAX_PARTICLES),
+    aS:      new Float32Array(MAX_PARTICLES),  // start alpha
+    aE:      new Float32Array(MAX_PARTICLES),  // end alpha
+    alive:   new Uint8Array(MAX_PARTICLES)     // 1=alive, 0=dead
+  };
+  var aliveCount = 0;
+
+  /* ============================================================
+   * Parameters (current state)
+   * ============================================================ */
+  var params = {
+    spawnRate: 5,
+    emitterShape: 'point',
+    emitterRadius: 0,
+    speedMin: 2,
+    speedMax: 6,
+    direction: 270,
+    spread: 360,
+    lifeMin: 30,
+    lifeMax: 60,
+    sizeStart: 4,
+    sizeEnd: 0,
+    colorStart: '#ff6600',
+    colorEnd: '#ff0000',
+    alphaStart: 1.0,
+    alphaEnd: 0.0,
+    blendMode: 'normal',
+    gravityX: 0,
+    gravityY: 0.1,
+    wind: 0,
+    friction: 0.99,
+    turbulence: 0
+  };
+
+  /* ============================================================
+   * Presets
+   * ============================================================ */
+  var PRESETS = {
+    firework: {
+      spawnRate: 8, emitterShape: 'point', emitterRadius: 0,
+      speedMin: 3, speedMax: 8, direction: 270, spread: 360,
+      lifeMin: 30, lifeMax: 60, sizeStart: 3, sizeEnd: 0,
+      colorStart: '#ffaa00', colorEnd: '#ff2200',
+      alphaStart: 1.0, alphaEnd: 0.0, blendMode: 'additive',
+      gravityX: 0, gravityY: 0.08, wind: 0, friction: 0.98, turbulence: 0.1
+    },
+    snow: {
+      spawnRate: 3, emitterShape: 'line', emitterRadius: 0,
+      speedMin: 0.5, speedMax: 1.5, direction: 90, spread: 30,
+      lifeMin: 150, lifeMax: 300, sizeStart: 3, sizeEnd: 3,
+      colorStart: '#ffffff', colorEnd: '#cceeff',
+      alphaStart: 0.8, alphaEnd: 0.2, blendMode: 'normal',
+      gravityX: 0, gravityY: 0.02, wind: 0.03, friction: 0.995, turbulence: 0.5
+    },
+    fire: {
+      spawnRate: 12, emitterShape: 'circle', emitterRadius: 20,
+      speedMin: 1, speedMax: 3, direction: 270, spread: 40,
+      lifeMin: 20, lifeMax: 50, sizeStart: 6, sizeEnd: 1,
+      colorStart: '#ffaa00', colorEnd: '#ff0000',
+      alphaStart: 0.9, alphaEnd: 0.0, blendMode: 'additive',
+      gravityX: 0, gravityY: -0.05, wind: 0, friction: 0.98, turbulence: 0.3
+    },
+    smoke: {
+      spawnRate: 4, emitterShape: 'circle', emitterRadius: 10,
+      speedMin: 0.3, speedMax: 1, direction: 270, spread: 50,
+      lifeMin: 80, lifeMax: 160, sizeStart: 4, sizeEnd: 20,
+      colorStart: '#888888', colorEnd: '#444444',
+      alphaStart: 0.4, alphaEnd: 0.0, blendMode: 'normal',
+      gravityX: 0, gravityY: -0.02, wind: 0.02, friction: 0.995, turbulence: 0.2
+    },
+    star: {
+      spawnRate: 6, emitterShape: 'point', emitterRadius: 0,
+      speedMin: 2, speedMax: 6, direction: 270, spread: 360,
+      lifeMin: 20, lifeMax: 40, sizeStart: 2, sizeEnd: 0,
+      colorStart: '#ffffff', colorEnd: '#aaccff',
+      alphaStart: 1.0, alphaEnd: 0.0, blendMode: 'additive',
+      gravityX: 0, gravityY: 0, wind: 0, friction: 0.99, turbulence: 0.05
+    },
+    bubble: {
+      spawnRate: 3, emitterShape: 'circle', emitterRadius: 30,
+      speedMin: 0.3, speedMax: 1, direction: 270, spread: 40,
+      lifeMin: 100, lifeMax: 200, sizeStart: 3, sizeEnd: 10,
+      colorStart: '#66ccff', colorEnd: '#aaeeff',
+      alphaStart: 0.5, alphaEnd: 0.1, blendMode: 'normal',
+      gravityX: 0, gravityY: -0.03, wind: 0, friction: 0.995, turbulence: 0.4
+    }
+  };
+
+  /* ============================================================
+   * DOM References
+   * ============================================================ */
+  var canvas   = document.getElementById('canvas');
+  var ctx      = canvas.getContext('2d');
+  var wrap     = document.getElementById('canvasWrap');
+  var indicator = document.getElementById('emitterIndicator');
+  var statCount = document.getElementById('statCount');
+  var statFps   = document.getElementById('statFps');
+  var btnPlay   = document.getElementById('btnPlay');
+  var btnReset  = document.getElementById('btnReset');
+  var appToast  = document.getElementById('appToast');
+
+  // Slider/select elements
+  var controls = {
+    spawnRate:     document.getElementById('spawnRate'),
+    emitterShape:  document.getElementById('emitterShape'),
+    emitterRadius: document.getElementById('emitterRadius'),
+    speedMin:      document.getElementById('speedMin'),
+    speedMax:      document.getElementById('speedMax'),
+    direction:     document.getElementById('direction'),
+    spread:        document.getElementById('spread'),
+    lifeMin:       document.getElementById('lifeMin'),
+    lifeMax:       document.getElementById('lifeMax'),
+    sizeStart:     document.getElementById('sizeStart'),
+    sizeEnd:       document.getElementById('sizeEnd'),
+    colorStart:    document.getElementById('colorStart'),
+    colorEnd:      document.getElementById('colorEnd'),
+    alphaStart:    document.getElementById('alphaStart'),
+    alphaEnd:      document.getElementById('alphaEnd'),
+    blendMode:     document.getElementById('blendMode'),
+    gravityX:      document.getElementById('gravityX'),
+    gravityY:      document.getElementById('gravityY'),
+    wind:          document.getElementById('wind'),
+    friction:      document.getElementById('friction'),
+    turbulence:    document.getElementById('turbulence')
+  };
+
+  // Value display elements
+  var valDisplays = {
+    spawnRate:     document.getElementById('valSpawnRate'),
+    emitterRadius: document.getElementById('valEmitterRadius'),
+    speedMin:      document.getElementById('valSpeedMin'),
+    speedMax:      document.getElementById('valSpeedMax'),
+    direction:     document.getElementById('valDirection'),
+    spread:        document.getElementById('valSpread'),
+    lifeMin:       document.getElementById('valLifeMin'),
+    lifeMax:       document.getElementById('valLifeMax'),
+    sizeStart:     document.getElementById('valSizeStart'),
+    sizeEnd:       document.getElementById('valSizeEnd'),
+    alphaStart:    document.getElementById('valAlphaStart'),
+    alphaEnd:      document.getElementById('valAlphaEnd'),
+    gravityX:      document.getElementById('valGravityX'),
+    gravityY:      document.getElementById('valGravityY'),
+    wind:          document.getElementById('valWind'),
+    friction:      document.getElementById('valFriction'),
+    turbulence:    document.getElementById('valTurbulence')
+  };
+
+  /* ============================================================
+   * State
+   * ============================================================ */
+  var playing = true;
+  var emitterX = 0.5;  // normalized 0-1
+  var emitterY = 0.5;
+  var dragging = false;
+  var canvasW = 800;
+  var canvasH = 600;
+  var dpr = window.devicePixelRatio || 1;
+
+  // FPS tracking
+  var frameCount = 0;
+  var lastFpsTime = performance.now();
+  var currentFps = 0;
+
+  /* ============================================================
+   * Helpers
+   * ============================================================ */
+  function hexToRgb(hex) {
+    var r = parseInt(hex.slice(1, 3), 16);
+    var g = parseInt(hex.slice(3, 5), 16);
+    var b = parseInt(hex.slice(5, 7), 16);
+    return [r, g, b];
+  }
+
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  function randRange(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function deg2rad(deg) {
+    return deg * Math.PI / 180;
+  }
+
+  function showToast(msg) {
+    appToast.textContent = msg;
+    appToast.classList.add('show');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(function () {
+      appToast.classList.remove('show');
+    }, 2000);
+  }
+
+  /* ============================================================
+   * Canvas Setup
+   * ============================================================ */
+  function resizeCanvas() {
+    var rect = wrap.getBoundingClientRect();
+    canvasW = rect.width;
+    canvasH = rect.height;
+    canvas.width = canvasW * dpr;
+    canvas.height = canvasH * dpr;
+    canvas.style.width = canvasW + 'px';
+    canvas.style.height = canvasH + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    updateIndicator();
+  }
+
+  function updateIndicator() {
+    indicator.style.left = (emitterX * canvasW) + 'px';
+    indicator.style.top = (emitterY * canvasH) + 'px';
+  }
+
+  /* ============================================================
+   * Particle Spawning
+   * ============================================================ */
+  function spawnParticle() {
+    // Find dead slot
+    var idx = -1;
+    for (var i = 0; i < MAX_PARTICLES; i++) {
+      if (!pool.alive[i]) { idx = i; break; }
+    }
+    if (idx === -1) return; // pool full
+
+    var ex = emitterX * canvasW;
+    var ey = emitterY * canvasH;
+
+    // Emitter shape offset
+    if (params.emitterShape === 'circle') {
+      var angle = Math.random() * Math.PI * 2;
+      var r = Math.random() * params.emitterRadius;
+      ex += Math.cos(angle) * r;
+      ey += Math.sin(angle) * r;
+    } else if (params.emitterShape === 'line') {
+      ex = Math.random() * canvasW;
+    }
+
+    // Velocity
+    var dir = deg2rad(params.direction);
+    var spreadHalf = deg2rad(params.spread / 2);
+    var a = dir - spreadHalf + Math.random() * spreadHalf * 2;
+    var spd = randRange(params.speedMin, params.speedMax);
+
+    pool.x[idx] = ex;
+    pool.y[idx] = ey;
+    pool.vx[idx] = Math.cos(a) * spd;
+    pool.vy[idx] = Math.sin(a) * spd;
+
+    var life = Math.round(randRange(params.lifeMin, params.lifeMax));
+    pool.life[idx] = life;
+    pool.maxLife[idx] = life;
+
+    pool.sizeS[idx] = params.sizeStart;
+    pool.sizeE[idx] = params.sizeEnd;
+
+    var cs = hexToRgb(params.colorStart);
+    var ce = hexToRgb(params.colorEnd);
+    pool.rS[idx] = cs[0]; pool.gS[idx] = cs[1]; pool.bS[idx] = cs[2];
+    pool.rE[idx] = ce[0]; pool.gE[idx] = ce[1]; pool.bE[idx] = ce[2];
+
+    pool.aS[idx] = params.alphaStart;
+    pool.aE[idx] = params.alphaEnd;
+
+    pool.alive[idx] = 1;
+    aliveCount++;
+  }
+
+  /* ============================================================
+   * Update & Render
+   * ============================================================ */
+  function update() {
+    var gx = params.gravityX + params.wind;
+    var gy = params.gravityY;
+    var fr = params.friction;
+    var tb = params.turbulence;
+    var count = 0;
+
+    for (var i = 0; i < MAX_PARTICLES; i++) {
+      if (!pool.alive[i]) continue;
+
+      pool.life[i]--;
+      if (pool.life[i] <= 0) {
+        pool.alive[i] = 0;
+        continue;
+      }
+
+      // Physics
+      pool.vx[i] = (pool.vx[i] + gx) * fr;
+      pool.vy[i] = (pool.vy[i] + gy) * fr;
+
+      // Turbulence
+      if (tb > 0) {
+        pool.vx[i] += (Math.random() - 0.5) * tb;
+        pool.vy[i] += (Math.random() - 0.5) * tb;
+      }
+
+      pool.x[i] += pool.vx[i];
+      pool.y[i] += pool.vy[i];
+
+      count++;
+    }
+    aliveCount = count;
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    // Set blend mode
+    ctx.globalCompositeOperation =
+      params.blendMode === 'additive' ? 'lighter' : 'source-over';
+
+    for (var i = 0; i < MAX_PARTICLES; i++) {
+      if (!pool.alive[i]) continue;
+
+      var t = 1 - pool.life[i] / pool.maxLife[i]; // 0→1 over lifetime
+      var size = lerp(pool.sizeS[i], pool.sizeE[i], t);
+      if (size <= 0) continue;
+
+      var r = Math.round(lerp(pool.rS[i], pool.rE[i], t));
+      var g = Math.round(lerp(pool.gS[i], pool.gE[i], t));
+      var b = Math.round(lerp(pool.bS[i], pool.bE[i], t));
+      var a = lerp(pool.aS[i], pool.aE[i], t);
+
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.beginPath();
+      ctx.arc(pool.x[i], pool.y[i], size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ============================================================
+   * Main Loop
+   * ============================================================ */
+  function loop() {
+    requestAnimationFrame(loop);
+
+    if (playing) {
+      // Spawn
+      for (var s = 0; s < params.spawnRate; s++) {
+        spawnParticle();
+      }
+      update();
+    }
+
+    render();
+
+    // FPS
+    frameCount++;
+    var now = performance.now();
+    if (now - lastFpsTime >= 500) {
+      currentFps = Math.round(frameCount / ((now - lastFpsTime) / 1000));
+      frameCount = 0;
+      lastFpsTime = now;
+      statFps.textContent = currentFps;
+    }
+    statCount.textContent = aliveCount;
+  }
+
+  /* ============================================================
+   * UI Sync
+   * ============================================================ */
+  function syncUiFromParams() {
+    // Sliders & selects
+    Object.keys(controls).forEach(function (key) {
+      var el = controls[key];
+      if (!el) return;
+      el.value = params[key];
+    });
+    // Value displays
+    Object.keys(valDisplays).forEach(function (key) {
+      var el = valDisplays[key];
+      if (!el) return;
+      el.textContent = params[key];
+    });
+    // Color hex displays
+    document.getElementById('hexStart').textContent = params.colorStart;
+    document.getElementById('hexEnd').textContent = params.colorEnd;
+  }
+
+  function readParamFromControl(key) {
+    var el = controls[key];
+    if (!el) return;
+    if (el.tagName === 'SELECT') {
+      params[key] = el.value;
+    } else if (el.type === 'color') {
+      params[key] = el.value;
+    } else {
+      params[key] = parseFloat(el.value);
+    }
+    // Update value display
+    if (valDisplays[key]) {
+      valDisplays[key].textContent = params[key];
+    }
+  }
+
+  // Bind all controls
+  Object.keys(controls).forEach(function (key) {
+    var el = controls[key];
+    if (!el) return;
+    var evName = (el.tagName === 'SELECT' || el.type === 'color') ? 'change' : 'input';
+    el.addEventListener(evName, function () {
+      readParamFromControl(key);
+      if (key === 'colorStart') {
+        document.getElementById('hexStart').textContent = params.colorStart;
+      }
+      if (key === 'colorEnd') {
+        document.getElementById('hexEnd').textContent = params.colorEnd;
+      }
+    });
+  });
+
+  /* ============================================================
+   * Presets
+   * ============================================================ */
+  var presetBtns = document.querySelectorAll('.preset-btn');
+
+  function applyPreset(name) {
+    var p = PRESETS[name];
+    if (!p) return;
+    Object.keys(p).forEach(function (key) {
+      params[key] = p[key];
+    });
+    syncUiFromParams();
+
+    // Highlight active button
+    presetBtns.forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-preset') === name);
+    });
+  }
+
+  presetBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      applyPreset(btn.getAttribute('data-preset'));
+    });
+  });
+
+  /* ============================================================
+   * Play / Reset Controls
+   * ============================================================ */
+  function togglePlay() {
+    playing = !playing;
+    btnPlay.textContent = playing ? '▶' : '⏸';
+    btnPlay.classList.toggle('playing', playing);
+  }
+
+  function resetParticles() {
+    for (var i = 0; i < MAX_PARTICLES; i++) {
+      pool.alive[i] = 0;
+    }
+    aliveCount = 0;
+  }
+
+  btnPlay.addEventListener('click', togglePlay);
+  btnReset.addEventListener('click', resetParticles);
+
+  /* ============================================================
+   * Panel Collapse
+   * ============================================================ */
+  document.querySelectorAll('.panel-header').forEach(function (header) {
+    header.addEventListener('click', function () {
+      header.parentElement.classList.toggle('collapsed');
+    });
+  });
+
+  /* ============================================================
+   * Canvas Interaction (Emitter Position)
+   * ============================================================ */
+  function setEmitterFromEvent(e) {
+    var rect = wrap.getBoundingClientRect();
+    var clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    emitterX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    emitterY = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    updateIndicator();
+  }
+
+  wrap.addEventListener('mousedown', function (e) {
+    dragging = true;
+    setEmitterFromEvent(e);
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (dragging) setEmitterFromEvent(e);
+  });
+  window.addEventListener('mouseup', function () {
+    dragging = false;
+  });
+
+  // Touch
+  wrap.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    dragging = true;
+    setEmitterFromEvent(e);
+  }, { passive: false });
+  wrap.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    if (dragging) setEmitterFromEvent(e);
+  }, { passive: false });
+  wrap.addEventListener('touchend', function () {
+    dragging = false;
+  });
+
+  /* ============================================================
+   * Keyboard Shortcuts
+   * ============================================================ */
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+    if (e.key === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      togglePlay();
+    } else if (e.key === 'r' || e.key === 'R') {
+      resetParticles();
+    } else if (e.key >= '1' && e.key <= '6') {
+      var presetNames = ['firework', 'snow', 'fire', 'smoke', 'star', 'bubble'];
+      applyPreset(presetNames[parseInt(e.key) - 1]);
+    }
+  });
+
+  /* ============================================================
+   * Export / Import
+   * ============================================================ */
+  function getExportData() {
+    return JSON.parse(JSON.stringify(params));
+  }
+
+  document.getElementById('btnExportJson').addEventListener('click', function () {
+    var data = JSON.stringify(getExportData(), null, 2);
+    var blob = new Blob([data], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'particle-preset.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('JSONをエクスポートしました');
+  });
+
+  document.getElementById('fileImport').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        var data = JSON.parse(ev.target.result);
+        Object.keys(params).forEach(function (key) {
+          if (data[key] !== undefined) {
+            params[key] = data[key];
+          }
+        });
+        syncUiFromParams();
+        // Clear active preset highlight
+        presetBtns.forEach(function (btn) { btn.classList.remove('active'); });
+        showToast('JSONをインポートしました');
+      } catch (err) {
+        showToast('無効なJSONファイルです');
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input so same file can be re-imported
+    e.target.value = '';
+  });
+
+  document.getElementById('btnCopyClipboard').addEventListener('click', function () {
+    var data = JSON.stringify(getExportData(), null, 2);
+    navigator.clipboard.writeText(data).then(function () {
+      showToast('クリップボードにコピーしました');
+    }).catch(function () {
+      showToast('コピーに失敗しました');
+    });
+  });
+
+  /* ============================================================
+   * Resize Observer
+   * ============================================================ */
+  window.addEventListener('resize', resizeCanvas);
+
+  /* ============================================================
+   * Init
+   * ============================================================ */
+  resizeCanvas();
+  applyPreset('firework');
+  loop();
+
+})();
+</script>
+</body>
+</html>
