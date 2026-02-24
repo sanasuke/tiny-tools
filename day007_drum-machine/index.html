@@ -113,15 +113,37 @@
       width: 80px;
       accent-color: #e94560;
     }
-    .transport .bpm-display {
+    .bpm-input {
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      color: #e94560;
       font-size: 1.4rem;
       font-weight: 700;
-      color: #e94560;
-      min-width: 3.5ch;
-      text-align: center;
+      font-family: inherit;
       font-variant-numeric: tabular-nums;
+      width: 4.5ch;
+      text-align: center;
+      padding: 0.2rem 0.3rem;
+      -moz-appearance: textfield;
     }
-    body:not(.tt-dark) .transport .bpm-display { color: #c0354a; }
+    .bpm-input::-webkit-outer-spin-button,
+    .bpm-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .bpm-input:focus {
+      outline: none;
+      border-color: #e94560;
+    }
+    body:not(.tt-dark) .bpm-input {
+      background: #f5f5f8;
+      border-color: #ccd;
+      color: #c0354a;
+    }
+    body:not(.tt-dark) .bpm-input:focus {
+      border-color: #c0354a;
+    }
     .swing-value {
       font-size: 0.75rem;
       color: #aaa;
@@ -360,9 +382,8 @@
       <div class="transport-group">
         <label>BPM</label>
         <button class="btn" id="bpmDown" title="BPM -5 (-)">-</button>
-        <span class="bpm-display" id="bpmDisplay">120</span>
+        <input type="number" class="bpm-input" id="bpmInput" min="60" max="200" value="120" title="BPM">
         <button class="btn" id="bpmUp" title="BPM +5 (+)">+</button>
-        <input type="range" id="bpmSlider" min="60" max="200" value="120" title="BPM">
       </div>
       <div class="transport-group">
         <label>Swing</label>
@@ -818,8 +839,7 @@
 
   function setBpm(val) {
     state.bpm = Math.max(60, Math.min(200, val));
-    bpmSlider.value = state.bpm;
-    bpmDisplay.textContent = state.bpm;
+    bpmInput.value = state.bpm;
   }
 
   /* ══════════════════════════════════════════════
@@ -1422,8 +1442,7 @@
      ══════════════════════════════════════════════ */
   // DOM references
   var playBtn = document.getElementById('playBtn');
-  var bpmSlider = document.getElementById('bpmSlider');
-  var bpmDisplay = document.getElementById('bpmDisplay');
+  var bpmInput = document.getElementById('bpmInput');
   var bpmDownBtn = document.getElementById('bpmDown');
   var bpmUpBtn = document.getElementById('bpmUp');
   var swingSlider = document.getElementById('swingSlider');
@@ -1438,8 +1457,16 @@
 
   // Event listeners — transport
   playBtn.addEventListener('click', togglePlayback);
-  bpmSlider.addEventListener('input', function () {
-    setBpm(parseInt(bpmSlider.value));
+  bpmInput.addEventListener('change', function () {
+    var val = parseInt(bpmInput.value);
+    if (!isNaN(val)) {
+      setBpm(val);
+    } else {
+      bpmInput.value = state.bpm;
+    }
+  });
+  bpmInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { bpmInput.blur(); }
   });
   bpmDownBtn.addEventListener('click', function () { setBpm(state.bpm - 5); });
   bpmUpBtn.addEventListener('click', function () { setBpm(state.bpm + 5); });
