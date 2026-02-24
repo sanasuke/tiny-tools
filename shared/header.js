@@ -186,7 +186,7 @@
       'body.tt-dark *:not(#tt-header):not(#tt-header *){color:inherit}' +
       'body.tt-dark input,body.tt-dark textarea,body.tt-dark select{' +
         'background:#252545!important;color:#e0e0e0!important;border-color:#3a3a5a!important}' +
-      'body.tt-dark button:not(#tt-menu-btn):not(#tt-search-btn):not(#tt-search-close):not(.tt-menu-item):not(.tt-search-result){' +
+      'body.tt-dark button:not(#tt-menu-btn):not(#tt-search-btn):not(#tt-search-close):not(.tt-menu-item):not(.tt-search-result):not(.ctrl-btn){' +
         'background:#252545!important;color:#e0e0e0!important;border-color:#3a3a5a!important}' +
       'body.tt-dark .container,body.tt-dark .card,body.tt-dark [class*="card"],body.tt-dark [class*="panel"],' +
         'body.tt-dark [class*="box"],body.tt-dark [class*="wrapper"]{' +
