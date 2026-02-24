@@ -81,49 +81,217 @@
       margin-bottom: 1.25rem;
       margin-top: 1rem;
     }
+
+    /* filter bar */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-chips {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-chip {
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      border: 1px solid #d0d0d0;
+      background: #fff;
+      color: #555;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      font-family: inherit;
+    }
+
+    .filter-chip:hover {
+      border-color: #4a90d9;
+      color: #4a90d9;
+    }
+
+    .filter-chip.active {
+      background: #4a90d9;
+      color: #fff;
+      border-color: #4a90d9;
+    }
+
+    .sort-control select {
+      padding: 0.35rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid #d0d0d0;
+      background: #fff;
+      color: #555;
+      font-size: 0.8rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .tools-empty {
+      text-align: center;
+      color: #888;
+      font-size: 0.9rem;
+      padding: 2rem 0;
+      display: none;
+    }
+
+    /* dark mode overrides for filter bar */
+    body.tt-dark .filter-chip {
+      background: #252545;
+      color: #ccc;
+      border-color: #3a3a5a;
+    }
+
+    body.tt-dark .filter-chip:hover {
+      border-color: #6ab0f3;
+      color: #6ab0f3;
+    }
+
+    body.tt-dark .filter-chip.active {
+      background: #4a90d9;
+      color: #fff;
+      border-color: #4a90d9;
+    }
   </style>
   <script src="./shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools" data-note="https://note.com/sana_suke"></script>
 </head>
 <body>
   <div class="container">
     <p class="subtitle">小さくて便利なWebツール集</p>
+    <div class="filter-bar">
+      <div class="filter-chips" id="filter-chips"></div>
+      <div class="sort-control">
+        <select id="sort-select" aria-label="並び替え">
+          <option value="newest">新しい順</option>
+          <option value="oldest">古い順</option>
+          <option value="name">名前順</option>
+        </select>
+      </div>
+    </div>
     <div class="tools">
-      <a class="tool-card" href="./day001_char-counter/">
+      <a class="tool-card" href="./day001_char-counter/" data-path="day001_char-counter">
         <div class="tool-day">Day 1</div>
         <div class="tool-name">文字数カウンター</div>
         <div class="tool-desc">文字数・行数・単語数・バイト数を計測</div>
       </a>
-      <a class="tool-card" href="./day002_multi-persona-review/">
+      <a class="tool-card" href="./day002_multi-persona-review/" data-path="day002_multi-persona-review">
         <div class="tool-day">Day 2</div>
         <div class="tool-name">マルチペルソナレビュー</div>
         <div class="tool-desc">複数の視点からテキストをAIレビュー</div>
       </a>
-      <a class="tool-card" href="./day003_mercari-toolkit/">
+      <a class="tool-card" href="./day003_mercari-toolkit/" data-path="day003_mercari-toolkit">
         <div class="tool-day">Day 3</div>
         <div class="tool-name">メルカリツールキット</div>
         <div class="tool-desc">テンプレ生成・送料計算・サイズ判定・タイトルチェック・写真加工</div>
       </a>
-      <a class="tool-card" href="./day004_color-palette/">
+      <a class="tool-card" href="./day004_color-palette/" data-path="day004_color-palette">
         <div class="tool-day">Day 4</div>
         <div class="tool-name">カラーパレット生成</div>
         <div class="tool-desc">補色・類似色・モノクロなど5種のパレットを生成・エクスポート</div>
       </a>
-      <a class="tool-card" href="./day005_music-stats/">
+      <a class="tool-card" href="./day005_music-stats/" data-path="day005_music-stats">
         <div class="tool-day">Day 5</div>
         <div class="tool-name">音楽統計ダッシュボード</div>
         <div class="tool-desc">Spotifyデータから再生履歴を可視化・分析</div>
       </a>
-      <a class="tool-card" href="./day006_pixel-art/">
+      <a class="tool-card" href="./day006_pixel-art/" data-path="day006_pixel-art">
         <div class="tool-day">Day 6</div>
         <div class="tool-name">ピクセルアートエディタ</div>
         <div class="tool-desc">Canvas ベースの本格ドット絵エディタ</div>
       </a>
-      <a class="tool-card" href="./day007_drum-machine/">
+      <a class="tool-card" href="./day007_drum-machine/" data-path="day007_drum-machine">
         <div class="tool-day">Day 7</div>
         <div class="tool-name">ドラムマシン</div>
         <div class="tool-desc">Web Audio APIで作るステップシーケンサー・ビートメーカー</div>
       </a>
     </div>
+    <p class="tools-empty" id="tools-empty">該当するツールがありません</p>
   </div>
+  <script>
+  (function () {
+    var TOOLS = window.__TT_TOOLS || [];
+    var GENRES = window.__TT_GENRES || [];
+    var activeGenre = 'all';
+    var currentSort = 'newest';
+
+    var chipsContainer = document.getElementById('filter-chips');
+    var sortSelect = document.getElementById('sort-select');
+    var toolsGrid = document.querySelector('.tools');
+    var emptyMsg = document.getElementById('tools-empty');
+
+    /* build genre chips */
+    GENRES.forEach(function (g) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'filter-chip' + (g.key === 'all' ? ' active' : '');
+      btn.textContent = g.label;
+      btn.setAttribute('data-genre', g.key);
+      btn.addEventListener('click', function () {
+        activeGenre = g.key;
+        chipsContainer.querySelectorAll('.filter-chip').forEach(function (c) {
+          c.classList.toggle('active', c.getAttribute('data-genre') === activeGenre);
+        });
+        applyFilterAndSort();
+      });
+      chipsContainer.appendChild(btn);
+    });
+
+    sortSelect.addEventListener('change', function () {
+      currentSort = sortSelect.value;
+      applyFilterAndSort();
+    });
+
+    function applyFilterAndSort() {
+      var cards = Array.prototype.slice.call(toolsGrid.querySelectorAll('.tool-card'));
+      var visibleCount = 0;
+
+      /* filter */
+      cards.forEach(function (card) {
+        if (activeGenre === 'all') {
+          card.style.display = '';
+          visibleCount++;
+          return;
+        }
+        var path = card.getAttribute('data-path');
+        var tool = TOOLS.find(function (t) { return t.path === path; });
+        var visible = tool && tool.genres && tool.genres.indexOf(activeGenre) !== -1;
+        card.style.display = visible ? '' : 'none';
+        if (visible) visibleCount++;
+      });
+
+      /* sort */
+      var sorted = cards.filter(function (c) { return c.style.display !== 'none'; });
+      sorted.sort(function (a, b) {
+        var pathA = a.getAttribute('data-path');
+        var pathB = b.getAttribute('data-path');
+        var toolA = TOOLS.find(function (t) { return t.path === pathA; });
+        var toolB = TOOLS.find(function (t) { return t.path === pathB; });
+        if (!toolA || !toolB) return 0;
+
+        if (currentSort === 'newest') return toolB.day - toolA.day;
+        if (currentSort === 'oldest') return toolA.day - toolB.day;
+        /* name */
+        return toolA.name.localeCompare(toolB.name, 'ja');
+      });
+
+      sorted.forEach(function (card) {
+        toolsGrid.appendChild(card);
+      });
+
+      /* empty state */
+      emptyMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+
+    window.__TT_applyFilterAndSort = applyFilterAndSort;
+
+    /* initial render */
+    applyFilterAndSort();
+  })();
+  </script>
 </body>
 </html>
