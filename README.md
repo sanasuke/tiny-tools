@@ -14,6 +14,9 @@
 | [002](https://tiny-tools-cjj.pages.dev/day002_multi-persona-review/) | マルチペルソナレビュー | AIが複数の視点からテキストをレビュー（Gemini API使用） |
 | [003](https://tiny-tools-cjj.pages.dev/day003_mercari-toolkit/) | メルカリツールキット | テンプレ生成・送料計算・サイズ判定・タイトルチェック・写真加工 |
 | [004](https://tiny-tools-cjj.pages.dev/day004_color-palette/) | カラーパレット生成 | 補色・類似色・モノクロなど5種のパレットを生成・エクスポート |
+| [005](https://tiny-tools-cjj.pages.dev/day005_music-stats/) | 音楽統計ダッシュボード | Spotifyデータから再生履歴を可視化・分析 |
+| [006](https://tiny-tools-cjj.pages.dev/day006_pixel-art/) | ピクセルアートエディタ | Canvas ベースの本格ドット絵エディタ |
+| [007](https://tiny-tools-cjj.pages.dev/day007_drum-machine/) | ドラムマシン | Web Audio APIで作るステップシーケンサー・ビートメーカー |
 
 ## 使い方
 
@@ -41,6 +44,12 @@ tiny-tools/
 │   └── js/
 ├── day004_color-palette/
 │   └── index.html                    # カラーパレット生成
+├── day005_music-stats/
+│   └── index.html                    # 音楽統計ダッシュボード
+├── day006_pixel-art/
+│   └── index.html                    # ピクセルアートエディタ
+├── day007_drum-machine/
+│   └── index.html                    # ドラムマシン
 ├── shared/
 │   └── header.js                     # 共通ヘッダー
 ├── .gitignore
