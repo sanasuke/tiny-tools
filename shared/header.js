@@ -15,13 +15,23 @@
 
   /* ---------- tools data ---------- */
   var TOOLS = [
-    { day: 1, name: '文字数カウンター', desc: '文字数・行数・単語数・バイト数を計測', path: 'day001_char-counter' },
-    { day: 2, name: 'マルチペルソナレビュー', desc: '複数の視点からテキストをAIレビュー', path: 'day002_multi-persona-review' },
-    { day: 3, name: 'メルカリツールキット', desc: 'テンプレ生成・送料計算・サイズ判定・タイトルチェック・写真加工', path: 'day003_mercari-toolkit' },
-    { day: 4, name: 'カラーパレット生成', desc: '補色・類似色・モノクロなど5種のパレットを生成・エクスポート', path: 'day004_color-palette' },
-    { day: 5, name: '音楽統計ダッシュボード', desc: 'Spotifyデータから再生履歴を可視化・分析', path: 'day005_music-stats' },
-    { day: 6, name: 'ピクセルアートエディタ', desc: 'Canvas ベースの本格ドット絵エディタ', path: 'day006_pixel-art' },
-    { day: 7, name: 'ドラムマシン', desc: 'Web Audio APIで作るステップシーケンサー・ビートメーカー', path: 'day007_drum-machine' }
+    { day: 1, name: '文字数カウンター', desc: '文字数・行数・単語数・バイト数を計測', path: 'day001_char-counter', genres: ['text', 'utility'] },
+    { day: 2, name: 'マルチペルソナレビュー', desc: '複数の視点からテキストをAIレビュー', path: 'day002_multi-persona-review', genres: ['text', 'ai'] },
+    { day: 3, name: 'メルカリツールキット', desc: 'テンプレ生成・送料計算・サイズ判定・タイトルチェック・写真加工', path: 'day003_mercari-toolkit', genres: ['utility'] },
+    { day: 4, name: 'カラーパレット生成', desc: '補色・類似色・モノクロなど5種のパレットを生成・エクスポート', path: 'day004_color-palette', genres: ['design'] },
+    { day: 5, name: '音楽統計ダッシュボード', desc: 'Spotifyデータから再生履歴を可視化・分析', path: 'day005_music-stats', genres: ['music'] },
+    { day: 6, name: 'ピクセルアートエディタ', desc: 'Canvas ベースの本格ドット絵エディタ', path: 'day006_pixel-art', genres: ['design'] },
+    { day: 7, name: 'ドラムマシン', desc: 'Web Audio APIで作るステップシーケンサー・ビートメーカー', path: 'day007_drum-machine', genres: ['music'] }
+  ];
+
+  /* ---------- genres ---------- */
+  var GENRES = [
+    { key: 'all', label: 'すべて' },
+    { key: 'text', label: 'テキスト' },
+    { key: 'design', label: 'デザイン' },
+    { key: 'music', label: 'ミュージック' },
+    { key: 'utility', label: 'ユーティリティ' },
+    { key: 'ai', label: 'AI' }
   ];
 
   /* ---------- dark mode persistence ---------- */
@@ -186,7 +196,7 @@
       'body.tt-dark *:not(#tt-header):not(#tt-header *){color:inherit}' +
       'body.tt-dark input,body.tt-dark textarea,body.tt-dark select{' +
         'background:#252545!important;color:#e0e0e0!important;border-color:#3a3a5a!important}' +
-      'body.tt-dark button:not(#tt-menu-btn):not(#tt-search-btn):not(#tt-search-close):not(.tt-menu-item):not(.tt-search-result):not(.ctrl-btn){' +
+      'body.tt-dark button:not(#tt-menu-btn):not(#tt-search-btn):not(#tt-search-close):not(.tt-menu-item):not(.tt-search-result):not(.ctrl-btn):not(.filter-chip){' +
         'background:#252545!important;color:#e0e0e0!important;border-color:#3a3a5a!important}' +
       'body.tt-dark .container,body.tt-dark .card,body.tt-dark [class*="card"],body.tt-dark [class*="panel"],' +
         'body.tt-dark [class*="box"],body.tt-dark [class*="wrapper"]{' +
@@ -474,6 +484,10 @@
     }
 
     function resetCardFilter() {
+      if (window.__TT_applyFilterAndSort) {
+        window.__TT_applyFilterAndSort();
+        return;
+      }
       var cards = document.querySelectorAll('.tool-card');
       cards.forEach(function (card) {
         card.style.display = '';
@@ -594,6 +608,10 @@
       el.classList.remove('tt-show');
     }, 2000);
   }
+
+  /* ---------- expose data for top page ---------- */
+  window.__TT_TOOLS = TOOLS;
+  window.__TT_GENRES = GENRES;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', injectHeader);
