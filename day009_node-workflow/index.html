@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ノードワークフローエディタ | tiny-tools</title>
+<meta name="description" content="ビジュアルノードでデータ処理フローを構築するワークフローエディタ">
+<script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools" data-note="https://note.com/sana_suke"></script>
+<style>
+/* ── Reset & Layout ── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Hiragino Sans','Noto Sans JP',sans-serif;
+  background:#f0f2f5;color:#333;display:flex;flex-direction:column}
+
+#app{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── Toolbar ── */
+#toolbar{display:flex;align-items:center;gap:8px;padding:6px 12px;
+  background:#fff;border-bottom:1px solid #e0e0e0;flex-shrink:0;flex-wrap:wrap;z-index:10}
+#toolbar .sep{width:1px;height:24px;background:#ddd;margin:0 4px}
+#toolbar button,#toolbar label{font-family:inherit;font-size:.8rem;cursor:pointer}
+#toolbar button{padding:4px 10px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#444;transition:background .15s,border-color .15s}
+#toolbar button:hover{background:#f0f6ff;border-color:#4a90d9}
+#toolbar button.primary{background:#4a90d9;color:#fff;border-color:#4a90d9}
+#toolbar button.primary:hover{background:#3a7dc5}
+#toolbar button.danger{color:#e74c3c;border-color:#e0a0a0}
+#toolbar button.danger:hover{background:#fef2f2}
+#toolbar label{display:flex;align-items:center;gap:4px;font-size:.8rem;color:#555;user-select:none}
+#toolbar .zoom-display{font-size:.75rem;color:#888;min-width:40px;text-align:center}
+
+/* ── Main area ── */
+#main{flex:1;display:flex;overflow:hidden;position:relative}
+
+/* ── Palette ── */
+#palette{width:220px;flex-shrink:0;background:#fff;border-right:1px solid #e0e0e0;
+  overflow-y:auto;padding:8px;z-index:5}
+#palette h3{font-size:.75rem;color:#999;text-transform:uppercase;letter-spacing:.05em;
+  margin:10px 0 4px;padding:0 4px}
+#palette h3:first-child{margin-top:4px}
+#palette button{display:block;width:100%;padding:7px 10px;margin-bottom:3px;border:1px solid #e8e8e8;
+  border-radius:6px;background:#fafafa;font-size:.8rem;font-family:inherit;text-align:left;
+  cursor:pointer;color:#333;transition:background .12s,border-color .12s}
+#palette button:hover{background:#eef4ff;border-color:#4a90d9}
+
+/* ── Canvas area ── */
+#canvas-area{flex:1;position:relative;overflow:hidden;cursor:default}
+#canvas-area.panning{cursor:grab}
+#canvas-area.panning:active{cursor:grabbing}
+canvas{display:block;width:100%;height:100%}
+
+/* ── Props panel ── */
+#props-panel{width:260px;flex-shrink:0;background:#fff;border-left:1px solid #e0e0e0;
+  overflow-y:auto;padding:12px;display:none;z-index:5}
+#props-panel.open{display:block}
+#props-panel h3{font-size:.85rem;font-weight:600;margin-bottom:10px;color:#333}
+#props-panel .prop-group{margin-bottom:12px}
+#props-panel .prop-label{font-size:.75rem;color:#888;margin-bottom:3px}
+#props-panel input,#props-panel textarea,#props-panel select{width:100%;padding:6px 8px;border:1px solid #d0d0d0;
+  border-radius:6px;font-size:.82rem;font-family:inherit;background:#fff;color:#333}
+#props-panel textarea{min-height:70px;resize:vertical}
+#props-panel .prop-result{margin-top:8px;padding:8px;background:#f8f9fa;border-radius:6px;
+  font-size:.78rem;color:#555;word-break:break-all;max-height:200px;overflow-y:auto;white-space:pre-wrap}
+
+/* ── Toast ── */
+#wf-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#333;color:#fff;padding:10px 20px;border-radius:8px;font-size:.85rem;
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:9999}
+#wf-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Error banner ── */
+#error-banner{display:none;padding:6px 14px;background:#fef2f2;color:#c0392b;font-size:.8rem;
+  border-bottom:1px solid #f5c6cb;text-align:center}
+#error-banner.show{display:block}
+
+/* ── Dark mode ── */
+body.tt-dark #toolbar{background:#1e1e3a;border-color:#2a2a4a}
+body.tt-dark #toolbar button{background:#252545;color:#ccc;border-color:#3a3a5a}
+body.tt-dark #toolbar button:hover{background:#303060;border-color:#5a5a8a}
+body.tt-dark #toolbar button.primary{background:#4a90d9;color:#fff;border-color:#4a90d9}
+body.tt-dark #toolbar .sep{background:#3a3a5a}
+body.tt-dark #toolbar label{color:#aaa}
+body.tt-dark #toolbar .zoom-display{color:#888}
+body.tt-dark #palette{background:#1e1e3a;border-color:#2a2a4a}
+body.tt-dark #palette h3{color:#777}
+body.tt-dark #palette button{background:#252545;border-color:#3a3a5a;color:#ccc}
+body.tt-dark #palette button:hover{background:#303060;border-color:#5a5a8a}
+body.tt-dark #canvas-area{background:#12122a}
+body.tt-dark #props-panel{background:#1e1e3a;border-color:#2a2a4a}
+body.tt-dark #props-panel h3{color:#ddd}
+body.tt-dark #props-panel .prop-label{color:#888}
+body.tt-dark #props-panel input,body.tt-dark #props-panel textarea,body.tt-dark #props-panel select{
+  background:#252545;color:#ddd;border-color:#3a3a5a}
+body.tt-dark #props-panel .prop-result{background:#252545;color:#bbb}
+body.tt-dark #error-banner{background:#3a1a1a;color:#f88;border-color:#5a2a2a}
+body.tt-dark #wf-toast{background:#555}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="error-banner"></div>
+  <div id="toolbar">
+    <button id="btn-zoom-in" title="ズームイン">+</button>
+    <button id="btn-zoom-out" title="ズームアウト">−</button>
+    <button id="btn-zoom-reset" title="ズームリセット">⊞</button>
+    <span class="zoom-display" id="zoom-display">100%</span>
+    <span class="sep"></span>
+    <label><input type="checkbox" id="chk-auto-run" checked> 自動実行</label>
+    <button id="btn-run" class="primary">&#9654; 実行</button>
+    <span class="sep"></span>
+    <button id="btn-clear" class="danger">クリア</button>
+    <button id="btn-save">保存</button>
+    <button id="btn-export">エクスポート</button>
+    <button id="btn-import">インポート</button>
+  </div>
+  <div id="main">
+    <div id="palette"></div>
+    <div id="canvas-area">
+      <canvas id="cv"></canvas>
+    </div>
+    <div id="props-panel"></div>
+  </div>
+</div>
+<div id="wf-toast"></div>
+<input type="file" id="import-file" accept=".json" style="display:none">
+
+<script>
+(function(){
+'use strict';
+
+/* ================================================================
+   1. Constants & Node Registry
+   ================================================================ */
+var PORT_TYPES = { string:'string', number:'number', boolean:'boolean', array:'array', any:'any' };
+var PORT_COLORS = { string:'#4ade80', number:'#60a5fa', boolean:'#fb923c', array:'#c084fc', any:'#9ca3af' };
+var CATEGORY_COLORS = {
+  input:'#22c55e', transform:'#3b82f6', math:'#a855f7', logic:'#f59e0b', output:'#ef4444'
+};
+
+var NODE_CATEGORIES = [
+  { key:'input', label:'入力' },
+  { key:'transform', label:'変換' },
+  { key:'math', label:'計算' },
+  { key:'logic', label:'ロジック' },
+  { key:'output', label:'出力' }
+];
+
+var NODE_DEFS = {};
+
+function defNode(type, cat, label, inputs, outputs, config, exec) {
+  NODE_DEFS[type] = { type:type, category:cat, label:label, inputs:inputs, outputs:outputs, config:config||[], execute:exec };
+}
+
+/* ── Input ── */
+defNode('text_input','input','Text Input',[],[{name:'text',type:'string'}],
+  [{key:'value',type:'text',default:'Hello World'}],
+  function(_,c){ return {text:c.value||''}; });
+defNode('number_input','input','Number Input',[],[{name:'value',type:'number'}],
+  [{key:'value',type:'number',default:42}],
+  function(_,c){ return {value:Number(c.value)||0}; });
+defNode('json_input','input','JSON Input',[],[{name:'data',type:'any'}],
+  [{key:'value',type:'json',default:'{"key":"value"}'}],
+  function(_,c){ try{return{data:JSON.parse(c.value)};}catch(e){return{data:null};} });
+
+/* ── Transform ── */
+defNode('uppercase','transform','Uppercase',
+  [{name:'text',type:'string'}],[{name:'result',type:'string'}],[],
+  function(i){ return {result:String(i.text||'').toUpperCase()}; });
+defNode('lowercase','transform','Lowercase',
+  [{name:'text',type:'string'}],[{name:'result',type:'string'}],[],
+  function(i){ return {result:String(i.text||'').toLowerCase()}; });
+defNode('trim','transform','Trim',
+  [{name:'text',type:'string'}],[{name:'result',type:'string'}],[],
+  function(i){ return {result:String(i.text||'').trim()}; });
+defNode('split','transform','Split',
+  [{name:'text',type:'string'}],[{name:'result',type:'array'}],
+  [{key:'separator',type:'text',default:','}],
+  function(i,c){ return {result:String(i.text||'').split(c.separator||',')}; });
+defNode('join','transform','Join',
+  [{name:'array',type:'array'}],[{name:'result',type:'string'}],
+  [{key:'separator',type:'text',default:','}],
+  function(i,c){ var a=i.array; if(!Array.isArray(a))a=[]; return {result:a.join(c.separator||',')}; });
+defNode('replace','transform','Replace',
+  [{name:'text',type:'string'},{name:'search',type:'string'},{name:'replace',type:'string'}],
+  [{name:'result',type:'string'}],[],
+  function(i){ return {result:String(i.text||'').split(String(i.search||'')).join(String(i.replace||''))}; });
+defNode('slice','transform','Slice',
+  [{name:'text',type:'string'},{name:'start',type:'number'},{name:'end',type:'number'}],
+  [{name:'result',type:'string'}],[],
+  function(i){ var t=String(i.text||''),s=Number(i.start)||0,e=i.end!=null?Number(i.end):undefined; return {result:t.slice(s,e)}; });
+
+/* ── Math ── */
+defNode('add','math','Add',
+  [{name:'a',type:'number'},{name:'b',type:'number'}],[{name:'result',type:'number'}],[],
+  function(i){ return {result:(Number(i.a)||0)+(Number(i.b)||0)}; });
+defNode('multiply','math','Multiply',
+  [{name:'a',type:'number'},{name:'b',type:'number'}],[{name:'result',type:'number'}],[],
+  function(i){ return {result:(Number(i.a)||0)*(Number(i.b)||0)}; });
+defNode('round','math','Round',
+  [{name:'value',type:'number'}],[{name:'result',type:'number'}],[],
+  function(i){ return {result:Math.round(Number(i.value)||0)}; });
+defNode('abs','math','Abs',
+  [{name:'value',type:'number'}],[{name:'result',type:'number'}],[],
+  function(i){ return {result:Math.abs(Number(i.value)||0)}; });
+defNode('min','math','Min',
+  [{name:'a',type:'number'},{name:'b',type:'number'}],[{name:'result',type:'number'}],[],
+  function(i){ return {result:Math.min(Number(i.a)||0,Number(i.b)||0)}; });
+defNode('max','math','Max',
+  [{name:'a',type:'number'},{name:'b',type:'number'}],[{name:'result',type:'number'}],[],
+  function(i){ return {result:Math.max(Number(i.a)||0,Number(i.b)||0)}; });
+
+/* ── Logic ── */
+defNode('if_else','logic','If/Else',
+  [{name:'condition',type:'boolean'},{name:'then',type:'any'},{name:'else',type:'any'}],
+  [{name:'result',type:'any'}],[],
+  function(i){ return {result:i.condition?i.then:i.else}; });
+defNode('compare','logic','Compare',
+  [{name:'a',type:'any'},{name:'b',type:'any'}],[{name:'result',type:'boolean'}],
+  [{key:'operator',type:'select',default:'==',options:['==','!=','>','<','>=','<=']}],
+  function(i,c){
+    var a=i.a,b=i.b,op=c.operator||'==';
+    var r=false;
+    switch(op){
+      case'==':r=a==b;break;case'!=':r=a!=b;break;
+      case'>':r=a>b;break;case'<':r=a<b;break;
+      case'>=':r=a>=b;break;case'<=':r=a<=b;break;
+    }
+    return {result:r};
+  });
+defNode('contains','logic','Contains',
+  [{name:'text',type:'string'},{name:'search',type:'string'}],[{name:'result',type:'boolean'}],[],
+  function(i){ return {result:String(i.text||'').indexOf(String(i.search||''))!==-1}; });
+
+/* ── Output ── */
+defNode('text_display','output','Text Display',
+  [{name:'text',type:'any'}],[],[],
+  function(i){ return {_display:String(i.text!=null?i.text:'')}; });
+defNode('json_display','output','JSON Display',
+  [{name:'data',type:'any'}],[],[],
+  function(i){ try{return{_display:JSON.stringify(i.data,null,2)};}catch(e){return{_display:'[Error]'};} });
+defNode('console_log','output','Console Log',
+  [{name:'value',type:'any'}],[],[],
+  function(i){ console.log('[Node Console]',i.value); return {_display:String(i.value!=null?i.value:'')}; });
+
+/* ── Node geometry ── */
+var NODE_W = 180;
+var NODE_HEADER_H = 28;
+var PORT_R = 7;
+var PORT_SPACING = 24;
+var PORT_MARGIN_TOP = 10;
+
+function nodeHeight(def) {
+  var rows = Math.max(def.inputs.length, def.outputs.length, 1);
+  return NODE_HEADER_H + PORT_MARGIN_TOP + rows * PORT_SPACING + 10;
+}
+
+function portPos(node, isInput, idx) {
+  var def = NODE_DEFS[node.type];
+  var h = NODE_HEADER_H + PORT_MARGIN_TOP + idx * PORT_SPACING + PORT_SPACING / 2;
+  return { x: node.x + (isInput ? 0 : NODE_W), y: node.y + h };
+}
+
+/* ================================================================
+   2. Graph State
+   ================================================================ */
+var G = {
+  nodes: [],
+  wires: [],
+  nextId: 1,
+  results: {},   // nodeId -> execute result
+  errors: {}     // nodeId -> error string
+};
+
+function createNode(type, x, y) {
+  var def = NODE_DEFS[type];
+  if (!def) return null;
+  var cfg = {};
+  def.config.forEach(function(c) { cfg[c.key] = c.default; });
+  var n = { id: G.nextId++, type: type, x: x, y: y, config: cfg };
+  G.nodes.push(n);
+  return n;
+}
+
+function createWire(fromId, fromPort, toId, toPort) {
+  // check if input port already connected
+  for (var i = 0; i < G.wires.length; i++) {
+    if (G.wires[i].to === toId && G.wires[i].toPort === toPort) return null;
+  }
+  var w = { id: G.nextId++, from: fromId, fromPort: fromPort, to: toId, toPort: toPort };
+  G.wires.push(w);
+  return w;
+}
+
+function removeNode(id) {
+  G.nodes = G.nodes.filter(function(n) { return n.id !== id; });
+  G.wires = G.wires.filter(function(w) { return w.from !== id && w.to !== id; });
+  delete G.results[id];
+  delete G.errors[id];
+}
+
+function removeWire(id) {
+  G.wires = G.wires.filter(function(w) { return w.id !== id; });
+}
+
+function findNode(id) {
+  for (var i = 0; i < G.nodes.length; i++) { if (G.nodes[i].id === id) return G.nodes[i]; }
+  return null;
+}
+
+/* ================================================================
+   3. DAG Engine
+   ================================================================ */
+function buildAdjacency() {
+  var adj = {};   // nodeId -> [nodeId]
+  var inDeg = {}; // nodeId -> count
+  G.nodes.forEach(function(n) { adj[n.id] = []; inDeg[n.id] = 0; });
+  G.wires.forEach(function(w) {
+    if (adj[w.from]) { adj[w.from].push(w.to); inDeg[w.to] = (inDeg[w.to] || 0) + 1; }
+  });
+  return { adj: adj, inDeg: inDeg };
+}
+
+function topologicalSort() {
+  var g = buildAdjacency();
+  var queue = [];
+  var order = [];
+  G.nodes.forEach(function(n) { if ((g.inDeg[n.id] || 0) === 0) queue.push(n.id); });
+  while (queue.length) {
+    var cur = queue.shift();
+    order.push(cur);
+    (g.adj[cur] || []).forEach(function(next) {
+      g.inDeg[next]--;
+      if (g.inDeg[next] === 0) queue.push(next);
+    });
+  }
+  if (order.length !== G.nodes.length) return null; // cycle detected
+  return order;
+}
+
+function typeCompatible(outType, inType) {
+  if (outType === 'any' || inType === 'any') return true;
+  return outType === inType;
+}
+
+function executeGraph() {
+  var order = topologicalSort();
+  if (!order) {
+    showError('サイクルが検出されました。接続を見直してください。');
+    return false;
+  }
+  hideError();
+  G.results = {};
+  G.errors = {};
+
+  order.forEach(function(nodeId) {
+    var node = findNode(nodeId);
+    if (!node) return;
+    var def = NODE_DEFS[node.type];
+    if (!def) return;
+
+    // Gather inputs from wires
+    var inputs = {};
+    def.inputs.forEach(function(inp, idx) {
+      inputs[inp.name] = undefined;
+      G.wires.forEach(function(w) {
+        if (w.to === nodeId && w.toPort === idx) {
+          var srcNode = findNode(w.from);
+          if (srcNode && G.results[srcNode.id]) {
+            var srcDef = NODE_DEFS[srcNode.type];
+            if (srcDef && srcDef.outputs[w.fromPort]) {
+              var outName = srcDef.outputs[w.fromPort].name;
+              inputs[inp.name] = G.results[srcNode.id][outName];
+            }
+          }
+        }
+      });
+    });
+
+    try {
+      G.results[nodeId] = def.execute(inputs, node.config);
+    } catch (e) {
+      G.errors[nodeId] = e.message;
+      G.results[nodeId] = {};
+    }
+  });
+  return true;
+}
+
+/* ================================================================
+   4. Renderer
+   ================================================================ */
+var canvas, ctx;
+var camera = { x: 0, y: 0, zoom: 1 };
+
+function isDark() { return document.body.classList.contains('tt-dark'); }
+
+function initCanvas() {
+  canvas = document.getElementById('cv');
+  ctx = canvas.getContext('2d');
+  resizeCanvas();
+}
+
+function resizeCanvas() {
+  var area = document.getElementById('canvas-area');
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = area.clientWidth * dpr;
+  canvas.height = area.clientHeight * dpr;
+  canvas.style.width = area.clientWidth + 'px';
+  canvas.style.height = area.clientHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  render();
+}
+
+function screenToWorld(sx, sy) {
+  return { x: (sx - camera.x) / camera.zoom, y: (sy - camera.y) / camera.zoom };
+}
+
+function worldToScreen(wx, wy) {
+  return { x: wx * camera.zoom + camera.x, y: wy * camera.zoom + camera.y };
+}
+
+function render() {
+  if (!ctx) return;
+  var w = canvas.clientWidth;
+  var h = canvas.clientHeight;
+  var dark = isDark();
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = dark ? '#12122a' : '#f0f2f5';
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.save();
+  ctx.translate(camera.x, camera.y);
+  ctx.scale(camera.zoom, camera.zoom);
+
+  drawGrid(w, h, dark);
+  drawWires(dark);
+  drawNodes(dark);
+
+  // draw dragging wire
+  if (interaction.draggingWire) {
+    var dw = interaction.draggingWire;
+    drawBezierWire(dw.sx, dw.sy, dw.ex, dw.ey, dw.color || '#999', 2.5, false, dark);
+  }
+
+  // Selection rect
+  if (interaction.selectRect) {
+    var sr = interaction.selectRect;
+    ctx.strokeStyle = '#4a90d9';
+    ctx.lineWidth = 1 / camera.zoom;
+    ctx.setLineDash([4 / camera.zoom, 4 / camera.zoom]);
+    ctx.strokeRect(sr.x, sr.y, sr.w, sr.h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(74,144,217,0.08)';
+    ctx.fillRect(sr.x, sr.y, sr.w, sr.h);
+  }
+
+  ctx.restore();
+}
+
+function drawGrid(w, h, dark) {
+  var step = 30;
+  var tl = screenToWorld(0, 0);
+  var br = screenToWorld(w, h);
+  var sx = Math.floor(tl.x / step) * step;
+  var sy = Math.floor(tl.y / step) * step;
+
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 1 / camera.zoom;
+  ctx.beginPath();
+  for (var x = sx; x <= br.x; x += step) { ctx.moveTo(x, tl.y); ctx.lineTo(x, br.y); }
+  for (var y = sy; y <= br.y; y += step) { ctx.moveTo(tl.x, y); ctx.lineTo(br.x, y); }
+  ctx.stroke();
+}
+
+function drawBezierWire(x1, y1, x2, y2, color, lw, selected, dark) {
+  var dx = Math.abs(x2 - x1) * 0.5;
+  dx = Math.max(dx, 50);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.bezierCurveTo(x1 + dx, y1, x2 - dx, y2, x2, y2);
+  if (selected) {
+    ctx.strokeStyle = '#4a90d9';
+    ctx.lineWidth = (lw + 2) / camera.zoom;
+    ctx.stroke();
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw / camera.zoom;
+  ctx.stroke();
+}
+
+function drawWires(dark) {
+  G.wires.forEach(function(w) {
+    var fromNode = findNode(w.from);
+    var toNode = findNode(w.to);
+    if (!fromNode || !toNode) return;
+    var fromDef = NODE_DEFS[fromNode.type];
+    var toDef = NODE_DEFS[toNode.type];
+    if (!fromDef || !toDef) return;
+    var sp = portPos(fromNode, false, w.fromPort);
+    var ep = portPos(toNode, true, w.toPort);
+    var outType = fromDef.outputs[w.fromPort] ? fromDef.outputs[w.fromPort].type : 'any';
+    var color = PORT_COLORS[outType] || PORT_COLORS.any;
+    var sel = (interaction.selectedWire === w.id);
+    drawBezierWire(sp.x, sp.y, ep.x, ep.y, color, 2.5, sel, dark);
+  });
+}
+
+function drawNodes(dark) {
+  G.nodes.forEach(function(node) {
+    var def = NODE_DEFS[node.type];
+    if (!def) return;
+    var nh = nodeHeight(def);
+    var sel = interaction.selectedNodes.indexOf(node.id) !== -1;
+    var catColor = CATEGORY_COLORS[def.category] || '#888';
+    var hasError = !!G.errors[node.id];
+
+    // Shadow
+    ctx.save();
+    ctx.shadowColor = sel ? 'rgba(74,144,217,0.4)' : 'rgba(0,0,0,0.12)';
+    ctx.shadowBlur = sel ? 12 : 6;
+    ctx.shadowOffsetY = 2;
+
+    // Body
+    var bodyColor = dark ? '#252545' : '#fff';
+    roundRect(ctx, node.x, node.y, NODE_W, nh, 8);
+    ctx.fillStyle = bodyColor;
+    ctx.fill();
+    ctx.restore();
+
+    // Border
+    if (sel) {
+      roundRect(ctx, node.x, node.y, NODE_W, nh, 8);
+      ctx.strokeStyle = '#4a90d9';
+      ctx.lineWidth = 2 / camera.zoom;
+      ctx.stroke();
+    } else if (hasError) {
+      roundRect(ctx, node.x, node.y, NODE_W, nh, 8);
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 2 / camera.zoom;
+      ctx.stroke();
+    }
+
+    // Header
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(node.x + 8, node.y);
+    ctx.lineTo(node.x + NODE_W - 8, node.y);
+    ctx.arcTo(node.x + NODE_W, node.y, node.x + NODE_W, node.y + 8, 8);
+    ctx.lineTo(node.x + NODE_W, node.y + NODE_HEADER_H);
+    ctx.lineTo(node.x, node.y + NODE_HEADER_H);
+    ctx.lineTo(node.x, node.y + 8);
+    ctx.arcTo(node.x, node.y, node.x + 8, node.y, 8);
+    ctx.closePath();
+    ctx.fillStyle = catColor;
+    ctx.fill();
+    ctx.restore();
+
+    // Header text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold ' + (12 / Math.max(camera.zoom, 0.5)) * camera.zoom + 'px -apple-system,sans-serif';
+    ctx.font = 'bold 12px -apple-system,sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(def.label, node.x + 10, node.y + NODE_HEADER_H / 2, NODE_W - 20);
+
+    // Ports
+    drawPorts(node, def, true, dark);
+    drawPorts(node, def, false, dark);
+
+    // Result preview for output nodes
+    var res = G.results[node.id];
+    if (res && res._display != null) {
+      var previewY = node.y + nh - 4;
+      ctx.fillStyle = dark ? '#aaa' : '#666';
+      ctx.font = '10px monospace';
+      ctx.textBaseline = 'top';
+      var preview = String(res._display);
+      if (preview.length > 30) preview = preview.substring(0, 30) + '...';
+      ctx.fillText(preview, node.x + 8, previewY);
+    }
+  });
+}
+
+function drawPorts(node, def, isInput, dark) {
+  var ports = isInput ? def.inputs : def.outputs;
+  ports.forEach(function(p, idx) {
+    var pos = portPos(node, isInput, idx);
+    var color = PORT_COLORS[p.type] || PORT_COLORS.any;
+
+    // Highlight compatible ports during wire drag
+    var highlight = false;
+    if (interaction.draggingWire) {
+      var dw = interaction.draggingWire;
+      if (dw.isFromOutput && isInput) {
+        // dragging from output, highlighting inputs
+        if (node.id !== dw.nodeId && typeCompatible(dw.portType, p.type)) highlight = true;
+      } else if (!dw.isFromOutput && !isInput) {
+        // dragging from input, highlighting outputs
+        if (node.id !== dw.nodeId && typeCompatible(p.type, dw.portType)) highlight = true;
+      }
+    }
+
+    // Port circle
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, PORT_R / (highlight ? 0.8 : 1), 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    if (highlight) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2 / camera.zoom;
+      ctx.stroke();
+    }
+
+    // Port label
+    ctx.fillStyle = dark ? '#bbb' : '#555';
+    ctx.font = '10px -apple-system,sans-serif';
+    ctx.textBaseline = 'middle';
+    if (isInput) {
+      ctx.textAlign = 'left';
+      ctx.fillText(p.name, pos.x + PORT_R + 5, pos.y);
+    } else {
+      ctx.textAlign = 'right';
+      ctx.fillText(p.name, pos.x - PORT_R - 5, pos.y);
+    }
+    ctx.textAlign = 'left';
+  });
+}
+
+/* ================================================================
+   5. Interaction
+   ================================================================ */
+var interaction = {
+  mode: 'idle', // idle, dragging_node, dragging_wire, panning, select_rect
+  selectedNodes: [],
+  selectedWire: null,
+  draggingWire: null,
+  dragOffset: [],
+  panStart: null,
+  selectRect: null,
+  spaceDown: false
+};
+
+function hitTestNode(wx, wy) {
+  for (var i = G.nodes.length - 1; i >= 0; i--) {
+    var n = G.nodes[i];
+    var def = NODE_DEFS[n.type];
+    if (!def) continue;
+    var nh = nodeHeight(def);
+    if (wx >= n.x && wx <= n.x + NODE_W && wy >= n.y && wy <= n.y + nh) return n;
+  }
+  return null;
+}
+
+function hitTestPort(wx, wy) {
+  var best = null;
+  var bestDist = PORT_R * 2.5;
+  G.nodes.forEach(function(node) {
+    var def = NODE_DEFS[node.type];
+    if (!def) return;
+    def.inputs.forEach(function(p, idx) {
+      var pos = portPos(node, true, idx);
+      var d = Math.hypot(wx - pos.x, wy - pos.y);
+      if (d < bestDist) { bestDist = d; best = { node: node, isInput: true, idx: idx, port: p }; }
+    });
+    def.outputs.forEach(function(p, idx) {
+      var pos = portPos(node, false, idx);
+      var d = Math.hypot(wx - pos.x, wy - pos.y);
+      if (d < bestDist) { bestDist = d; best = { node: node, isInput: false, idx: idx, port: p }; }
+    });
+  });
+  return best;
+}
+
+function hitTestWire(wx, wy) {
+  var threshold = 8 / camera.zoom;
+  var bestId = null;
+  var bestDist = threshold;
+
+  G.wires.forEach(function(w) {
+    var fromNode = findNode(w.from);
+    var toNode = findNode(w.to);
+    if (!fromNode || !toNode) return;
+    var sp = portPos(fromNode, false, w.fromPort);
+    var ep = portPos(toNode, true, w.toPort);
+
+    // Sample bezier at multiple points
+    var dx = Math.abs(ep.x - sp.x) * 0.5;
+    dx = Math.max(dx, 50);
+    for (var t = 0; t <= 1; t += 0.05) {
+      var t1 = 1 - t;
+      var bx = t1*t1*t1*sp.x + 3*t1*t1*t*(sp.x+dx) + 3*t1*t*t*(ep.x-dx) + t*t*t*ep.x;
+      var by = t1*t1*t1*sp.y + 3*t1*t1*t*sp.y + 3*t1*t*t*ep.y + t*t*t*ep.y;
+      var d = Math.hypot(wx - bx, wy - by);
+      if (d < bestDist) { bestDist = d; bestId = w.id; }
+    }
+  });
+  return bestId;
+}
+
+function getCanvasPos(e) {
+  var rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function setupInteraction() {
+  var area = document.getElementById('canvas-area');
+
+  canvas.addEventListener('mousedown', function(e) {
+    if (e.button === 1 || (e.button === 0 && interaction.spaceDown)) {
+      // Pan
+      interaction.mode = 'panning';
+      interaction.panStart = { x: e.clientX - camera.x, y: e.clientY - camera.y };
+      area.classList.add('panning');
+      e.preventDefault();
+      return;
+    }
+
+    if (e.button !== 0) return;
+    var cpos = getCanvasPos(e);
+    var wpos = screenToWorld(cpos.x, cpos.y);
+
+    // Hit test port first
+    var port = hitTestPort(wpos.x, wpos.y);
+    if (port) {
+      if (port.isInput) {
+        // If input port already has a wire, disconnect it and start dragging from the other end
+        var existingWire = null;
+        for (var i = 0; i < G.wires.length; i++) {
+          if (G.wires[i].to === port.node.id && G.wires[i].toPort === port.idx) {
+            existingWire = G.wires[i];
+            break;
+          }
+        }
+        if (existingWire) {
+          var srcNode = findNode(existingWire.from);
+          var srcDef = NODE_DEFS[srcNode.type];
+          var srcPort = srcDef.outputs[existingWire.fromPort];
+          var sp = portPos(srcNode, false, existingWire.fromPort);
+          removeWire(existingWire.id);
+          interaction.mode = 'dragging_wire';
+          interaction.draggingWire = {
+            nodeId: srcNode.id, isFromOutput: true, portIdx: existingWire.fromPort,
+            portType: srcPort.type, sx: sp.x, sy: sp.y, ex: wpos.x, ey: wpos.y,
+            color: PORT_COLORS[srcPort.type] || PORT_COLORS.any
+          };
+          interaction.selectedWire = null;
+          render();
+          return;
+        }
+        // Start wire from input (reverse direction)
+        var pp = portPos(port.node, true, port.idx);
+        interaction.mode = 'dragging_wire';
+        interaction.draggingWire = {
+          nodeId: port.node.id, isFromOutput: false, portIdx: port.idx,
+          portType: port.port.type, sx: pp.x, sy: pp.y, ex: wpos.x, ey: wpos.y,
+          color: PORT_COLORS[port.port.type] || PORT_COLORS.any
+        };
+      } else {
+        // Start wire from output
+        var pp2 = portPos(port.node, false, port.idx);
+        interaction.mode = 'dragging_wire';
+        interaction.draggingWire = {
+          nodeId: port.node.id, isFromOutput: true, portIdx: port.idx,
+          portType: port.port.type, sx: pp2.x, sy: pp2.y, ex: wpos.x, ey: wpos.y,
+          color: PORT_COLORS[port.port.type] || PORT_COLORS.any
+        };
+      }
+      interaction.selectedWire = null;
+      render();
+      return;
+    }
+
+    // Hit test node
+    var node = hitTestNode(wpos.x, wpos.y);
+    if (node) {
+      if (e.shiftKey) {
+        // Toggle selection
+        var idx2 = interaction.selectedNodes.indexOf(node.id);
+        if (idx2 === -1) interaction.selectedNodes.push(node.id);
+        else interaction.selectedNodes.splice(idx2, 1);
+      } else {
+        if (interaction.selectedNodes.indexOf(node.id) === -1) {
+          interaction.selectedNodes = [node.id];
+        }
+      }
+      interaction.selectedWire = null;
+
+      // Start drag
+      interaction.mode = 'dragging_node';
+      interaction.dragOffset = interaction.selectedNodes.map(function(nid) {
+        var n = findNode(nid);
+        return { id: nid, ox: wpos.x - n.x, oy: wpos.y - n.y };
+      });
+
+      // Move to end for render order
+      var moveIdx = G.nodes.indexOf(node);
+      if (moveIdx !== -1) {
+        G.nodes.splice(moveIdx, 1);
+        G.nodes.push(node);
+      }
+
+      updatePropsPanel();
+      render();
+      return;
+    }
+
+    // Hit test wire
+    var wireId = hitTestWire(wpos.x, wpos.y);
+    if (wireId) {
+      interaction.selectedNodes = [];
+      interaction.selectedWire = wireId;
+      updatePropsPanel();
+      render();
+      return;
+    }
+
+    // Deselect & start selection rect
+    interaction.selectedNodes = [];
+    interaction.selectedWire = null;
+    interaction.mode = 'select_rect';
+    interaction.selectRect = { startX: wpos.x, startY: wpos.y, x: wpos.x, y: wpos.y, w: 0, h: 0 };
+    updatePropsPanel();
+    render();
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    var cpos = getCanvasPos(e);
+    var wpos = screenToWorld(cpos.x, cpos.y);
+
+    if (interaction.mode === 'panning') {
+      camera.x = e.clientX - interaction.panStart.x;
+      camera.y = e.clientY - interaction.panStart.y;
+      render();
+      return;
+    }
+
+    if (interaction.mode === 'dragging_node') {
+      interaction.dragOffset.forEach(function(d) {
+        var n = findNode(d.id);
+        if (n) { n.x = wpos.x - d.ox; n.y = wpos.y - d.oy; }
+      });
+      render();
+      return;
+    }
+
+    if (interaction.mode === 'dragging_wire') {
+      interaction.draggingWire.ex = wpos.x;
+      interaction.draggingWire.ey = wpos.y;
+      render();
+      return;
+    }
+
+    if (interaction.mode === 'select_rect') {
+      var sr = interaction.selectRect;
+      sr.x = Math.min(sr.startX, wpos.x);
+      sr.y = Math.min(sr.startY, wpos.y);
+      sr.w = Math.abs(wpos.x - sr.startX);
+      sr.h = Math.abs(wpos.y - sr.startY);
+      render();
+      return;
+    }
+  });
+
+  function mouseUp(e) {
+    if (interaction.mode === 'panning') {
+      interaction.mode = 'idle';
+      area.classList.remove('panning');
+      return;
+    }
+
+    if (interaction.mode === 'dragging_node') {
+      interaction.mode = 'idle';
+      autoRun();
+      return;
+    }
+
+    if (interaction.mode === 'dragging_wire') {
+      var cpos = getCanvasPos(e);
+      var wpos = screenToWorld(cpos.x, cpos.y);
+      var port = hitTestPort(wpos.x, wpos.y);
+      var dw = interaction.draggingWire;
+
+      if (port && port.node.id !== dw.nodeId) {
+        if (dw.isFromOutput && port.isInput) {
+          if (typeCompatible(dw.portType, port.port.type)) {
+            createWire(dw.nodeId, dw.portIdx, port.node.id, port.idx);
+            autoRun();
+          }
+        } else if (!dw.isFromOutput && !port.isInput) {
+          if (typeCompatible(port.port.type, dw.portType)) {
+            createWire(port.node.id, port.idx, dw.nodeId, dw.portIdx);
+            autoRun();
+          }
+        }
+      }
+
+      interaction.draggingWire = null;
+      interaction.mode = 'idle';
+      render();
+      return;
+    }
+
+    if (interaction.mode === 'select_rect') {
+      var sr = interaction.selectRect;
+      if (sr.w > 5 || sr.h > 5) {
+        interaction.selectedNodes = [];
+        G.nodes.forEach(function(n) {
+          var def = NODE_DEFS[n.type];
+          if (!def) return;
+          var nh = nodeHeight(def);
+          if (n.x + NODE_W > sr.x && n.x < sr.x + sr.w &&
+              n.y + nh > sr.y && n.y < sr.y + sr.h) {
+            interaction.selectedNodes.push(n.id);
+          }
+        });
+      }
+      interaction.selectRect = null;
+      interaction.mode = 'idle';
+      updatePropsPanel();
+      render();
+      return;
+    }
+  }
+
+  canvas.addEventListener('mouseup', mouseUp);
+  canvas.addEventListener('mouseleave', function(e) {
+    if (interaction.mode === 'dragging_wire') {
+      interaction.draggingWire = null;
+      interaction.mode = 'idle';
+      render();
+    }
+  });
+
+  // Zoom
+  canvas.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    var cpos = getCanvasPos(e);
+    var factor = e.deltaY < 0 ? 1.1 : 0.9;
+    var newZoom = Math.max(0.2, Math.min(5, camera.zoom * factor));
+    var ratio = newZoom / camera.zoom;
+    camera.x = cpos.x - (cpos.x - camera.x) * ratio;
+    camera.y = cpos.y - (cpos.y - camera.y) * ratio;
+    camera.zoom = newZoom;
+    updateZoomDisplay();
+    render();
+  }, { passive: false });
+
+  // Keyboard
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') {
+      interaction.spaceDown = true;
+      area.classList.add('panning');
+      e.preventDefault();
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (interaction.selectedNodes.length > 0) {
+        interaction.selectedNodes.forEach(function(id) { removeNode(id); });
+        interaction.selectedNodes = [];
+        updatePropsPanel();
+        autoRun();
+        render();
+      } else if (interaction.selectedWire != null) {
+        removeWire(interaction.selectedWire);
+        interaction.selectedWire = null;
+        updatePropsPanel();
+        autoRun();
+        render();
+      }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveState();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault();
+      interaction.selectedNodes = G.nodes.map(function(n) { return n.id; });
+      render();
+    }
+  });
+
+  document.addEventListener('keyup', function(e) {
+    if (e.code === 'Space') {
+      interaction.spaceDown = false;
+      if (interaction.mode !== 'panning') area.classList.remove('panning');
+    }
+  });
+
+  // Middle button pan prevention
+  canvas.addEventListener('auxclick', function(e) { e.preventDefault(); });
+}
+
+/* ================================================================
+   6. UI — Palette, Props Panel, Toolbar
+   ================================================================ */
+function buildPalette() {
+  var palette = document.getElementById('palette');
+  palette.innerHTML = '';
+  NODE_CATEGORIES.forEach(function(cat) {
+    var h3 = document.createElement('h3');
+    h3.textContent = cat.label;
+    palette.appendChild(h3);
+
+    Object.keys(NODE_DEFS).forEach(function(type) {
+      var def = NODE_DEFS[type];
+      if (def.category !== cat.key) return;
+      var btn = document.createElement('button');
+      btn.textContent = def.label;
+      btn.style.borderLeft = '3px solid ' + (CATEGORY_COLORS[cat.key] || '#888');
+      btn.addEventListener('click', function() {
+        // Place at center of viewport
+        var area = document.getElementById('canvas-area');
+        var cx = area.clientWidth / 2;
+        var cy = area.clientHeight / 2;
+        var wc = screenToWorld(cx, cy);
+        var node = createNode(type, wc.x - NODE_W / 2, wc.y - nodeHeight(def) / 2);
+        if (node) {
+          interaction.selectedNodes = [node.id];
+          interaction.selectedWire = null;
+          updatePropsPanel();
+          autoRun();
+          render();
+        }
+      });
+      palette.appendChild(btn);
+    });
+  });
+}
+
+function updatePropsPanel() {
+  var panel = document.getElementById('props-panel');
+  panel.innerHTML = '';
+
+  if (interaction.selectedNodes.length === 1) {
+    var node = findNode(interaction.selectedNodes[0]);
+    if (!node) { panel.classList.remove('open'); return; }
+    var def = NODE_DEFS[node.type];
+    if (!def) { panel.classList.remove('open'); return; }
+
+    panel.classList.add('open');
+    var h3 = document.createElement('h3');
+    h3.textContent = def.label;
+    panel.appendChild(h3);
+
+    // Node ID
+    var idDiv = document.createElement('div');
+    idDiv.className = 'prop-group';
+    idDiv.innerHTML = '<div class="prop-label">ID: ' + node.id + '</div>';
+    panel.appendChild(idDiv);
+
+    // Config fields
+    def.config.forEach(function(cfg) {
+      var group = document.createElement('div');
+      group.className = 'prop-group';
+      var label = document.createElement('div');
+      label.className = 'prop-label';
+      label.textContent = cfg.key;
+      group.appendChild(label);
+
+      if (cfg.type === 'select') {
+        var sel = document.createElement('select');
+        (cfg.options || []).forEach(function(opt) {
+          var o = document.createElement('option');
+          o.value = opt; o.textContent = opt;
+          if (node.config[cfg.key] === opt) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', function() {
+          node.config[cfg.key] = sel.value;
+          autoRun();
+        });
+        group.appendChild(sel);
+      } else if (cfg.type === 'json' || cfg.type === 'text') {
+        var ta = cfg.type === 'json' ? document.createElement('textarea') : document.createElement('input');
+        if (cfg.type !== 'json') ta.type = 'text';
+        ta.value = node.config[cfg.key] != null ? String(node.config[cfg.key]) : '';
+        ta.addEventListener('input', function() {
+          node.config[cfg.key] = ta.value;
+          autoRun();
+        });
+        group.appendChild(ta);
+      } else if (cfg.type === 'number') {
+        var inp = document.createElement('input');
+        inp.type = 'number';
+        inp.value = node.config[cfg.key] != null ? node.config[cfg.key] : '';
+        inp.addEventListener('input', function() {
+          node.config[cfg.key] = Number(inp.value) || 0;
+          autoRun();
+        });
+        group.appendChild(inp);
+      }
+
+      panel.appendChild(group);
+    });
+
+    // Result display
+    var res = G.results[node.id];
+    if (res) {
+      var resGroup = document.createElement('div');
+      resGroup.className = 'prop-group';
+      var resLabel = document.createElement('div');
+      resLabel.className = 'prop-label';
+      resLabel.textContent = '出力結果';
+      resGroup.appendChild(resLabel);
+      var resDiv = document.createElement('div');
+      resDiv.className = 'prop-result';
+      if (res._display != null) {
+        resDiv.textContent = String(res._display);
+      } else {
+        var entries = Object.keys(res).map(function(k) { return k + ': ' + JSON.stringify(res[k]); });
+        resDiv.textContent = entries.join('\n');
+      }
+      resGroup.appendChild(resDiv);
+      panel.appendChild(resGroup);
+    }
+
+    // Error display
+    if (G.errors[node.id]) {
+      var errGroup = document.createElement('div');
+      errGroup.className = 'prop-group';
+      var errDiv = document.createElement('div');
+      errDiv.className = 'prop-result';
+      errDiv.style.color = '#e74c3c';
+      errDiv.textContent = 'Error: ' + G.errors[node.id];
+      errGroup.appendChild(errDiv);
+      panel.appendChild(errGroup);
+    }
+  } else if (interaction.selectedNodes.length > 1) {
+    panel.classList.add('open');
+    var h3m = document.createElement('h3');
+    h3m.textContent = interaction.selectedNodes.length + ' ノード選択中';
+    panel.appendChild(h3m);
+  } else {
+    panel.classList.remove('open');
+  }
+}
+
+function setupToolbar() {
+  document.getElementById('btn-zoom-in').addEventListener('click', function() {
+    zoomTo(camera.zoom * 1.2);
+  });
+  document.getElementById('btn-zoom-out').addEventListener('click', function() {
+    zoomTo(camera.zoom / 1.2);
+  });
+  document.getElementById('btn-zoom-reset').addEventListener('click', function() {
+    camera.x = 0; camera.y = 0; camera.zoom = 1;
+    updateZoomDisplay();
+    render();
+  });
+
+  document.getElementById('btn-run').addEventListener('click', function() {
+    executeGraph();
+    updatePropsPanel();
+    render();
+  });
+
+  document.getElementById('btn-clear').addEventListener('click', function() {
+    if (!confirm('すべてのノードとワイヤーを削除しますか？')) return;
+    G.nodes = []; G.wires = []; G.results = {}; G.errors = {};
+    interaction.selectedNodes = []; interaction.selectedWire = null;
+    updatePropsPanel();
+    render();
+    showToast('クリアしました');
+  });
+
+  document.getElementById('btn-save').addEventListener('click', function() {
+    saveState();
+  });
+
+  document.getElementById('btn-export').addEventListener('click', function() {
+    exportJSON();
+  });
+
+  document.getElementById('btn-import').addEventListener('click', function() {
+    document.getElementById('import-file').click();
+  });
+
+  document.getElementById('import-file').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        importJSON(ev.target.result);
+        showToast('インポートしました');
+      } catch (err) {
+        showToast('インポートに失敗しました');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+}
+
+function zoomTo(z) {
+  var area = document.getElementById('canvas-area');
+  var cx = area.clientWidth / 2;
+  var cy = area.clientHeight / 2;
+  var newZoom = Math.max(0.2, Math.min(5, z));
+  var ratio = newZoom / camera.zoom;
+  camera.x = cx - (cx - camera.x) * ratio;
+  camera.y = cy - (cy - camera.y) * ratio;
+  camera.zoom = newZoom;
+  updateZoomDisplay();
+  render();
+}
+
+function updateZoomDisplay() {
+  document.getElementById('zoom-display').textContent = Math.round(camera.zoom * 100) + '%';
+}
+
+function autoRun() {
+  if (document.getElementById('chk-auto-run').checked) {
+    executeGraph();
+    updatePropsPanel();
+  }
+  render();
+}
+
+/* ================================================================
+   7. Persistence
+   ================================================================ */
+var STORAGE_KEY = 'tt-node-workflow-v1';
+
+function saveState() {
+  var data = { nodes: G.nodes, wires: G.wires, nextId: G.nextId, camera: camera };
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    showToast('保存しました');
+  } catch (e) {
+    showToast('保存に失敗しました');
+  }
+}
+
+function loadState() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    var data = JSON.parse(raw);
+    if (data.nodes && data.wires) {
+      G.nodes = data.nodes;
+      G.wires = data.wires;
+      G.nextId = data.nextId || 1;
+      if (data.camera) {
+        camera.x = data.camera.x || 0;
+        camera.y = data.camera.y || 0;
+        camera.zoom = data.camera.zoom || 1;
+      }
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+function exportJSON() {
+  var data = { nodes: G.nodes, wires: G.wires, nextId: G.nextId };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'workflow.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('エクスポートしました');
+}
+
+function importJSON(jsonStr) {
+  var data = JSON.parse(jsonStr);
+  if (!data.nodes || !data.wires) throw new Error('Invalid format');
+  G.nodes = data.nodes;
+  G.wires = data.wires;
+  G.nextId = data.nextId || 1;
+  G.results = {};
+  G.errors = {};
+  interaction.selectedNodes = [];
+  interaction.selectedWire = null;
+  autoRun();
+  updatePropsPanel();
+  render();
+}
+
+/* ================================================================
+   8. Helpers
+   ================================================================ */
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+var toastTimer;
+function showToast(msg) {
+  var el = document.getElementById('wf-toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
+}
+
+function showError(msg) {
+  var el = document.getElementById('error-banner');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function hideError() {
+  document.getElementById('error-banner').classList.remove('show');
+}
+
+/* ================================================================
+   9. Init
+   ================================================================ */
+function createDemo() {
+  var n1 = createNode('text_input', 80, 120);
+  var n2 = createNode('uppercase', 360, 120);
+  var n3 = createNode('text_display', 640, 120);
+  if (n1 && n2 && n3) {
+    createWire(n1.id, 0, n2.id, 0);
+    createWire(n2.id, 0, n3.id, 0);
+  }
+}
+
+function init() {
+  initCanvas();
+  buildPalette();
+  setupToolbar();
+  setupInteraction();
+
+  if (!loadState()) {
+    createDemo();
+  }
+
+  updateZoomDisplay();
+  executeGraph();
+  updatePropsPanel();
+  render();
+
+  // Observe resize
+  var ro = new ResizeObserver(function() { resizeCanvas(); });
+  ro.observe(document.getElementById('canvas-area'));
+
+  // Observe dark mode changes
+  var mo = new MutationObserver(function() { render(); });
+  mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+})();
+</script>
+</body>
+</html>
