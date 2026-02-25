@@ -21,7 +21,8 @@
     { day: 4, name: 'カラーパレット生成', desc: '補色・類似色・モノクロなど5種のパレットを生成・エクスポート', path: 'day004_color-palette', genres: ['design'] },
     { day: 5, name: '音楽統計ダッシュボード', desc: 'Spotifyデータから再生履歴を可視化・分析', path: 'day005_music-stats', genres: ['music'] },
     { day: 6, name: 'ピクセルアートエディタ', desc: 'Canvas ベースの本格ドット絵エディタ', path: 'day006_pixel-art', genres: ['design'] },
-    { day: 7, name: 'ドラムマシン', desc: 'Web Audio APIで作るステップシーケンサー・ビートメーカー', path: 'day007_drum-machine', genres: ['music'] }
+    { day: 7, name: 'ドラムマシン', desc: 'Web Audio APIで作るステップシーケンサー・ビートメーカー', path: 'day007_drum-machine', genres: ['music'] },
+    { day: 8, name: 'パーティクルエフェクトエディタ', desc: 'リアルタイム2Dパーティクルシミュレーター', path: 'day008_particle-editor', genres: ['design'] }
   ];
 
   /* ---------- genres ---------- */
