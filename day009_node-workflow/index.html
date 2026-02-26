@@ -922,12 +922,8 @@ function setupInteraction() {
   }
 
   canvas.addEventListener('mouseup', mouseUp);
-  canvas.addEventListener('mouseleave', function(e) {
-    if (interaction.mode === 'dragging_wire') {
-      interaction.draggingWire = null;
-      interaction.mode = 'idle';
-      render();
-    }
+  document.addEventListener('mouseup', function(e) {
+    if (interaction.mode !== 'idle') mouseUp(e);
   });
 
   // Zoom
