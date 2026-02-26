@@ -22,7 +22,8 @@
     { day: 5, name: '音楽統計ダッシュボード', desc: 'Spotifyデータから再生履歴を可視化・分析', path: 'day005_music-stats', genres: ['music'] },
     { day: 6, name: 'ピクセルアートエディタ', desc: 'Canvas ベースの本格ドット絵エディタ', path: 'day006_pixel-art', genres: ['design'] },
     { day: 7, name: 'ドラムマシン', desc: 'Web Audio APIで作るステップシーケンサー・ビートメーカー', path: 'day007_drum-machine', genres: ['music'] },
-    { day: 8, name: 'パーティクルエフェクトエディタ', desc: 'リアルタイム2Dパーティクルシミュレーター', path: 'day008_particle-editor', genres: ['design'] }
+    { day: 8, name: 'パーティクルエフェクトエディタ', desc: 'リアルタイム2Dパーティクルシミュレーター', path: 'day008_particle-editor', genres: ['design'] },
+    { day: 10, name: '持ち物チェックリストビルダー', desc: 'シーン別テンプレートで旅行・出張の持ち物リストを作成・共有', path: 'day010_packing-list', genres: ['utility'] }
   ];
 
   /* ---------- genres ---------- */

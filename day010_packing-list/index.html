@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>持ち物チェックリストビルダー | tiny-tools Day 10</title>
+  <meta name="description" content="シーン別テンプレートで旅行・出張の持ち物リストを作成・共有">
+  <style>
+    /* ===== Reset & Base ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5; color: #333; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .container { width: 100%; max-width: 680px; padding: 1rem; }
+    h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #222; }
+
+    /* ===== Scene Selection Cards ===== */
+    .scene-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1rem;
+    }
+    .scene-card {
+      background: #fff; border: 2px solid #e0e0e0; border-radius: 10px;
+      padding: 0.9rem 0.6rem; text-align: center; cursor: pointer;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+    }
+    .scene-card:hover { border-color: #4a90d9; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .scene-card.active { border-color: #4a90d9; background: #eef4fc; }
+    .scene-icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
+    .scene-label { font-size: 0.82rem; font-weight: 600; color: #333; }
+
+    /* collapsed scene selection → pill bar */
+    .scene-pills { display: none; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+    .scene-pills.active { display: flex; }
+    .scene-pill {
+      padding: 0.3rem 0.75rem; border-radius: 999px; border: 1px solid #d0d0d0;
+      background: #fff; color: #555; font-size: 0.78rem; cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s; font-family: inherit;
+    }
+    .scene-pill:hover { border-color: #4a90d9; color: #4a90d9; }
+    .scene-pill.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+
+    /* ===== Config Bar ===== */
+    .config-bar {
+      display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem;
+      background: #fff; padding: 0.75rem 1rem; border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .config-bar label { font-size: 0.82rem; font-weight: 600; color: #555; white-space: nowrap; }
+    .config-bar input[type="number"] {
+      width: 60px; padding: 0.35rem 0.5rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: 0.9rem; text-align: center; font-family: inherit;
+    }
+    .config-bar select {
+      padding: 0.35rem 0.5rem; border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: 0.85rem; font-family: inherit; background: #fff;
+    }
+
+    /* ===== Progress Bar ===== */
+    .progress-section { margin-bottom: 1rem; }
+    .progress-header {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.82rem; color: #555; margin-bottom: 0.4rem;
+    }
+    .progress-track {
+      height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s;
+      background: #e74c3c;
+    }
+
+    /* ===== Category Groups ===== */
+    .category-group { margin-bottom: 0.75rem; }
+    .category-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 0.8rem; background: #fff; border-radius: 8px 8px 0 0;
+      cursor: pointer; user-select: none;
+      border: 1px solid #e0e0e0; border-bottom: none;
+      transition: background 0.15s;
+    }
+    .category-header:hover { background: #f8f8f8; }
+    .category-header-left { display: flex; align-items: center; gap: 0.5rem; }
+    .category-arrow {
+      display: inline-block; transition: transform 0.2s; font-size: 0.7rem; color: #888;
+    }
+    .category-group.collapsed .category-arrow { transform: rotate(-90deg); }
+    .category-name { font-size: 0.88rem; font-weight: 600; color: #333; }
+    .category-progress { font-size: 0.75rem; color: #888; }
+    .category-items {
+      border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;
+      overflow: hidden;
+    }
+    .category-group.collapsed .category-items { display: none; }
+
+    /* ===== Item Row ===== */
+    .item-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.55rem 0.8rem; background: #fff;
+      border-bottom: 1px solid #f0f0f0; cursor: pointer;
+      transition: background 0.1s;
+    }
+    .item-row:last-child { border-bottom: none; }
+    .item-row:hover { background: #fafafa; }
+    .item-row.checked { opacity: 0.5; }
+    .item-row.checked .item-name { text-decoration: line-through; }
+    .item-check {
+      width: 18px; height: 18px; border: 2px solid #ccc; border-radius: 4px;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .item-row.checked .item-check { background: #4a90d9; border-color: #4a90d9; }
+    .item-row.checked .item-check::after {
+      content: '\2713'; color: #fff; font-size: 0.7rem; font-weight: 700;
+    }
+    .item-name { flex: 1; font-size: 0.88rem; color: #333; }
+    .item-badge {
+      font-size: 0.65rem; color: #e6a817; margin-left: 0.2rem; vertical-align: super;
+    }
+    .item-qty {
+      font-size: 0.78rem; color: #888; background: #f0f0f0; padding: 0.15rem 0.5rem;
+      border-radius: 999px; white-space: nowrap;
+    }
+    .item-delete {
+      background: none; border: none; cursor: pointer; color: #ccc;
+      font-size: 1rem; padding: 0.2rem; line-height: 1; transition: color 0.15s;
+    }
+    .item-delete:hover { color: #e74c3c; }
+
+    /* ===== Add Custom Item ===== */
+    .add-section {
+      background: #fff; border-radius: 10px; padding: 0.75rem 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 1rem;
+    }
+    .add-section h3 { font-size: 0.88rem; margin-bottom: 0.5rem; color: #555; }
+    .add-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .add-row input[type="text"] {
+      flex: 1; min-width: 120px; padding: 0.4rem 0.6rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: 0.85rem; font-family: inherit;
+    }
+    .add-row input[type="number"] {
+      width: 55px; padding: 0.4rem 0.5rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: 0.85rem; text-align: center; font-family: inherit;
+    }
+    .add-row select {
+      padding: 0.4rem 0.5rem; border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: 0.85rem; font-family: inherit; background: #fff;
+    }
+    .add-btn {
+      padding: 0.4rem 1rem; border: none; border-radius: 6px; background: #4a90d9;
+      color: #fff; font-size: 0.85rem; cursor: pointer; font-family: inherit;
+      transition: background 0.15s;
+    }
+    .add-btn:hover { background: #3a7bc8; }
+
+    /* ===== Action Bar ===== */
+    .action-bar { display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+    .action-btn {
+      padding: 0.5rem 1rem; border: 1px solid #d0d0d0; border-radius: 8px;
+      background: #fff; color: #555; font-size: 0.82rem; cursor: pointer;
+      font-family: inherit; transition: background 0.15s, border-color 0.15s;
+    }
+    .action-btn:hover { border-color: #4a90d9; color: #4a90d9; }
+    .action-btn.danger { color: #e74c3c; }
+    .action-btn.danger:hover { border-color: #e74c3c; }
+
+    /* ===== Toast ===== */
+    .app-toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: #333; color: #fff; padding: 10px 20px; border-radius: 8px;
+      font-size: 0.85rem; opacity: 0; pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s; z-index: 100;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    .app-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+    .toast-undo {
+      background: none; border: none; color: #6ab0f3; font-size: 0.85rem;
+      cursor: pointer; font-family: inherit; font-weight: 600; text-decoration: underline;
+    }
+
+    /* ===== Empty State ===== */
+    .empty-state {
+      text-align: center; padding: 2rem 1rem; color: #999; font-size: 0.9rem;
+    }
+    .empty-state .empty-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+
+    /* ===== Dark Mode ===== */
+    body.tt-dark .scene-card { background: #20203a; border-color: #2a2a4a; }
+    body.tt-dark .scene-card:hover { border-color: #4a90d9; }
+    body.tt-dark .scene-card.active { background: #252550; border-color: #4a90d9; }
+    body.tt-dark .scene-label { color: #e0e0e0; }
+    body.tt-dark .scene-pill { background: #252545; color: #ccc; border-color: #3a3a5a; }
+    body.tt-dark .scene-pill:hover { border-color: #6ab0f3; color: #6ab0f3; }
+    body.tt-dark .scene-pill.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+    body.tt-dark .config-bar { background: #20203a; box-shadow: none; }
+    body.tt-dark .config-bar label { color: #aaa; }
+    body.tt-dark .progress-track { background: #2a2a4a; }
+    body.tt-dark .progress-header { color: #aaa; }
+    body.tt-dark .category-header { background: #20203a; border-color: #2a2a4a; }
+    body.tt-dark .category-header:hover { background: #252545; }
+    body.tt-dark .category-name { color: #e0e0e0; }
+    body.tt-dark .category-progress { color: #888; }
+    body.tt-dark .category-items { border-color: #2a2a4a; }
+    body.tt-dark .item-row { background: #20203a; border-bottom-color: #2a2a4a; }
+    body.tt-dark .item-row:hover { background: #252545; }
+    body.tt-dark .item-name { color: #e0e0e0; }
+    body.tt-dark .item-qty { background: #2a2a4a; color: #aaa; }
+    body.tt-dark .item-check { border-color: #555; }
+    body.tt-dark .item-delete { color: #555; }
+    body.tt-dark .item-delete:hover { color: #e74c3c; }
+    body.tt-dark .add-section { background: #20203a; box-shadow: none; }
+    body.tt-dark .add-section h3 { color: #aaa; }
+    body.tt-dark .action-btn { background: #20203a; border-color: #3a3a5a; color: #ccc; }
+    body.tt-dark .action-btn:hover { border-color: #6ab0f3; color: #6ab0f3; }
+    body.tt-dark .action-btn.danger:hover { border-color: #e74c3c; color: #e74c3c; }
+    body.tt-dark .empty-state { color: #666; }
+    body.tt-dark .app-toast { background: #555; }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 480px) {
+      .scene-grid { grid-template-columns: repeat(2, 1fr); }
+      .config-bar { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+      .config-bar .config-group { display: flex; align-items: center; gap: 0.5rem; }
+      .add-row { flex-direction: column; }
+      .add-row input[type="text"], .add-row input[type="number"], .add-row select { width: 100%; }
+    }
+  </style>
+  <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools" data-note="https://note.com/sana_suke"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Scene Selection -->
+    <div id="scene-grid" class="scene-grid"></div>
+    <div id="scene-pills" class="scene-pills"></div>
+
+    <!-- Config Bar -->
+    <div id="config-bar" class="config-bar" style="display:none">
+      <div class="config-group">
+        <label for="input-days">泊数</label>
+        <input type="number" id="input-days" min="1" max="30" value="3">
+        <span style="font-size:0.82rem;color:#888">泊</span>
+      </div>
+      <div class="config-group">
+        <label for="select-weather">天気</label>
+        <select id="select-weather">
+          <option value="hot">暑い</option>
+          <option value="normal" selected>普通</option>
+          <option value="cold">寒い</option>
+          <option value="rainy">雨</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="progress-section" class="progress-section" style="display:none">
+      <div class="progress-header">
+        <span id="progress-label">0 / 0 アイテム</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div id="progress-fill" class="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Items -->
+    <div id="items-container"></div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-icon">&#x1F9F3;</div>
+      <p>シーンを選択して持ち物リストを作成しましょう</p>
+    </div>
+
+    <!-- Add Custom Item -->
+    <div id="add-section" class="add-section" style="display:none">
+      <h3>アイテムを追加</h3>
+      <div class="add-row">
+        <input type="text" id="add-name" placeholder="アイテム名">
+        <input type="number" id="add-qty" min="1" max="99" value="1" placeholder="数量">
+        <select id="add-category"></select>
+        <button class="add-btn" id="add-btn">追加</button>
+      </div>
+    </div>
+
+    <!-- Action Bar -->
+    <div id="action-bar" class="action-bar" style="display:none">
+      <button class="action-btn" id="btn-share">&#x1F517; URLで共有</button>
+      <button class="action-btn danger" id="btn-reset">&#x1F5D1; リセット</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="app-toast" class="app-toast">
+    <span id="toast-msg"></span>
+    <button class="toast-undo" id="toast-undo" style="display:none">元に戻す</button>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    /* ========== 1. Constants & Categories ========== */
+    var STORAGE_KEY = 'tt-packing-list';
+    var CATEGORIES = [
+      { key: 'clothing', label: '衣類', icon: '\uD83D\uDC55' },
+      { key: 'electronics', label: '電子機器', icon: '\uD83D\uDD0C' },
+      { key: 'toiletries', label: '洗面用具', icon: '\uD83E\uDDF4' },
+      { key: 'documents', label: '書類・貴重品', icon: '\uD83D\uDCCB' },
+      { key: 'medicine', label: '医薬品', icon: '\uD83D\uDC8A' },
+      { key: 'food', label: '食料・飲料', icon: '\uD83C\uDF75' },
+      { key: 'outdoor', label: 'アウトドア用品', icon: '\u26FA' },
+      { key: 'other', label: 'その他', icon: '\uD83D\uDCE6' }
+    ];
+
+    var CATEGORY_MAP = {};
+    CATEGORIES.forEach(function (c) { CATEGORY_MAP[c.key] = c; });
+
+    /* ========== 2. Quantity Rule Helpers ========== */
+    function fixed(n) { return { type: 'fixed', n: n }; }
+    function perDay(n) { return { type: 'perDay', n: n }; }
+    function perDayCapped(n, max) { return { type: 'perDayCapped', n: n, max: max }; }
+    function weather(base, hot, cold, rain) {
+      return { type: 'weather', base: base, hot: hot, cold: cold, rain: rain };
+    }
+
+    /* ========== 3. Template Data (6 Scenes) ========== */
+    var SCENES = [
+      { id: 'domestic', label: '国内旅行', icon: '\uD83C\uDFE8' },
+      { id: 'overseas', label: '海外旅行', icon: '\u2708\uFE0F' },
+      { id: 'camp', label: 'キャンプ', icon: '\u26FA' },
+      { id: 'business', label: '出張', icon: '\uD83D\uDCBC' },
+      { id: 'festival', label: 'フェス・ライブ', icon: '\uD83C\uDFB5' },
+      { id: 'hospital', label: '入院', icon: '\uD83C\uDFE5' }
+    ];
+
+    var TEMPLATES = {
+      domestic: [
+        { id: 'd01', name: '下着', category: 'clothing', rule: perDay(1), essential: true },
+        { id: 'd02', name: '靴下', category: 'clothing', rule: perDay(1), essential: true },
+        { id: 'd03', name: 'トップス', category: 'clothing', rule: perDayCapped(1, 5), essential: true },
+        { id: 'd04', name: 'ボトムス', category: 'clothing', rule: perDayCapped(0.5, 3), essential: true },
+        { id: 'd05', name: 'パジャマ', category: 'clothing', rule: fixed(1), essential: false },
+        { id: 'd06', name: 'アウター', category: 'clothing', rule: weather(1, 0, 2, 1), essential: false },
+        { id: 'd07', name: '折りたたみ傘', category: 'other', rule: weather(0, 0, 0, 1), essential: false },
+        { id: 'd08', name: 'スマートフォン', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'd09', name: '充電器', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'd10', name: 'モバイルバッテリー', category: 'electronics', rule: fixed(1), essential: false },
+        { id: 'd11', name: '歯ブラシ・歯磨き粉', category: 'toiletries', rule: fixed(1), essential: true },
+        { id: 'd12', name: 'シャンプー・リンス', category: 'toiletries', rule: fixed(1), essential: false },
+        { id: 'd13', name: '洗顔料', category: 'toiletries', rule: fixed(1), essential: false },
+        { id: 'd14', name: '財布', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'd15', name: '身分証明書', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'd16', name: '常備薬', category: 'medicine', rule: fixed(1), essential: false },
+        { id: 'd17', name: 'タオル', category: 'other', rule: perDayCapped(1, 3), essential: false },
+        { id: 'd18', name: 'ビニール袋', category: 'other', rule: fixed(3), essential: false }
+      ],
+      overseas: [
+        { id: 'o01', name: '下着', category: 'clothing', rule: perDay(1), essential: true },
+        { id: 'o02', name: '靴下', category: 'clothing', rule: perDay(1), essential: true },
+        { id: 'o03', name: 'トップス', category: 'clothing', rule: perDayCapped(1, 5), essential: true },
+        { id: 'o04', name: 'ボトムス', category: 'clothing', rule: perDayCapped(0.5, 3), essential: true },
+        { id: 'o05', name: 'パジャマ', category: 'clothing', rule: fixed(1), essential: false },
+        { id: 'o06', name: 'アウター', category: 'clothing', rule: weather(1, 0, 2, 1), essential: false },
+        { id: 'o07', name: 'パスポート', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'o08', name: '航空券（eチケット）', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'o09', name: '財布（現地通貨）', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'o10', name: 'クレジットカード', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'o11', name: '海外旅行保険証', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'o12', name: 'スマートフォン', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'o13', name: '充電器', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'o14', name: '変換プラグ', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'o15', name: 'モバイルバッテリー', category: 'electronics', rule: fixed(1), essential: false },
+        { id: 'o16', name: '歯ブラシ・歯磨き粉', category: 'toiletries', rule: fixed(1), essential: true },
+        { id: 'o17', name: 'シャンプー・リンス', category: 'toiletries', rule: fixed(1), essential: false },
+        { id: 'o18', name: '常備薬', category: 'medicine', rule: fixed(1), essential: true },
+        { id: 'o19', name: '折りたたみ傘', category: 'other', rule: weather(0, 0, 0, 1), essential: false },
+        { id: 'o20', name: 'ビニール袋', category: 'other', rule: fixed(3), essential: false }
+      ],
+      camp: [
+        { id: 'c01', name: 'テント', category: 'outdoor', rule: fixed(1), essential: true },
+        { id: 'c02', name: '寝袋（シュラフ）', category: 'outdoor', rule: fixed(1), essential: true },
+        { id: 'c03', name: 'マット・コット', category: 'outdoor', rule: fixed(1), essential: true },
+        { id: 'c04', name: 'ランタン', category: 'outdoor', rule: fixed(1), essential: true },
+        { id: 'c05', name: '焚き火台', category: 'outdoor', rule: fixed(1), essential: false },
+        { id: 'c06', name: 'クッカー・食器', category: 'outdoor', rule: fixed(1), essential: true },
+        { id: 'c07', name: 'バーナー・燃料', category: 'outdoor', rule: fixed(1), essential: true },
+        { id: 'c08', name: 'クーラーボックス', category: 'outdoor', rule: fixed(1), essential: false },
+        { id: 'c09', name: '着替え', category: 'clothing', rule: perDay(1), essential: true },
+        { id: 'c10', name: '防寒着', category: 'clothing', rule: weather(1, 0, 2, 1), essential: false },
+        { id: 'c11', name: 'レインウェア', category: 'clothing', rule: weather(0, 0, 0, 1), essential: false },
+        { id: 'c12', name: '軍手', category: 'outdoor', rule: fixed(1), essential: false },
+        { id: 'c13', name: 'ナイフ・マルチツール', category: 'outdoor', rule: fixed(1), essential: false },
+        { id: 'c14', name: '虫除けスプレー', category: 'medicine', rule: fixed(1), essential: false },
+        { id: 'c15', name: '日焼け止め', category: 'toiletries', rule: fixed(1), essential: false },
+        { id: 'c16', name: '救急セット', category: 'medicine', rule: fixed(1), essential: true },
+        { id: 'c17', name: 'ゴミ袋', category: 'other', rule: fixed(5), essential: true },
+        { id: 'c18', name: '飲料水', category: 'food', rule: perDay(2), essential: true }
+      ],
+      business: [
+        { id: 'b01', name: 'スーツ', category: 'clothing', rule: perDayCapped(1, 2), essential: true },
+        { id: 'b02', name: 'ワイシャツ', category: 'clothing', rule: perDay(1), essential: true },
+        { id: 'b03', name: 'ネクタイ', category: 'clothing', rule: perDayCapped(1, 3), essential: false },
+        { id: 'b04', name: '下着', category: 'clothing', rule: perDay(1), essential: true },
+        { id: 'b05', name: '靴下', category: 'clothing', rule: perDay(1), essential: true },
+        { id: 'b06', name: 'ノートPC', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'b07', name: 'PC充電器', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'b08', name: 'スマートフォン', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'b09', name: '充電器', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'b10', name: '名刺', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'b11', name: '社員証', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'b12', name: '財布', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'b13', name: '手帳・ノート', category: 'documents', rule: fixed(1), essential: false },
+        { id: 'b14', name: '筆記用具', category: 'documents', rule: fixed(1), essential: false },
+        { id: 'b15', name: '歯ブラシ・歯磨き粉', category: 'toiletries', rule: fixed(1), essential: true },
+        { id: 'b16', name: '整髪料', category: 'toiletries', rule: fixed(1), essential: false },
+        { id: 'b17', name: '折りたたみ傘', category: 'other', rule: weather(0, 0, 0, 1), essential: false },
+        { id: 'b18', name: '常備薬', category: 'medicine', rule: fixed(1), essential: false }
+      ],
+      festival: [
+        { id: 'f01', name: 'チケット（電子/紙）', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'f02', name: '身分証明書', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'f03', name: '財布（少額現金）', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'f04', name: '着替えTシャツ', category: 'clothing', rule: perDayCapped(2, 4), essential: true },
+        { id: 'f05', name: 'タオル', category: 'other', rule: perDayCapped(2, 4), essential: true },
+        { id: 'f06', name: '帽子', category: 'clothing', rule: weather(1, 1, 0, 0), essential: false },
+        { id: 'f07', name: 'レインコート', category: 'clothing', rule: weather(0, 0, 0, 1), essential: false },
+        { id: 'f08', name: 'スマートフォン', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'f09', name: 'モバイルバッテリー', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'f10', name: '充電ケーブル', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'f11', name: '日焼け止め', category: 'toiletries', rule: weather(1, 1, 0, 0), essential: false },
+        { id: 'f12', name: 'ウェットティッシュ', category: 'toiletries', rule: fixed(1), essential: false },
+        { id: 'f13', name: 'レジャーシート', category: 'other', rule: fixed(1), essential: false },
+        { id: 'f14', name: 'ジップロック', category: 'other', rule: fixed(3), essential: false },
+        { id: 'f15', name: '飲料水', category: 'food', rule: fixed(2), essential: true },
+        { id: 'f16', name: '塩分タブレット', category: 'food', rule: weather(1, 1, 0, 0), essential: false },
+        { id: 'f17', name: '耳栓', category: 'other', rule: fixed(1), essential: false }
+      ],
+      hospital: [
+        { id: 'h01', name: 'パジャマ', category: 'clothing', rule: perDayCapped(1, 3), essential: true },
+        { id: 'h02', name: '下着', category: 'clothing', rule: perDay(1), essential: true },
+        { id: 'h03', name: '室内履き（スリッパ）', category: 'clothing', rule: fixed(1), essential: true },
+        { id: 'h04', name: 'カーディガン', category: 'clothing', rule: fixed(1), essential: false },
+        { id: 'h05', name: '保険証', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'h06', name: '診察券', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'h07', name: 'お薬手帳', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'h08', name: '印鑑', category: 'documents', rule: fixed(1), essential: false },
+        { id: 'h09', name: '現金（小銭多め）', category: 'documents', rule: fixed(1), essential: true },
+        { id: 'h10', name: 'スマートフォン', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'h11', name: '充電器', category: 'electronics', rule: fixed(1), essential: true },
+        { id: 'h12', name: 'イヤホン', category: 'electronics', rule: fixed(1), essential: false },
+        { id: 'h13', name: '歯ブラシ・歯磨き粉', category: 'toiletries', rule: fixed(1), essential: true },
+        { id: 'h14', name: 'タオル', category: 'other', rule: perDayCapped(1, 3), essential: true },
+        { id: 'h15', name: 'ティッシュ', category: 'toiletries', rule: fixed(1), essential: false },
+        { id: 'h16', name: 'コップ・箸・スプーン', category: 'other', rule: fixed(1), essential: true },
+        { id: 'h17', name: '本・雑誌', category: 'other', rule: fixed(1), essential: false },
+        { id: 'h18', name: 'ビニール袋', category: 'other', rule: fixed(3), essential: false }
+      ]
+    };
+
+    /* ========== 4. Quantity Calculation ========== */
+    function calcQty(rule, days, weather_val) {
+      if (!rule) return 1;
+      switch (rule.type) {
+        case 'fixed':
+          return rule.n;
+        case 'perDay':
+          return Math.ceil(days * rule.n);
+        case 'perDayCapped':
+          return Math.min(Math.ceil(days * rule.n), rule.max);
+        case 'weather':
+          switch (weather_val) {
+            case 'hot': return rule.hot;
+            case 'cold': return rule.cold;
+            case 'rainy': return rule.rain;
+            default: return rule.base;
+          }
+      }
+      return 1;
+    }
+
+    /* ========== 5. State Management ========== */
+    var state = {
+      scene: null,
+      days: 3,
+      weather: 'normal',
+      items: [],
+      collapsed: {}
+    };
+
+    function rebuildItems() {
+      var tpl = TEMPLATES[state.scene];
+      if (!tpl) { state.items = []; return; }
+
+      var checkedMap = {};
+      state.items.forEach(function (it) { checkedMap[it.id] = it.checked; });
+
+      var customs = state.items.filter(function (it) { return it.isCustom; });
+
+      var items = [];
+      tpl.forEach(function (t) {
+        var qty = calcQty(t.rule, state.days, state.weather);
+        if (qty <= 0) return;
+        items.push({
+          id: t.id, name: t.name, category: t.category,
+          qty: qty, checked: !!checkedMap[t.id],
+          isCustom: false, essential: t.essential, rule: t.rule
+        });
+      });
+
+      customs.forEach(function (c) { items.push(c); });
+
+      state.items = items;
+    }
+
+    function recalcQty() {
+      state.items.forEach(function (it) {
+        if (!it.isCustom && it.rule) {
+          var qty = calcQty(it.rule, state.days, state.weather);
+          if (qty <= 0) { it._hidden = true; }
+          else { it._hidden = false; it.qty = qty; }
+        }
+      });
+    }
+
+    /* ========== 6. DOM References ========== */
+    var $sceneGrid = document.getElementById('scene-grid');
+    var $scenePills = document.getElementById('scene-pills');
+    var $configBar = document.getElementById('config-bar');
+    var $inputDays = document.getElementById('input-days');
+    var $selectWeather = document.getElementById('select-weather');
+    var $progressSection = document.getElementById('progress-section');
+    var $progressLabel = document.getElementById('progress-label');
+    var $progressPct = document.getElementById('progress-pct');
+    var $progressFill = document.getElementById('progress-fill');
+    var $itemsContainer = document.getElementById('items-container');
+    var $emptyState = document.getElementById('empty-state');
+    var $addSection = document.getElementById('add-section');
+    var $addName = document.getElementById('add-name');
+    var $addQty = document.getElementById('add-qty');
+    var $addCategory = document.getElementById('add-category');
+    var $addBtn = document.getElementById('add-btn');
+    var $actionBar = document.getElementById('action-bar');
+    var $btnShare = document.getElementById('btn-share');
+    var $btnReset = document.getElementById('btn-reset');
+    var $toast = document.getElementById('app-toast');
+    var $toastMsg = document.getElementById('toast-msg');
+    var $toastUndo = document.getElementById('toast-undo');
+
+    /* ========== 7. Helpers ========== */
+    var toastTimer = null;
+    var undoCallback = null;
+
+    function showToast(msg, undoFn) {
+      clearTimeout(toastTimer);
+      $toastMsg.textContent = msg;
+      undoCallback = undoFn || null;
+      $toastUndo.style.display = undoFn ? 'inline' : 'none';
+      $toast.classList.add('show');
+      toastTimer = setTimeout(function () {
+        $toast.classList.remove('show');
+        undoCallback = null;
+      }, 3000);
+    }
+
+    $toastUndo.addEventListener('click', function () {
+      if (undoCallback) {
+        undoCallback();
+        undoCallback = null;
+      }
+      $toast.classList.remove('show');
+      clearTimeout(toastTimer);
+    });
+
+    var customCounter = 0;
+    function genId() {
+      return 'custom_' + Date.now() + '_' + (++customCounter);
+    }
+
+    /* ========== 8. Rendering ========== */
+    function renderSceneGrid() {
+      $sceneGrid.innerHTML = '';
+      SCENES.forEach(function (s) {
+        var card = document.createElement('div');
+        card.className = 'scene-card' + (state.scene === s.id ? ' active' : '');
+        card.innerHTML = '<div class="scene-icon">' + s.icon + '</div>' +
+                         '<div class="scene-label">' + s.label + '</div>';
+        card.addEventListener('click', function () {
+          state.scene = s.id;
+          state.collapsed = {};
+          rebuildItems();
+          renderAll();
+          saveState();
+        });
+        $sceneGrid.appendChild(card);
+      });
+    }
+
+    function renderScenePills() {
+      $scenePills.innerHTML = '';
+      SCENES.forEach(function (s) {
+        var btn = document.createElement('button');
+        btn.className = 'scene-pill' + (state.scene === s.id ? ' active' : '');
+        btn.textContent = s.icon + ' ' + s.label;
+        btn.addEventListener('click', function () {
+          state.scene = s.id;
+          state.collapsed = {};
+          rebuildItems();
+          renderAll();
+          saveState();
+        });
+        $scenePills.appendChild(btn);
+      });
+    }
+
+    function renderProgress() {
+      var visible = state.items.filter(function (it) { return !it._hidden; });
+      var total = visible.length;
+      var checked = visible.filter(function (it) { return it.checked; }).length;
+      var pct = total === 0 ? 0 : Math.round(checked / total * 100);
+
+      $progressLabel.textContent = checked + ' / ' + total + ' アイテム';
+      $progressPct.textContent = pct + '%';
+      $progressFill.style.width = pct + '%';
+
+      if (pct < 25) $progressFill.style.background = '#e74c3c';
+      else if (pct < 50) $progressFill.style.background = '#e67e22';
+      else if (pct < 100) $progressFill.style.background = '#3498db';
+      else $progressFill.style.background = '#27ae60';
+    }
+
+    function renderItems() {
+      $itemsContainer.innerHTML = '';
+
+      var visible = state.items.filter(function (it) { return !it._hidden; });
+      if (visible.length === 0) return;
+
+      var grouped = {};
+      CATEGORIES.forEach(function (c) { grouped[c.key] = []; });
+      visible.forEach(function (it) {
+        if (!grouped[it.category]) grouped[it.category] = [];
+        grouped[it.category].push(it);
+      });
+
+      CATEGORIES.forEach(function (cat) {
+        var items = grouped[cat.key];
+        if (!items || items.length === 0) return;
+
+        var group = document.createElement('div');
+        group.className = 'category-group' + (state.collapsed[cat.key] ? ' collapsed' : '');
+
+        var catChecked = items.filter(function (it) { return it.checked; }).length;
+
+        var header = document.createElement('div');
+        header.className = 'category-header';
+        header.innerHTML =
+          '<div class="category-header-left">' +
+            '<span class="category-arrow">\u25BC</span>' +
+            '<span class="category-name">' + cat.icon + ' ' + cat.label + '</span>' +
+          '</div>' +
+          '<span class="category-progress">' + catChecked + '/' + items.length + '</span>';
+        header.addEventListener('click', function () {
+          state.collapsed[cat.key] = !state.collapsed[cat.key];
+          group.classList.toggle('collapsed');
+          saveState();
+        });
+
+        var itemsDiv = document.createElement('div');
+        itemsDiv.className = 'category-items';
+
+        items.forEach(function (item) {
+          var row = document.createElement('div');
+          row.className = 'item-row' + (item.checked ? ' checked' : '');
+
+          var checkDiv = document.createElement('div');
+          checkDiv.className = 'item-check';
+
+          var nameSpan = document.createElement('span');
+          nameSpan.className = 'item-name';
+          nameSpan.textContent = item.name;
+          if (item.essential) {
+            var badge = document.createElement('span');
+            badge.className = 'item-badge';
+            badge.textContent = '\u2605';
+            badge.title = '必須アイテム';
+            nameSpan.appendChild(badge);
+          }
+
+          var qtySpan = document.createElement('span');
+          qtySpan.className = 'item-qty';
+          qtySpan.textContent = '\u00D7' + item.qty;
+
+          var delBtn = document.createElement('button');
+          delBtn.className = 'item-delete';
+          delBtn.innerHTML = '\u00D7';
+          delBtn.title = '削除';
+
+          row.appendChild(checkDiv);
+          row.appendChild(nameSpan);
+          row.appendChild(qtySpan);
+          row.appendChild(delBtn);
+
+          /* check toggle */
+          var toggleCheck = function (e) {
+            if (e.target === delBtn || delBtn.contains(e.target)) return;
+            item.checked = !item.checked;
+            row.classList.toggle('checked', item.checked);
+            renderProgress();
+            renderCategoryProgress(group, items);
+            saveState();
+          };
+          row.addEventListener('click', toggleCheck);
+
+          /* delete */
+          delBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var idx = state.items.indexOf(item);
+            if (idx === -1) return;
+            var removed = state.items.splice(idx, 1)[0];
+            renderItems();
+            renderProgress();
+            saveState();
+            showToast('\u300C' + removed.name + '\u300D\u3092\u524A\u9664\u3057\u307E\u3057\u305F', function () {
+              state.items.splice(idx, 0, removed);
+              renderItems();
+              renderProgress();
+              saveState();
+            });
+          });
+
+          itemsDiv.appendChild(row);
+        });
+
+        group.appendChild(header);
+        group.appendChild(itemsDiv);
+        $itemsContainer.appendChild(group);
+      });
+    }
+
+    function renderCategoryProgress(groupEl, items) {
+      var catChecked = items.filter(function (it) { return it.checked; }).length;
+      var progEl = groupEl.querySelector('.category-progress');
+      if (progEl) progEl.textContent = catChecked + '/' + items.length;
+    }
+
+    function renderAll() {
+      var hasScene = !!state.scene;
+      $sceneGrid.style.display = hasScene ? 'none' : '';
+      $scenePills.classList.toggle('active', hasScene);
+      $configBar.style.display = hasScene ? '' : 'none';
+      $progressSection.style.display = hasScene ? '' : 'none';
+      $addSection.style.display = hasScene ? '' : 'none';
+      $actionBar.style.display = hasScene ? '' : 'none';
+      $emptyState.style.display = hasScene ? 'none' : '';
+
+      if (hasScene) {
+        renderScenePills();
+        renderItems();
+        renderProgress();
+      } else {
+        renderSceneGrid();
+        $itemsContainer.innerHTML = '';
+      }
+    }
+
+    /* ========== 9. Event Handlers ========== */
+    $inputDays.addEventListener('change', function () {
+      var v = parseInt($inputDays.value, 10);
+      if (isNaN(v) || v < 1) v = 1;
+      if (v > 30) v = 30;
+      $inputDays.value = v;
+      state.days = v;
+      recalcQty();
+      renderItems();
+      renderProgress();
+      saveState();
+    });
+
+    $selectWeather.addEventListener('change', function () {
+      state.weather = $selectWeather.value;
+      rebuildItems();
+      renderItems();
+      renderProgress();
+      saveState();
+    });
+
+    /* populate category select for add section */
+    CATEGORIES.forEach(function (c) {
+      var opt = document.createElement('option');
+      opt.value = c.key;
+      opt.textContent = c.label;
+      $addCategory.appendChild(opt);
+    });
+
+    $addBtn.addEventListener('click', addCustomItem);
+    $addName.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') addCustomItem();
+    });
+
+    function addCustomItem() {
+      var name = $addName.value.trim();
+      if (!name) { $addName.focus(); return; }
+      var qty = parseInt($addQty.value, 10);
+      if (isNaN(qty) || qty < 1) qty = 1;
+      var category = $addCategory.value;
+
+      state.items.push({
+        id: genId(), name: name, category: category,
+        qty: qty, checked: false, isCustom: true, essential: false
+      });
+
+      $addName.value = '';
+      $addQty.value = 1;
+      renderItems();
+      renderProgress();
+      saveState();
+      showToast('\u300C' + name + '\u300D\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F');
+    }
+
+    /* Share */
+    $btnShare.addEventListener('click', function () {
+      var hash = encodeState();
+      var url = location.origin + location.pathname + '#' + hash;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function () {
+          showToast('共有URLをコピーしました');
+        }).catch(function () {
+          showToast('コピーに失敗しました');
+        });
+      } else {
+        showToast('コピーに失敗しました');
+      }
+    });
+
+    /* Reset */
+    $btnReset.addEventListener('click', function () {
+      if (!confirm('リストをリセットしますか？')) return;
+      state.scene = null;
+      state.days = 3;
+      state.weather = 'normal';
+      state.items = [];
+      state.collapsed = {};
+      $inputDays.value = 3;
+      $selectWeather.value = 'normal';
+      localStorage.removeItem(STORAGE_KEY);
+      location.hash = '';
+      renderAll();
+    });
+
+    /* ========== 10. URL Encoding / Decoding ========== */
+    function encodeState() {
+      var parts = [];
+      parts.push('s=' + state.scene);
+      parts.push('d=' + state.days);
+      parts.push('w=' + state.weather.charAt(0));
+
+      var checkedIds = state.items.filter(function (it) { return it.checked && !it.isCustom; })
+        .map(function (it) { return it.id; });
+      if (checkedIds.length > 0) parts.push('c=' + checkedIds.join(','));
+
+      var customs = state.items.filter(function (it) { return it.isCustom; });
+      if (customs.length > 0) {
+        var encoded = customs.map(function (it) {
+          return encodeURIComponent(it.name) + '~' + it.category + '~' + it.qty +
+                 (it.checked ? '~1' : '');
+        });
+        parts.push('x=' + encoded.join('|'));
+      }
+
+      return parts.join('&');
+    }
+
+    function decodeHash() {
+      var hash = location.hash.replace(/^#/, '');
+      if (!hash) return false;
+
+      var params = {};
+      hash.split('&').forEach(function (p) {
+        var kv = p.split('=');
+        if (kv.length === 2) params[kv[0]] = kv[1];
+      });
+
+      if (!params.s || !TEMPLATES[params.s]) return false;
+
+      state.scene = params.s;
+      state.days = parseInt(params.d, 10) || 3;
+      var wMap = { h: 'hot', n: 'normal', c: 'cold', r: 'rainy' };
+      state.weather = wMap[params.w] || 'normal';
+
+      $inputDays.value = state.days;
+      $selectWeather.value = state.weather;
+
+      rebuildItems();
+
+      /* restore checked */
+      if (params.c) {
+        var checkedSet = {};
+        params.c.split(',').forEach(function (id) { checkedSet[id] = true; });
+        state.items.forEach(function (it) { if (checkedSet[it.id]) it.checked = true; });
+      }
+
+      /* restore custom items */
+      if (params.x) {
+        params.x.split('|').forEach(function (entry) {
+          var parts = entry.split('~');
+          if (parts.length >= 3) {
+            state.items.push({
+              id: genId(), name: decodeURIComponent(parts[0]),
+              category: parts[1], qty: parseInt(parts[2], 10) || 1,
+              checked: parts[3] === '1', isCustom: true, essential: false
+            });
+          }
+        });
+      }
+
+      return true;
+    }
+
+    /* ========== 11. localStorage Persistence ========== */
+    function saveState() {
+      var data = {
+        scene: state.scene, days: state.days, weather: state.weather,
+        collapsed: state.collapsed,
+        items: state.items.map(function (it) {
+          var obj = { id: it.id, checked: it.checked };
+          if (it.isCustom) {
+            obj.isCustom = true;
+            obj.name = it.name;
+            obj.category = it.category;
+            obj.qty = it.qty;
+          }
+          return obj;
+        })
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function loadState() {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      try {
+        var data = JSON.parse(raw);
+        if (!data.scene || !TEMPLATES[data.scene]) return false;
+
+        state.scene = data.scene;
+        state.days = data.days || 3;
+        state.weather = data.weather || 'normal';
+        state.collapsed = data.collapsed || {};
+
+        $inputDays.value = state.days;
+        $selectWeather.value = state.weather;
+
+        rebuildItems();
+
+        /* restore checked & custom items */
+        var savedMap = {};
+        var customs = [];
+        (data.items || []).forEach(function (si) {
+          if (si.isCustom) {
+            customs.push({
+              id: si.id, name: si.name, category: si.category,
+              qty: si.qty, checked: !!si.checked, isCustom: true, essential: false
+            });
+          } else {
+            savedMap[si.id] = si;
+          }
+        });
+
+        state.items.forEach(function (it) {
+          if (savedMap[it.id]) it.checked = !!savedMap[it.id].checked;
+        });
+        customs.forEach(function (c) { state.items.push(c); });
+
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /* ========== 12. Init ========== */
+    function init() {
+      /* priority: URL hash > localStorage */
+      if (decodeHash()) {
+        renderAll();
+        saveState();
+        return;
+      }
+
+      if (loadState()) {
+        renderAll();
+        return;
+      }
+
+      renderSceneGrid();
+    }
+
+    init();
+  })();
+  </script>
+</body>
+</html>
