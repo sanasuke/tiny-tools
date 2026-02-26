@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>割り勘計算機 | tiny-tools Day 10</title>
+  <meta name="description" content="飲み会・旅行の割り勘を簡単計算。傾斜割り・飲み放題割り・端数処理・クーポン対応">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5; color: #333; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .container { width: 100%; max-width: 680px; padding: 1rem; }
+
+    /* --- Card --- */
+    .card {
+      background: #fff; border-radius: 10px; padding: 1rem 1.1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: .75rem;
+    }
+    .card-title {
+      font-size: .85rem; font-weight: 700; color: #555; margin-bottom: .7rem;
+      display: flex; align-items: center; gap: .4rem;
+    }
+    .card-title-icon { font-size: 1rem; }
+
+    /* --- Input row --- */
+    .input-row {
+      display: flex; align-items: center; gap: .6rem; margin-bottom: .6rem;
+    }
+    .input-row:last-child { margin-bottom: 0; }
+    .input-label { font-size: .85rem; min-width: 5.5em; color: #555; }
+    .input-field {
+      flex: 1; padding: .5rem .6rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: 1rem; text-align: right;
+      background: #fafafa; outline: none; transition: border-color .2s;
+    }
+    .input-field:focus { border-color: #4a90d9; }
+    .input-suffix { font-size: .85rem; color: #888; min-width: 1.5em; }
+
+    /* --- Stepper --- */
+    .stepper { display: flex; align-items: center; gap: 0; }
+    .stepper-btn {
+      width: 36px; height: 36px; border: 1px solid #d0d0d0; background: #f8f8f8;
+      font-size: 1.2rem; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; color: #555; transition: background .15s;
+      user-select: none;
+    }
+    .stepper-btn:first-child { border-radius: 6px 0 0 6px; }
+    .stepper-btn:last-child { border-radius: 0 6px 6px 0; }
+    .stepper-btn:hover { background: #e8e8e8; }
+    .stepper-btn:active { background: #ddd; }
+    .stepper-val {
+      width: 48px; height: 36px; border-top: 1px solid #d0d0d0;
+      border-bottom: 1px solid #d0d0d0; display: flex; align-items: center;
+      justify-content: center; font-size: 1.1rem; font-weight: 600;
+      background: #fff;
+    }
+
+    /* --- Discount select --- */
+    .discount-group { display: flex; align-items: center; gap: .5rem; flex: 1; }
+    .discount-select {
+      padding: .4rem .5rem; border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: .85rem; background: #fafafa; outline: none; cursor: pointer;
+    }
+    .discount-input {
+      width: 80px; padding: .4rem .5rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: .9rem; text-align: right;
+      background: #fafafa; outline: none;
+    }
+    .discount-input:focus { border-color: #4a90d9; }
+    .discount-suffix { font-size: .8rem; color: #888; }
+
+    /* --- Tab pills --- */
+    .tab-group {
+      display: flex; gap: 0; background: #e8e8e8; border-radius: 999px;
+      padding: 3px; margin-bottom: .75rem;
+    }
+    .tab-btn {
+      flex: 1; padding: .45rem .3rem; border: none; background: transparent;
+      border-radius: 999px; font-size: .82rem; font-weight: 600;
+      cursor: pointer; color: #666; transition: all .2s;
+    }
+    .tab-btn.active { background: #4a90d9; color: #fff; box-shadow: 0 1px 4px rgba(74,144,217,.3); }
+
+    /* --- Mode panels --- */
+    .mode-panel { display: none; }
+    .mode-panel.active { display: block; }
+
+    /* --- Member list (weighted mode) --- */
+    .member-row {
+      display: flex; align-items: center; gap: .4rem; margin-bottom: .4rem;
+      padding: .35rem .5rem; background: #f8f8f8; border-radius: 6px;
+    }
+    .member-name {
+      flex: 1; padding: .3rem .4rem; border: 1px solid #d0d0d0;
+      border-radius: 4px; font-size: .85rem; background: #fff; outline: none;
+      min-width: 0;
+    }
+    .member-name:focus { border-color: #4a90d9; }
+    .member-role {
+      padding: .3rem .4rem; border: 1px solid #d0d0d0; border-radius: 4px;
+      font-size: .8rem; background: #fff; cursor: pointer; outline: none;
+    }
+    .member-weight { font-size: .75rem; color: #888; min-width: 3em; text-align: center; }
+    .member-del {
+      width: 26px; height: 26px; border: none; background: transparent;
+      color: #ccc; font-size: 1.1rem; cursor: pointer; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      transition: color .15s, background .15s;
+    }
+    .member-del:hover { color: #e74c3c; background: rgba(231,76,60,.08); }
+    .add-member-btn {
+      width: 100%; padding: .4rem; border: 1px dashed #ccc; background: transparent;
+      border-radius: 6px; font-size: .8rem; color: #888; cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .add-member-btn:hover { border-color: #4a90d9; color: #4a90d9; }
+
+    /* --- Rounding pills --- */
+    .round-group {
+      display: flex; gap: .35rem; flex-wrap: wrap;
+    }
+    .round-btn {
+      padding: .35rem .7rem; border: 1px solid #d0d0d0; background: #fff;
+      border-radius: 999px; font-size: .8rem; cursor: pointer; color: #555;
+      transition: all .15s;
+    }
+    .round-btn.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+
+    /* --- Result card --- */
+    .result-card {
+      background: #fff; border-radius: 12px; padding: 1.2rem;
+      box-shadow: 0 4px 16px rgba(74,144,217,.12); border-top: 3px solid #4a90d9;
+    }
+    .result-title { font-size: .9rem; font-weight: 700; color: #4a90d9; margin-bottom: .8rem; }
+    .result-empty { text-align: center; color: #aaa; font-size: .85rem; padding: 1.5rem 0; }
+    .result-rows { list-style: none; }
+    .result-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: .45rem 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-label { font-size: .85rem; color: #555; }
+    .result-amount { font-size: 1.1rem; font-weight: 700; color: #333; }
+    .result-sub {
+      font-size: .78rem; color: #888; margin-top: .5rem; padding-top: .5rem;
+      border-top: 1px dashed #e0e0e0;
+    }
+    .result-sub-row { display: flex; justify-content: space-between; margin-bottom: .2rem; }
+    .result-check {
+      display: flex; justify-content: space-between; margin-top: .6rem;
+      padding: .5rem .6rem; background: #f0f7ff; border-radius: 6px;
+      font-size: .8rem; color: #4a90d9; font-weight: 600;
+    }
+    .result-check.error { background: #fff0f0; color: #e74c3c; }
+
+    /* --- Action buttons --- */
+    .action-row { display: flex; gap: .5rem; margin-top: .8rem; }
+    .action-btn {
+      flex: 1; padding: .5rem; border: 1px solid #d0d0d0; background: #fff;
+      border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer;
+      color: #555; transition: all .15s; display: flex; align-items: center;
+      justify-content: center; gap: .3rem;
+    }
+    .action-btn:hover { border-color: #4a90d9; color: #4a90d9; }
+    .action-btn.primary { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+    .action-btn.primary:hover { background: #3a7bc8; }
+
+    /* ========== Dark Mode ========== */
+    body.tt-dark { background: #1a1a2e; color: #e0e0e0; }
+    body.tt-dark .card { background: #20203a; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+    body.tt-dark .card-title { color: #aaa; }
+    body.tt-dark .input-field { background: #252545; border-color: #3a3a5a; color: #e0e0e0; }
+    body.tt-dark .input-field:focus { border-color: #6ab0f3; }
+    body.tt-dark .input-label { color: #aaa; }
+    body.tt-dark .input-suffix { color: #777; }
+    body.tt-dark .stepper-btn { background: #252545; border-color: #3a3a5a; color: #ccc; }
+    body.tt-dark .stepper-btn:hover { background: #30305a; }
+    body.tt-dark .stepper-val { background: #20203a; border-color: #3a3a5a; color: #e0e0e0; }
+    body.tt-dark .discount-select { background: #252545; border-color: #3a3a5a; color: #e0e0e0; }
+    body.tt-dark .discount-input { background: #252545; border-color: #3a3a5a; color: #e0e0e0; }
+    body.tt-dark .discount-input:focus { border-color: #6ab0f3; }
+    body.tt-dark .discount-suffix { color: #777; }
+    body.tt-dark .tab-group { background: #252545; }
+    body.tt-dark .tab-btn { color: #888; }
+    body.tt-dark .tab-btn.active { background: #4a90d9; color: #fff; }
+    body.tt-dark .member-row { background: #252545; }
+    body.tt-dark .member-name { background: #20203a; border-color: #3a3a5a; color: #e0e0e0; }
+    body.tt-dark .member-name:focus { border-color: #6ab0f3; }
+    body.tt-dark .member-role { background: #20203a; border-color: #3a3a5a; color: #e0e0e0; }
+    body.tt-dark .member-weight { color: #777; }
+    body.tt-dark .member-del { color: #555; }
+    body.tt-dark .member-del:hover { color: #e74c3c; background: rgba(231,76,60,.1); }
+    body.tt-dark .add-member-btn { border-color: #3a3a5a; color: #777; }
+    body.tt-dark .add-member-btn:hover { border-color: #6ab0f3; color: #6ab0f3; }
+    body.tt-dark .round-btn { background: #252545; border-color: #3a3a5a; color: #aaa; }
+    body.tt-dark .round-btn.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+    body.tt-dark .result-card { background: #20203a; box-shadow: 0 4px 16px rgba(0,0,0,.3); border-top-color: #6ab0f3; }
+    body.tt-dark .result-title { color: #6ab0f3; }
+    body.tt-dark .result-empty { color: #666; }
+    body.tt-dark .result-row { border-bottom-color: #2a2a4a; }
+    body.tt-dark .result-label { color: #aaa; }
+    body.tt-dark .result-amount { color: #e0e0e0; }
+    body.tt-dark .result-sub { border-top-color: #2a2a4a; color: #777; }
+    body.tt-dark .result-check { background: rgba(74,144,217,.1); color: #6ab0f3; }
+    body.tt-dark .result-check.error { background: rgba(231,76,60,.1); color: #e74c3c; }
+    body.tt-dark .action-btn { background: #252545; border-color: #3a3a5a; color: #aaa; }
+    body.tt-dark .action-btn:hover { border-color: #6ab0f3; color: #6ab0f3; }
+    body.tt-dark .action-btn.primary { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+    body.tt-dark .action-btn.primary:hover { background: #3a7bc8; }
+
+    /* ========== Responsive ========== */
+    @media (max-width: 480px) {
+      .input-row { flex-wrap: wrap; }
+      .input-label { min-width: 100%; margin-bottom: .2rem; }
+      .member-row { flex-wrap: wrap; }
+      .member-name { flex: 1 1 100%; margin-bottom: .3rem; }
+    }
+  </style>
+  <script src="../shared/header.js"></script>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Basic Input -->
+    <div class="card">
+      <div class="card-title"><span class="card-title-icon">&#x1F4B0;</span> 基本情報</div>
+      <div class="input-row">
+        <span class="input-label">合計金額</span>
+        <input type="text" id="totalAmount" class="input-field" inputmode="numeric" placeholder="0" value="">
+        <span class="input-suffix">円</span>
+      </div>
+      <div class="input-row">
+        <span class="input-label">人数</span>
+        <div class="stepper">
+          <button type="button" class="stepper-btn" id="headcountMinus">−</button>
+          <div class="stepper-val" id="headcountVal">2</div>
+          <button type="button" class="stepper-btn" id="headcountPlus">＋</button>
+        </div>
+        <span class="input-suffix">人</span>
+      </div>
+      <div class="input-row">
+        <span class="input-label">割引</span>
+        <div class="discount-group">
+          <select id="discountType" class="discount-select">
+            <option value="none">なし</option>
+            <option value="percent">%割引</option>
+            <option value="fixed">円引き</option>
+          </select>
+          <input type="text" id="discountValue" class="discount-input" inputmode="numeric" placeholder="0" style="display:none">
+          <span id="discountSuffix" class="discount-suffix" style="display:none"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Split Mode -->
+    <div class="card">
+      <div class="card-title"><span class="card-title-icon">&#x2702;&#xFE0F;</span> 分け方</div>
+      <div class="tab-group">
+        <button type="button" class="tab-btn active" data-mode="equal">均等割り</button>
+        <button type="button" class="tab-btn" data-mode="drink">飲み割り</button>
+        <button type="button" class="tab-btn" data-mode="weighted">傾斜割り</button>
+      </div>
+
+      <!-- Drink mode -->
+      <div class="mode-panel" id="panel-drink">
+        <div class="input-row">
+          <span class="input-label">飲む人</span>
+          <div class="stepper">
+            <button type="button" class="stepper-btn" id="drinkerMinus">−</button>
+            <div class="stepper-val" id="drinkerVal">1</div>
+            <button type="button" class="stepper-btn" id="drinkerPlus">＋</button>
+          </div>
+          <span class="input-suffix">人</span>
+        </div>
+        <div class="input-row">
+          <span class="input-label">飲まない人</span>
+          <div class="stepper">
+            <button type="button" class="stepper-btn" id="nonDrinkerMinus">−</button>
+            <div class="stepper-val" id="nonDrinkerVal">1</div>
+            <button type="button" class="stepper-btn" id="nonDrinkerPlus">＋</button>
+          </div>
+          <span class="input-suffix">人</span>
+        </div>
+        <div class="input-row">
+          <span class="input-label">飲み放題料金</span>
+          <input type="text" id="drinkFee" class="input-field" inputmode="numeric" placeholder="1500" value="1500">
+          <span class="input-suffix">円</span>
+        </div>
+      </div>
+
+      <!-- Weighted mode -->
+      <div class="mode-panel" id="panel-weighted">
+        <div id="memberList"></div>
+        <button type="button" class="add-member-btn" id="addMemberBtn">＋ メンバーを追加</button>
+      </div>
+    </div>
+
+    <!-- Rounding -->
+    <div class="card">
+      <div class="card-title"><span class="card-title-icon">&#x1F4B4;</span> 端数処理</div>
+      <div class="round-group">
+        <button type="button" class="round-btn active" data-unit="0">なし</button>
+        <button type="button" class="round-btn" data-unit="100">100円</button>
+        <button type="button" class="round-btn" data-unit="500">500円</button>
+        <button type="button" class="round-btn" data-unit="1000">1000円</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="result-card" id="resultCard">
+      <div class="result-title">計算結果</div>
+      <div class="result-empty" id="resultEmpty">金額と人数を入力してください</div>
+      <div id="resultContent" style="display:none">
+        <ul class="result-rows" id="resultRows"></ul>
+        <div class="result-sub" id="resultSub"></div>
+        <div class="result-check" id="resultCheck"></div>
+        <div class="action-row">
+          <button type="button" class="action-btn primary" id="copyBtn">&#x1F4CB; コピー</button>
+          <button type="button" class="action-btn" id="shareBtn">&#x1F517; シェア</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    /* ---------- State ---------- */
+    var state = {
+      totalAmount: 0,
+      headcount: 2,
+      discountType: 'none',
+      discountValue: 0,
+      splitMode: 'equal',
+      drinkerCount: 1,
+      nonDrinkerCount: 1,
+      drinkFee: 1500,
+      members: [],
+      roundUnit: 0
+    };
+
+    var ROLES = {
+      more:   { label: '多め',   weight: 1.5 },
+      normal: { label: '普通',   weight: 1.0 },
+      less:   { label: '少なめ', weight: 0.7 }
+    };
+
+    /* ---------- DOM refs ---------- */
+    var $totalAmount = document.getElementById('totalAmount');
+    var $headcountVal = document.getElementById('headcountVal');
+    var $discountType = document.getElementById('discountType');
+    var $discountValue = document.getElementById('discountValue');
+    var $discountSuffix = document.getElementById('discountSuffix');
+    var $drinkFee = document.getElementById('drinkFee');
+    var $drinkerVal = document.getElementById('drinkerVal');
+    var $nonDrinkerVal = document.getElementById('nonDrinkerVal');
+    var $memberList = document.getElementById('memberList');
+    var $resultEmpty = document.getElementById('resultEmpty');
+    var $resultContent = document.getElementById('resultContent');
+    var $resultRows = document.getElementById('resultRows');
+    var $resultSub = document.getElementById('resultSub');
+    var $resultCheck = document.getElementById('resultCheck');
+
+    /* ---------- Helpers ---------- */
+    function yen(n) {
+      return '¥' + Math.round(n).toLocaleString('ja-JP');
+    }
+
+    function parseNum(str) {
+      return parseInt(String(str).replace(/[,，]/g, ''), 10) || 0;
+    }
+
+    function formatInput(el) {
+      var raw = parseNum(el.value);
+      if (raw > 0) {
+        el.value = raw.toLocaleString('ja-JP');
+      }
+    }
+
+    /* ---------- Discount UI ---------- */
+    $discountType.addEventListener('change', function () {
+      state.discountType = this.value;
+      if (this.value === 'none') {
+        $discountValue.style.display = 'none';
+        $discountSuffix.style.display = 'none';
+        state.discountValue = 0;
+      } else {
+        $discountValue.style.display = '';
+        $discountSuffix.style.display = '';
+        $discountSuffix.textContent = this.value === 'percent' ? '%' : '円';
+        $discountValue.value = '';
+        $discountValue.focus();
+      }
+      recalc();
+    });
+    $discountValue.addEventListener('input', function () {
+      state.discountValue = parseNum(this.value);
+      recalc();
+    });
+
+    /* ---------- Total amount ---------- */
+    $totalAmount.addEventListener('input', function () {
+      state.totalAmount = parseNum(this.value);
+      recalc();
+    });
+    $totalAmount.addEventListener('blur', function () { formatInput(this); });
+
+    /* ---------- Headcount stepper ---------- */
+    function setHeadcount(n) {
+      state.headcount = Math.max(2, Math.min(50, n));
+      $headcountVal.textContent = state.headcount;
+      syncDrinkCounts();
+      recalc();
+    }
+    document.getElementById('headcountMinus').addEventListener('click', function () { setHeadcount(state.headcount - 1); });
+    document.getElementById('headcountPlus').addEventListener('click', function () { setHeadcount(state.headcount + 1); });
+
+    /* ---------- Split mode tabs ---------- */
+    var tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        tabBtns.forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        state.splitMode = btn.getAttribute('data-mode');
+        document.querySelectorAll('.mode-panel').forEach(function (p) { p.classList.remove('active'); });
+        var panel = document.getElementById('panel-' + state.splitMode);
+        if (panel) panel.classList.add('active');
+        if (state.splitMode === 'drink') syncDrinkCounts();
+        if (state.splitMode === 'weighted') initMembers();
+        recalc();
+      });
+    });
+
+    /* ---------- Drink mode ---------- */
+    function syncDrinkCounts() {
+      if (state.drinkerCount + state.nonDrinkerCount !== state.headcount) {
+        state.drinkerCount = Math.max(1, state.headcount - 1);
+        state.nonDrinkerCount = state.headcount - state.drinkerCount;
+      }
+      state.drinkerCount = Math.max(0, Math.min(state.headcount, state.drinkerCount));
+      state.nonDrinkerCount = state.headcount - state.drinkerCount;
+      $drinkerVal.textContent = state.drinkerCount;
+      $nonDrinkerVal.textContent = state.nonDrinkerCount;
+    }
+
+    function setDrinker(n) {
+      state.drinkerCount = Math.max(0, Math.min(state.headcount, n));
+      state.nonDrinkerCount = state.headcount - state.drinkerCount;
+      $drinkerVal.textContent = state.drinkerCount;
+      $nonDrinkerVal.textContent = state.nonDrinkerCount;
+      recalc();
+    }
+    function setNonDrinker(n) {
+      state.nonDrinkerCount = Math.max(0, Math.min(state.headcount, n));
+      state.drinkerCount = state.headcount - state.nonDrinkerCount;
+      $drinkerVal.textContent = state.drinkerCount;
+      $nonDrinkerVal.textContent = state.nonDrinkerCount;
+      recalc();
+    }
+    document.getElementById('drinkerMinus').addEventListener('click', function () { setDrinker(state.drinkerCount - 1); });
+    document.getElementById('drinkerPlus').addEventListener('click', function () { setDrinker(state.drinkerCount + 1); });
+    document.getElementById('nonDrinkerMinus').addEventListener('click', function () { setNonDrinker(state.nonDrinkerCount - 1); });
+    document.getElementById('nonDrinkerPlus').addEventListener('click', function () { setNonDrinker(state.nonDrinkerCount + 1); });
+
+    $drinkFee.addEventListener('input', function () {
+      state.drinkFee = parseNum(this.value);
+      recalc();
+    });
+    $drinkFee.addEventListener('blur', function () { formatInput(this); });
+
+    /* ---------- Weighted mode ---------- */
+    function initMembers() {
+      if (state.members.length === 0) {
+        state.members = [];
+        for (var i = 0; i < state.headcount; i++) {
+          state.members.push({ name: 'メンバー' + (i + 1), role: 'normal' });
+        }
+      }
+      renderMembers();
+    }
+
+    function renderMembers() {
+      $memberList.innerHTML = '';
+      state.members.forEach(function (m, i) {
+        var row = document.createElement('div');
+        row.className = 'member-row';
+
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'member-name';
+        nameInput.value = m.name;
+        nameInput.addEventListener('input', function () {
+          state.members[i].name = this.value;
+        });
+
+        var roleSelect = document.createElement('select');
+        roleSelect.className = 'member-role';
+        Object.keys(ROLES).forEach(function (key) {
+          var opt = document.createElement('option');
+          opt.value = key;
+          opt.textContent = ROLES[key].label;
+          if (key === m.role) opt.selected = true;
+          roleSelect.appendChild(opt);
+        });
+        roleSelect.addEventListener('change', function () {
+          state.members[i].role = this.value;
+          row.querySelector('.member-weight').textContent = ROLES[this.value].weight + 'x';
+          recalc();
+        });
+
+        var weightSpan = document.createElement('span');
+        weightSpan.className = 'member-weight';
+        weightSpan.textContent = ROLES[m.role].weight + 'x';
+
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'member-del';
+        delBtn.innerHTML = '&times;';
+        delBtn.addEventListener('click', function () {
+          if (state.members.length <= 2) return;
+          state.members.splice(i, 1);
+          state.headcount = state.members.length;
+          $headcountVal.textContent = state.headcount;
+          renderMembers();
+          recalc();
+        });
+
+        row.appendChild(nameInput);
+        row.appendChild(roleSelect);
+        row.appendChild(weightSpan);
+        row.appendChild(delBtn);
+        $memberList.appendChild(row);
+      });
+    }
+
+    document.getElementById('addMemberBtn').addEventListener('click', function () {
+      if (state.members.length >= 50) return;
+      state.members.push({ name: 'メンバー' + (state.members.length + 1), role: 'normal' });
+      state.headcount = state.members.length;
+      $headcountVal.textContent = state.headcount;
+      renderMembers();
+      recalc();
+    });
+
+    /* ---------- Rounding ---------- */
+    var roundBtns = document.querySelectorAll('.round-btn');
+    roundBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        roundBtns.forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        state.roundUnit = parseInt(btn.getAttribute('data-unit'), 10);
+        recalc();
+      });
+    });
+
+    /* ---------- Calculation ---------- */
+    function calcDiscount(total) {
+      if (state.discountType === 'percent') {
+        return Math.floor(total * state.discountValue / 100);
+      }
+      if (state.discountType === 'fixed') {
+        return Math.min(state.discountValue, total);
+      }
+      return 0;
+    }
+
+    function roundAmount(amount, unit) {
+      if (!unit) return Math.round(amount);
+      return Math.round(amount / unit) * unit;
+    }
+
+    function recalc() {
+      if (state.totalAmount <= 0 || state.headcount < 2) {
+        $resultEmpty.style.display = '';
+        $resultContent.style.display = 'none';
+        return;
+      }
+
+      var discount = calcDiscount(state.totalAmount);
+      var effective = state.totalAmount - discount;
+      if (effective <= 0) {
+        $resultEmpty.textContent = '割引後の金額が0以下です';
+        $resultEmpty.style.display = '';
+        $resultContent.style.display = 'none';
+        return;
+      }
+
+      var items = []; // { label, amount, count? }
+      var mode = state.splitMode;
+
+      if (mode === 'equal') {
+        var per = effective / state.headcount;
+        var rounded = roundAmount(per, state.roundUnit);
+        items.push({ label: '1人あたり', amount: rounded, count: state.headcount });
+      } else if (mode === 'drink') {
+        if (state.drinkerCount + state.nonDrinkerCount !== state.headcount) {
+          syncDrinkCounts();
+        }
+        var drinkTotal = state.drinkerCount * state.drinkFee;
+        if (drinkTotal > effective) {
+          $resultEmpty.textContent = '飲み放題料金が合計を超えています';
+          $resultEmpty.style.display = '';
+          $resultContent.style.display = 'none';
+          return;
+        }
+        var foodTotal = effective - drinkTotal;
+        var foodPer = foodTotal / state.headcount;
+        var drinkerPay = roundAmount(foodPer + state.drinkFee, state.roundUnit);
+        var nonDrinkerPay = roundAmount(foodPer, state.roundUnit);
+        if (state.drinkerCount > 0) {
+          items.push({ label: '飲む人', amount: drinkerPay, count: state.drinkerCount });
+        }
+        if (state.nonDrinkerCount > 0) {
+          items.push({ label: '飲まない人', amount: nonDrinkerPay, count: state.nonDrinkerCount });
+        }
+      } else if (mode === 'weighted') {
+        var totalWeight = state.members.reduce(function (sum, m) { return sum + ROLES[m.role].weight; }, 0);
+        if (totalWeight <= 0) return;
+        var baseUnit = effective / totalWeight;
+        state.members.forEach(function (m) {
+          var amt = roundAmount(baseUnit * ROLES[m.role].weight, state.roundUnit);
+          items.push({ label: m.name + '（' + ROLES[m.role].label + '）', amount: amt, count: 1 });
+        });
+      }
+
+      // Calculate total after rounding
+      var paidTotal = items.reduce(function (sum, it) { return sum + it.amount * (it.count || 1); }, 0);
+      var diff = effective - paidTotal;
+
+      // Render
+      $resultEmpty.style.display = 'none';
+      $resultContent.style.display = '';
+
+      $resultRows.innerHTML = '';
+      items.forEach(function (it) {
+        var li = document.createElement('li');
+        li.className = 'result-row';
+        var countLabel = it.count > 1 ? ' (' + it.count + '人)' : '';
+        li.innerHTML = '<span class="result-label">' + it.label + countLabel + '</span>'
+          + '<span class="result-amount">' + yen(it.amount) + '</span>';
+        $resultRows.appendChild(li);
+      });
+
+      // Sub info
+      var subHtml = '';
+      if (discount > 0) {
+        var discLabel = state.discountType === 'percent' ? state.discountValue + '%OFF' : yen(state.discountValue) + '引き';
+        subHtml += '<div class="result-sub-row"><span>割引</span><span>-' + yen(discount) + '（' + discLabel + '）</span></div>';
+      }
+      if (state.roundUnit > 0 && diff !== 0) {
+        var diffLabel = diff > 0 ? '幹事が +' + yen(Math.abs(diff)) + ' 負担' : '幹事が ' + yen(Math.abs(diff)) + ' 受け取り';
+        subHtml += '<div class="result-sub-row"><span>端数調整</span><span>' + diffLabel + '</span></div>';
+      }
+      $resultSub.innerHTML = subHtml;
+      $resultSub.style.display = subHtml ? '' : 'none';
+
+      // Check
+      var checkTotal = paidTotal + (diff > 0 ? diff : 0);
+      var isOk = Math.abs(checkTotal - effective) < 1 || state.roundUnit > 0;
+      if (state.roundUnit > 0) {
+        $resultCheck.innerHTML = '<span>支払合計</span><span>' + yen(paidTotal) + (diff !== 0 ? ' + 調整' + yen(Math.abs(diff)) : '') + ' = ' + yen(effective) + '</span>';
+      } else {
+        $resultCheck.innerHTML = '<span>支払合計</span><span>' + yen(paidTotal) + '</span>';
+      }
+      $resultCheck.className = 'result-check' + (Math.abs(paidTotal + Math.max(0, diff) - effective) > 1 && state.roundUnit === 0 ? ' error' : '');
+    }
+
+    /* ---------- Share / Copy ---------- */
+    function buildShareText() {
+      var lines = [];
+      lines.push('割り勘計算結果');
+      lines.push('━━━━━━━━━━━━━━');
+      lines.push('合計: ' + yen(state.totalAmount));
+
+      var discount = calcDiscount(state.totalAmount);
+      var effective = state.totalAmount - discount;
+      var modeLabels = { equal: '均等割り', drink: '飲み放題割り', weighted: '傾斜割り' };
+      lines.push('人数: ' + state.headcount + '人（' + modeLabels[state.splitMode] + '）');
+
+      if (discount > 0) {
+        var discLabel = state.discountType === 'percent' ? state.discountValue + '%OFF' : yen(state.discountValue) + '引き';
+        lines.push('割引: ' + discLabel + ' (-' + yen(discount) + ')');
+      }
+
+      lines.push('');
+      lines.push('支払い金額');
+
+      if (state.splitMode === 'equal') {
+        var per = roundAmount(effective / state.headcount, state.roundUnit);
+        lines.push('・1人あたり: ' + yen(per));
+      } else if (state.splitMode === 'drink') {
+        var drinkTotal = state.drinkerCount * state.drinkFee;
+        var foodPer = (effective - drinkTotal) / state.headcount;
+        if (state.drinkerCount > 0) {
+          lines.push('・飲む人 (' + state.drinkerCount + '人): ' + yen(roundAmount(foodPer + state.drinkFee, state.roundUnit)) + ' /人');
+        }
+        if (state.nonDrinkerCount > 0) {
+          lines.push('・飲まない人 (' + state.nonDrinkerCount + '人): ' + yen(roundAmount(foodPer, state.roundUnit)) + ' /人');
+        }
+      } else if (state.splitMode === 'weighted') {
+        var totalWeight = state.members.reduce(function (s, m) { return s + ROLES[m.role].weight; }, 0);
+        var base = effective / totalWeight;
+        state.members.forEach(function (m) {
+          lines.push('・' + m.name + '（' + ROLES[m.role].label + '）: ' + yen(roundAmount(base * ROLES[m.role].weight, state.roundUnit)));
+        });
+      }
+
+      if (state.roundUnit > 0) {
+        var items2 = [];
+        if (state.splitMode === 'equal') {
+          items2.push({ amount: roundAmount(effective / state.headcount, state.roundUnit), count: state.headcount });
+        } else if (state.splitMode === 'drink') {
+          var dt = state.drinkerCount * state.drinkFee;
+          var fp = (effective - dt) / state.headcount;
+          items2.push({ amount: roundAmount(fp + state.drinkFee, state.roundUnit), count: state.drinkerCount });
+          items2.push({ amount: roundAmount(fp, state.roundUnit), count: state.nonDrinkerCount });
+        } else {
+          var tw = state.members.reduce(function (s, m) { return s + ROLES[m.role].weight; }, 0);
+          var bu = effective / tw;
+          state.members.forEach(function (m) {
+            items2.push({ amount: roundAmount(bu * ROLES[m.role].weight, state.roundUnit), count: 1 });
+          });
+        }
+        var paid = items2.reduce(function (s, it) { return s + it.amount * it.count; }, 0);
+        var d = effective - paid;
+        if (d !== 0) {
+          lines.push('');
+          lines.push('端数: 幹事が ' + (d > 0 ? '+' : '') + yen(Math.abs(d)) + (d > 0 ? ' 負担' : ' 受け取り'));
+        }
+      }
+
+      lines.push('━━━━━━━━━━━━━━');
+      lines.push('tiny-tools 割り勘計算機');
+      return lines.join('\n');
+    }
+
+    document.getElementById('copyBtn').addEventListener('click', function () {
+      var text = buildShareText();
+      navigator.clipboard.writeText(text).then(function () {
+        if (typeof showToast === 'function') showToast('コピーしました');
+      }).catch(function () {
+        // fallback
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (typeof showToast === 'function') showToast('コピーしました');
+      });
+    });
+
+    document.getElementById('shareBtn').addEventListener('click', function () {
+      var text = buildShareText();
+      if (navigator.share) {
+        navigator.share({ title: '割り勘計算結果', text: text }).catch(function () {});
+      } else {
+        navigator.clipboard.writeText(text).then(function () {
+          if (typeof showToast === 'function') showToast('クリップボードにコピーしました');
+        });
+      }
+    });
+
+    /* ---------- Init ---------- */
+    syncDrinkCounts();
+    recalc();
+  })();
+  </script>
+</body>
+</html>
