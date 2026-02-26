@@ -1235,18 +1235,18 @@ function loadState() {
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
-    var data = JSON.parse(raw);
-    if (data.nodes && data.wires) {
-      G.nodes = data.nodes;
-      G.wires = data.wires;
-      G.nextId = data.nextId || 1;
-      if (data.camera) {
-        camera.x = data.camera.x || 0;
-        camera.y = data.camera.y || 0;
-        camera.zoom = data.camera.zoom || 1;
-      }
-      return true;
+    var parsed = JSON.parse(raw);
+    var data = validateGraphData(parsed);
+    if (!data) return false;
+    G.nodes = data.nodes;
+    G.wires = data.wires;
+    G.nextId = data.nextId;
+    if (parsed.camera) {
+      camera.x = parsed.camera.x || 0;
+      camera.y = parsed.camera.y || 0;
+      camera.zoom = parsed.camera.zoom || 1;
     }
+    return true;
   } catch (e) {}
   return false;
 }
@@ -1263,12 +1263,32 @@ function exportJSON() {
   showToast('エクスポートしました');
 }
 
+function validateGraphData(data) {
+  if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.wires)) return null;
+  var nodes = data.nodes.filter(function(n) {
+    return n && typeof n.id === 'number' && typeof n.x === 'number'
+      && typeof n.y === 'number' && NODE_DEFS[n.type];
+  });
+  var nodeIds = {};
+  nodes.forEach(function(n) { nodeIds[n.id] = true; });
+  var wires = data.wires.filter(function(w) {
+    return w && typeof w.id === 'number' && typeof w.from === 'number'
+      && typeof w.to === 'number' && typeof w.fromPort === 'number'
+      && typeof w.toPort === 'number' && nodeIds[w.from] && nodeIds[w.to];
+  });
+  var maxId = 0;
+  nodes.forEach(function(n) { if (n.id > maxId) maxId = n.id; });
+  wires.forEach(function(w) { if (w.id > maxId) maxId = w.id; });
+  return { nodes: nodes, wires: wires, nextId: Math.max(data.nextId || 0, maxId + 1) };
+}
+
 function importJSON(jsonStr) {
-  var data = JSON.parse(jsonStr);
-  if (!data.nodes || !data.wires) throw new Error('Invalid format');
+  var raw = JSON.parse(jsonStr);
+  var data = validateGraphData(raw);
+  if (!data) throw new Error('Invalid format');
   G.nodes = data.nodes;
   G.wires = data.wires;
-  G.nextId = data.nextId || 1;
+  G.nextId = data.nextId;
   G.results = {};
   G.errors = {};
   interaction.selectedNodes = [];
