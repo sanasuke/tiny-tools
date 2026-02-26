@@ -558,7 +558,6 @@ function drawNodes(dark) {
 
     // Header text
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold ' + (12 / Math.max(camera.zoom, 0.5)) * camera.zoom + 'px -apple-system,sans-serif';
     ctx.font = 'bold 12px -apple-system,sans-serif';
     ctx.textBaseline = 'middle';
     ctx.fillText(def.label, node.x + 10, node.y + NODE_HEADER_H / 2, NODE_W - 20);
