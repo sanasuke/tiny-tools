@@ -286,6 +286,8 @@
     <!-- Action Bar -->
     <div id="action-bar" class="action-bar" style="display:none">
       <button class="action-btn" id="btn-share">&#x1F517; URLで共有</button>
+      <button class="action-btn" id="btn-markdown">&#x1F4DD; Markdownコピー</button>
+      <button class="action-btn" id="btn-text">&#x1F4AC; テキストコピー</button>
       <button class="action-btn danger" id="btn-reset">&#x1F5D1; リセット</button>
     </div>
   </div>
@@ -542,6 +544,8 @@
     var $addBtn = document.getElementById('add-btn');
     var $actionBar = document.getElementById('action-bar');
     var $btnShare = document.getElementById('btn-share');
+    var $btnMarkdown = document.getElementById('btn-markdown');
+    var $btnText = document.getElementById('btn-text');
     var $btnReset = document.getElementById('btn-reset');
     var $toast = document.getElementById('app-toast');
     var $toastMsg = document.getElementById('toast-msg');
@@ -817,6 +821,85 @@
       showToast('\u300C' + name + '\u300D\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F');
     }
 
+    /* ========== Export Helpers ========== */
+    var WEATHER_LABELS = { hot: '暑い', normal: '普通', cold: '寒い', rainy: '雨' };
+
+    function getSceneLabel() {
+      var scene = SCENES.filter(function (s) { return s.id === state.scene; })[0];
+      return scene ? scene.label : '';
+    }
+
+    function getVisibleGrouped() {
+      var visible = state.items.filter(function (it) { return !it._hidden; });
+      var grouped = [];
+      CATEGORIES.forEach(function (cat) {
+        var items = visible.filter(function (it) { return it.category === cat.key; });
+        if (items.length > 0) grouped.push({ cat: cat, items: items });
+      });
+      return grouped;
+    }
+
+    function generateMarkdown() {
+      var lines = [];
+      lines.push('# 持ち物リスト - ' + getSceneLabel() + '（' + state.days + '泊 / ' + WEATHER_LABELS[state.weather] + '）');
+      lines.push('');
+
+      var groups = getVisibleGrouped();
+      var total = 0, checked = 0;
+      groups.forEach(function (g) {
+        lines.push('## ' + g.cat.icon + ' ' + g.cat.label);
+        g.items.forEach(function (item) {
+          total++;
+          if (item.checked) checked++;
+          var mark = item.checked ? 'x' : ' ';
+          var ess = item.essential ? ' ★' : '';
+          lines.push('- [' + mark + '] ' + item.name + ' ×' + item.qty + ess);
+        });
+        lines.push('');
+      });
+
+      lines.push('---');
+      lines.push('✅ ' + checked + ' / ' + total + ' アイテム完了');
+      return lines.join('\n');
+    }
+
+    function generateText() {
+      var lines = [];
+      lines.push('📋 持ち物リスト - ' + getSceneLabel());
+      lines.push('　' + state.days + '泊 / ' + WEATHER_LABELS[state.weather]);
+      lines.push('');
+
+      var groups = getVisibleGrouped();
+      var total = 0, checked = 0;
+      groups.forEach(function (g) {
+        lines.push('【' + g.cat.icon + ' ' + g.cat.label + '】');
+        g.items.forEach(function (item) {
+          total++;
+          if (item.checked) checked++;
+          var mark = item.checked ? '✅' : '☐';
+          var ess = item.essential ? ' ★' : '';
+          lines.push(mark + ' ' + item.name + ' ×' + item.qty + ess);
+        });
+        lines.push('');
+      });
+
+      lines.push('──────────');
+      lines.push('✅ ' + checked + ' / ' + total + ' アイテム完了');
+      return lines.join('\n');
+    }
+
+    function copyToClipboard(text, successMsg) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function () {
+          showToast(successMsg);
+        }).catch(function () {
+          showToast('コピーに失敗しました');
+        });
+      } else {
+        showToast('コピーに失敗しました');
+      }
+    }
+
     /* Share */
     $btnShare.addEventListener('click', function () {
       var hash = encodeState();
@@ -830,6 +913,16 @@
       } else {
         showToast('コピーに失敗しました');
       }
+    });
+
+    /* Markdown copy */
+    $btnMarkdown.addEventListener('click', function () {
+      copyToClipboard(generateMarkdown(), 'Markdownをコピーしました');
+    });
+
+    /* Text copy */
+    $btnText.addEventListener('click', function () {
+      copyToClipboard(generateText(), 'テキストをコピーしました');
     });
 
     /* Reset */
