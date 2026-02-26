@@ -17,6 +17,8 @@
 | [005](https://tiny-tools-cjj.pages.dev/day005_music-stats/) | 音楽統計ダッシュボード | Spotifyデータから再生履歴を可視化・分析 |
 | [006](https://tiny-tools-cjj.pages.dev/day006_pixel-art/) | ピクセルアートエディタ | Canvas ベースの本格ドット絵エディタ |
 | [007](https://tiny-tools-cjj.pages.dev/day007_drum-machine/) | ドラムマシン | Web Audio APIで作るステップシーケンサー・ビートメーカー |
+| [008](https://tiny-tools-cjj.pages.dev/day008_particle-editor/) | パーティクルエフェクトエディタ | リアルタイム2Dパーティクルシミュレーター |
+| [009](https://tiny-tools-cjj.pages.dev/day009_packing-list/) | 持ち物チェックリストビルダー | シーン別テンプレートで旅行・出張の持ち物リストを作成・共有 |
 
 ## 使い方
 
@@ -50,6 +52,10 @@ tiny-tools/
 │   └── index.html                    # ピクセルアートエディタ
 ├── day007_drum-machine/
 │   └── index.html                    # ドラムマシン
+├── day008_particle-editor/
+│   └── index.html                    # パーティクルエフェクトエディタ
+├── day009_packing-list/
+│   └── index.html                    # 持ち物チェックリストビルダー
 ├── shared/
 │   └── header.js                     # 共通ヘッダー
 ├── .gitignore
