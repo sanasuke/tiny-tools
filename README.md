@@ -18,7 +18,7 @@
 | [006](https://tiny-tools-cjj.pages.dev/day006_pixel-art/) | ピクセルアートエディタ | Canvas ベースの本格ドット絵エディタ |
 | [007](https://tiny-tools-cjj.pages.dev/day007_drum-machine/) | ドラムマシン | Web Audio APIで作るステップシーケンサー・ビートメーカー |
 | [008](https://tiny-tools-cjj.pages.dev/day008_particle-editor/) | パーティクルエフェクトエディタ | リアルタイム2Dパーティクルシミュレーター |
-| [010](https://tiny-tools-cjj.pages.dev/day010_packing-list/) | 持ち物チェックリストビルダー | シーン別テンプレートで旅行・出張の持ち物リストを作成・共有 |
+| [009](https://tiny-tools-cjj.pages.dev/day009_packing-list/) | 持ち物チェックリストビルダー | シーン別テンプレートで旅行・出張の持ち物リストを作成・共有 |
 
 ## 使い方
 
@@ -54,7 +54,7 @@ tiny-tools/
 │   └── index.html                    # ドラムマシン
 ├── day008_particle-editor/
 │   └── index.html                    # パーティクルエフェクトエディタ
-├── day010_packing-list/
+├── day009_packing-list/
 │   └── index.html                    # 持ち物チェックリストビルダー
 ├── shared/
 │   └── header.js                     # 共通ヘッダー
