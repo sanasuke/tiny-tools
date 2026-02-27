@@ -317,7 +317,7 @@
         });
       });
       groupInfo[gid] = {
-        id: +gid,
+        id: gid,
         name: first.name,
         kana: first.kana,
         pref: first.pref,
@@ -330,13 +330,19 @@
     var searchIndex = [];
     Object.keys(groupInfo).forEach(function (gid) {
       var g = groupInfo[gid];
+      var kana = g.kana || '';
       searchIndex.push({
-        gid: +gid,
+        gid: gid,
         name: g.name,
-        kana: g.kana,
-        kanaHira: katakanaToHiragana(g.kana),
+        kana: kana,
+        kanaHira: kana ? katakanaToHiragana(kana) : '',
         pref: g.pref
       });
+    });
+
+    // Sort searchIndex: stations with more lines first (major hubs appear earlier)
+    searchIndex.sort(function (a, b) {
+      return (groupInfo[b.gid].lines.length) - (groupInfo[a.gid].lines.length);
     });
 
     function katakanaToHiragana(str) {
@@ -352,17 +358,27 @@
       var q = query.toLowerCase();
       var qHira = katakanaToHiragana(q);
       var results = [];
+      var exact = [];
+      var prefix = [];
+      var partial = [];
 
       for (var i = 0; i < searchIndex.length; i++) {
         var s = searchIndex[i];
-        if (s.name.indexOf(q) !== -1 ||
-            s.kana.toLowerCase().indexOf(q) !== -1 ||
-            s.kanaHira.indexOf(qHira) !== -1) {
-          results.push(s);
-          if (results.length >= limit) break;
-        }
+        var nameMatch = s.name.indexOf(q) !== -1;
+        var kanaMatch = s.kana && s.kana.toLowerCase().indexOf(q) !== -1;
+        var hiraMatch = s.kanaHira && s.kanaHira.indexOf(qHira) !== -1;
+
+        if (!nameMatch && !kanaMatch && !hiraMatch) continue;
+
+        // Prioritize: exact name > name prefix > partial match
+        if (s.name === q) { exact.push(s); }
+        else if (s.name.indexOf(q) === 0) { prefix.push(s); }
+        else { partial.push(s); }
+
+        if (exact.length + prefix.length + partial.length >= limit * 2) break;
       }
-      return results;
+      results = exact.concat(prefix).concat(partial);
+      return results.slice(0, limit);
     }
 
     /* ========== BFS / Dijkstra ========== */
@@ -798,7 +814,7 @@
             });
           });
           entries.push({
-            gid: +gid,
+            gid: gid,
             info: g,
             access: access,
             totalTransfers: access.reduce(function (s, a) { return s + a.transfers; }, 0),
