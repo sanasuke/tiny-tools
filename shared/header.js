@@ -23,7 +23,8 @@
     { day: 6, name: 'ピクセルアートエディタ', desc: 'Canvas ベースの本格ドット絵エディタ', path: 'day006_pixel-art', genres: ['design'] },
     { day: 7, name: 'ドラムマシン', desc: 'Web Audio APIで作るステップシーケンサー・ビートメーカー', path: 'day007_drum-machine', genres: ['music'] },
     { day: 8, name: 'パーティクルエフェクトエディタ', desc: 'リアルタイム2Dパーティクルシミュレーター', path: 'day008_particle-editor', genres: ['design'] },
-    { day: 9, name: '持ち物チェックリストビルダー', desc: 'シーン別テンプレートで旅行・出張の持ち物リストを作成・共有', path: 'day009_packing-list', genres: ['utility'] }
+    { day: 9, name: '持ち物チェックリストビルダー', desc: 'シーン別テンプレートで旅行・出張の持ち物リストを作成・共有', path: 'day009_packing-list', genres: ['utility'] },
+    { day: 10, name: '割り勘計算機', desc: '飲み会・旅行の割り勘を簡単計算。傾斜割り・飲み放題割り対応', path: 'day010_split-bill', genres: ['utility'] }
   ];
 
   /* ---------- genres ---------- */
@@ -614,6 +615,7 @@
   /* ---------- expose data for top page ---------- */
   window.__TT_TOOLS = TOOLS;
   window.__TT_GENRES = GENRES;
+  window.__TT_showToast = showToast;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', injectHeader);
