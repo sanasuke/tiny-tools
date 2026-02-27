@@ -508,6 +508,7 @@
         nameInput.value = m.name;
         nameInput.addEventListener('input', function () {
           state.members[i].name = this.value;
+          recalc();
         });
 
         var roleSelect = document.createElement('select');
@@ -588,6 +589,7 @@
 
     function recalc() {
       if (state.totalAmount <= 0 || state.headcount < 2) {
+        $resultEmpty.textContent = '金額と人数を入力してください';
         $resultEmpty.style.display = '';
         $resultContent.style.display = 'none';
         return;
