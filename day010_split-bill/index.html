@@ -219,7 +219,7 @@
       .member-name { flex: 1 1 100%; margin-bottom: .3rem; }
     }
   </style>
-  <script src="../shared/header.js"></script>
+  <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools" data-note="https://note.com/sana_suke"></script>
 </head>
 <body>
   <div class="container">
@@ -366,6 +366,10 @@
     var $resultCheck = document.getElementById('resultCheck');
 
     /* ---------- Helpers ---------- */
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     function yen(n) {
       return '¥' + Math.round(n).toLocaleString('ja-JP');
     }
@@ -414,6 +418,15 @@
       state.headcount = Math.max(2, Math.min(50, n));
       $headcountVal.textContent = state.headcount;
       syncDrinkCounts();
+      if (state.splitMode === 'weighted' && state.members.length > 0) {
+        while (state.members.length < state.headcount) {
+          state.members.push({ name: 'メンバー' + (state.members.length + 1), role: 'normal' });
+        }
+        while (state.members.length > state.headcount && state.members.length > 2) {
+          state.members.pop();
+        }
+        renderMembers();
+      }
       recalc();
     }
     document.getElementById('headcountMinus').addEventListener('click', function () { setHeadcount(state.headcount - 1); });
@@ -623,7 +636,7 @@
         var baseUnit = effective / totalWeight;
         state.members.forEach(function (m) {
           var amt = roundAmount(baseUnit * ROLES[m.role].weight, state.roundUnit);
-          items.push({ label: m.name + '（' + ROLES[m.role].label + '）', amount: amt, count: 1 });
+          items.push({ label: escapeHtml(m.name) + '（' + ROLES[m.role].label + '）', amount: amt, count: 1 });
         });
       }
 
@@ -659,8 +672,6 @@
       $resultSub.style.display = subHtml ? '' : 'none';
 
       // Check
-      var checkTotal = paidTotal + (diff > 0 ? diff : 0);
-      var isOk = Math.abs(checkTotal - effective) < 1 || state.roundUnit > 0;
       if (state.roundUnit > 0) {
         $resultCheck.innerHTML = '<span>支払合計</span><span>' + yen(paidTotal) + (diff !== 0 ? ' + 調整' + yen(Math.abs(diff)) : '') + ' = ' + yen(effective) + '</span>';
       } else {
@@ -741,7 +752,7 @@
     document.getElementById('copyBtn').addEventListener('click', function () {
       var text = buildShareText();
       navigator.clipboard.writeText(text).then(function () {
-        if (typeof showToast === 'function') showToast('コピーしました');
+        if (typeof window.__TT_showToast === 'function') window.__TT_showToast('コピーしました');
       }).catch(function () {
         // fallback
         var ta = document.createElement('textarea');
@@ -750,7 +761,7 @@
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        if (typeof showToast === 'function') showToast('コピーしました');
+        if (typeof window.__TT_showToast === 'function') window.__TT_showToast('コピーしました');
       });
     });
 
@@ -760,7 +771,7 @@
         navigator.share({ title: '割り勘計算結果', text: text }).catch(function () {});
       } else {
         navigator.clipboard.writeText(text).then(function () {
-          if (typeof showToast === 'function') showToast('クリップボードにコピーしました');
+          if (typeof window.__TT_showToast === 'function') window.__TT_showToast('クリップボードにコピーしました');
         });
       }
     });

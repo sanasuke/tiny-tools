@@ -615,6 +615,7 @@
   /* ---------- expose data for top page ---------- */
   window.__TT_TOOLS = TOOLS;
   window.__TT_GENRES = GENRES;
+  window.__TT_showToast = showToast;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', injectHeader);
