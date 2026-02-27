@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>駅アクセスチェッカー | tiny-tools Day 11</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5; color: #333; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .container { width: 100%; max-width: 760px; padding: 1rem; }
+    h1 { font-size: 1.4rem; margin-bottom: .3rem; }
+    .app-desc { font-size: .85rem; color: #888; margin-bottom: 1.2rem; }
+
+    /* Search card */
+    .card {
+      background: #fff; border-radius: 12px; padding: 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 1rem;
+    }
+    .card-title { font-size: 1rem; font-weight: 600; margin-bottom: .8rem; }
+
+    /* Origin row */
+    .origin-row {
+      display: flex; gap: .5rem; align-items: flex-start; margin-bottom: .75rem;
+      flex-wrap: wrap;
+    }
+    .origin-input-wrap {
+      flex: 1; min-width: 160px; position: relative;
+    }
+    .origin-input {
+      width: 100%; padding: .55rem .75rem; border: 1px solid #d0d0d0;
+      border-radius: 8px; font-size: .95rem; font-family: inherit;
+      outline: none; transition: border-color .15s;
+    }
+    .origin-input:focus { border-color: #4a90d9; }
+    .origin-input.has-value { border-color: #4a90d9; background: #f0f6ff; }
+
+    /* Autocomplete dropdown */
+    .ac-dropdown {
+      display: none; position: absolute; left: 0; right: 0; top: 100%;
+      background: #fff; border: 1px solid #d0d0d0; border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.12); max-height: 240px;
+      overflow-y: auto; z-index: 100; margin-top: 2px;
+    }
+    .ac-dropdown.open { display: block; }
+    .ac-item {
+      padding: .5rem .75rem; cursor: pointer; font-size: .9rem;
+      display: flex; justify-content: space-between; align-items: center;
+      transition: background .1s;
+    }
+    .ac-item:hover, .ac-item.active { background: #f0f6ff; }
+    .ac-item-name { font-weight: 500; }
+    .ac-item-lines { font-size: .75rem; color: #888; }
+    .ac-item-pref { font-size: .75rem; color: #aaa; margin-left: .5rem; }
+
+    /* Condition selectors */
+    .condition-row {
+      display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+    }
+    .cond-group {
+      display: flex; align-items: center; gap: .3rem; font-size: .85rem;
+    }
+    .cond-group label { white-space: nowrap; }
+    .cond-group input[type="number"] {
+      width: 56px; padding: .35rem .4rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: .85rem; font-family: inherit;
+      text-align: center; outline: none;
+    }
+    .cond-group input[type="number"]:focus { border-color: #4a90d9; }
+    .cond-group input[type="checkbox"] { margin-right: .2rem; }
+
+    .remove-origin {
+      background: none; border: 1px solid #e0e0e0; border-radius: 6px;
+      color: #999; cursor: pointer; padding: .35rem .55rem; font-size: .85rem;
+      transition: color .15s, border-color .15s; flex-shrink: 0;
+    }
+    .remove-origin:hover { color: #e55; border-color: #e55; }
+
+    .btn-row { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
+    .btn-add {
+      background: none; border: 1px dashed #4a90d9; color: #4a90d9;
+      padding: .5rem 1rem; border-radius: 8px; cursor: pointer;
+      font-size: .85rem; font-family: inherit; transition: background .15s;
+    }
+    .btn-add:hover { background: #f0f6ff; }
+    .btn-search {
+      background: #4a90d9; color: #fff; border: none; padding: .55rem 1.5rem;
+      border-radius: 8px; cursor: pointer; font-size: .95rem; font-weight: 600;
+      font-family: inherit; transition: background .15s;
+    }
+    .btn-search:hover { background: #3a7bc0; }
+    .btn-search:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* Results */
+    .result-header {
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem;
+    }
+    .result-count { font-size: .95rem; font-weight: 600; }
+    .result-controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    .result-controls select {
+      padding: .3rem .5rem; border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: .8rem; font-family: inherit; background: #fff; cursor: pointer;
+    }
+
+    .station-list { list-style: none; }
+    .station-item {
+      background: #fff; border-radius: 10px; padding: 1rem 1.1rem;
+      margin-bottom: .6rem; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      transition: box-shadow .15s;
+    }
+    .station-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+    .station-top {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: .4rem;
+    }
+    .station-name { font-size: 1.05rem; font-weight: 600; }
+    .station-pref { font-size: .8rem; color: #888; }
+    .line-badges { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .5rem; }
+    .line-badge {
+      display: inline-flex; align-items: center; gap: .25rem;
+      padding: .15rem .5rem; border-radius: 999px; font-size: .75rem;
+      font-weight: 500; color: #fff; white-space: nowrap;
+    }
+    .line-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: currentColor;
+    }
+    .access-info { font-size: .82rem; color: #555; }
+    .access-line {
+      display: flex; gap: .5rem; align-items: center;
+      padding: .15rem 0; flex-wrap: wrap;
+    }
+    .access-origin { font-weight: 500; min-width: 80px; }
+    .access-detail { color: #4a90d9; }
+
+    /* Paging */
+    .paging {
+      display: flex; justify-content: center; gap: .5rem; margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .paging button {
+      padding: .4rem .8rem; border: 1px solid #d0d0d0; border-radius: 6px;
+      background: #fff; cursor: pointer; font-size: .85rem; font-family: inherit;
+      transition: background .15s, border-color .15s;
+    }
+    .paging button:hover { border-color: #4a90d9; }
+    .paging button.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+    .paging button:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* Loading */
+    .loading {
+      text-align: center; padding: 2rem; color: #888; font-size: .9rem;
+    }
+    .loading-spinner {
+      width: 28px; height: 28px; border: 3px solid #e0e0e0;
+      border-top-color: #4a90d9; border-radius: 50%;
+      animation: spin .7s linear infinite; margin: 0 auto .8rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Share button */
+    .btn-share {
+      background: none; border: 1px solid #d0d0d0; color: #555;
+      padding: .35rem .75rem; border-radius: 6px; cursor: pointer;
+      font-size: .8rem; font-family: inherit; transition: background .15s;
+    }
+    .btn-share:hover { background: #f0f6ff; border-color: #4a90d9; color: #4a90d9; }
+
+    /* Empty state */
+    .no-results { text-align: center; padding: 2rem; color: #888; font-size: .9rem; }
+
+    /* Dark mode */
+    body.tt-dark { background: #1a1a2e; color: #e0e0e0; }
+    body.tt-dark .card { background: #20203a; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+    body.tt-dark .origin-input {
+      background: #252545; color: #e0e0e0; border-color: #3a3a5a;
+    }
+    body.tt-dark .origin-input:focus { border-color: #6ab0f3; }
+    body.tt-dark .origin-input.has-value { background: #252550; border-color: #6ab0f3; }
+    body.tt-dark .ac-dropdown {
+      background: #252545; border-color: #3a3a5a;
+      box-shadow: 0 4px 16px rgba(0,0,0,.3);
+    }
+    body.tt-dark .ac-item:hover, body.tt-dark .ac-item.active { background: #303060; }
+    body.tt-dark .ac-item-name { color: #e0e0e0; }
+    body.tt-dark .cond-group input[type="number"] {
+      background: #252545; color: #e0e0e0; border-color: #3a3a5a;
+    }
+    body.tt-dark .remove-origin { border-color: #3a3a5a; color: #777; }
+    body.tt-dark .remove-origin:hover { color: #f66; border-color: #f66; }
+    body.tt-dark .btn-add { border-color: #6ab0f3; color: #6ab0f3; }
+    body.tt-dark .btn-add:hover { background: rgba(106,176,243,.1); }
+    body.tt-dark .station-item { background: #20203a; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+    body.tt-dark .station-name { color: #f0f0f0; }
+    body.tt-dark .station-pref { color: #999; }
+    body.tt-dark .access-info { color: #bbb; }
+    body.tt-dark .access-detail { color: #6ab0f3; }
+    body.tt-dark .result-controls select {
+      background: #252545; color: #e0e0e0; border-color: #3a3a5a;
+    }
+    body.tt-dark .paging button {
+      background: #252545; color: #e0e0e0; border-color: #3a3a5a;
+    }
+    body.tt-dark .paging button:hover { border-color: #6ab0f3; }
+    body.tt-dark .paging button.active {
+      background: #4a90d9; color: #fff; border-color: #4a90d9;
+    }
+    body.tt-dark .btn-share { border-color: #3a3a5a; color: #999; }
+    body.tt-dark .btn-share:hover { background: rgba(106,176,243,.1); border-color: #6ab0f3; color: #6ab0f3; }
+
+    @media (max-width: 500px) {
+      .container { padding: .75rem; }
+      .origin-row { gap: .4rem; }
+      .condition-row { gap: .4rem; }
+      .station-item { padding: .8rem; }
+    }
+  </style>
+  <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools"></script>
+  <script src="data.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>駅アクセスチェッカー</h1>
+    <p class="app-desc">所要時間は概算です（駅間平均2.5分、乗換5分で計算）</p>
+
+    <div class="card" id="search-card">
+      <div class="card-title">検索条件</div>
+      <div id="origins"></div>
+      <div class="btn-row">
+        <button class="btn-add" id="btn-add-origin">+ 出発地を追加</button>
+        <button class="btn-search" id="btn-search">検索</button>
+      </div>
+    </div>
+
+    <div id="results-area"></div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    /* ========== Data Structures ========== */
+    var RD = window.RAIL_DATA;
+    if (!RD) { document.getElementById('results-area').innerHTML = '<div class="no-results">鉄道データの読み込みに失敗しました</div>'; return; }
+
+    // stationMap: sid -> {id, name, kana, groupId, pref, lines:[lineId...]}
+    var stationMap = {};
+    // groupMap: groupId -> [sid, ...]
+    var groupMap = {};
+    // lineMap: lineId -> {id, name, color, stationIds:[]}
+    var lineMap = {};
+    // adjacency: sid -> [{neighbor: sid, lineId}]
+    var adjacency = {};
+    // circularSet
+    var circularSet = {};
+    // groupStationInfo: groupId -> {name, kana, pref, lines:[{id,name,color}], sids:[]}
+    var groupInfo = {};
+
+    // Build lineMap
+    RD.lines.forEach(function (l) {
+      lineMap[l[0]] = { id: l[0], name: l[1], color: l[2], stationIds: l[3] };
+    });
+
+    // Build stationMap
+    RD.stations.forEach(function (s) {
+      stationMap[s[0]] = { id: s[0], name: s[1], kana: s[2], groupId: s[3], pref: s[4], lines: [] };
+      if (!groupMap[s[3]]) groupMap[s[3]] = [];
+      groupMap[s[3]].push(s[0]);
+    });
+
+    // Circular set
+    RD.circular.forEach(function (lid) { circularSet[lid] = true; });
+
+    // Assign lines to stations & build adjacency
+    RD.lines.forEach(function (l) {
+      var lineId = l[0];
+      var sids = l[3];
+      var isCirc = !!circularSet[lineId];
+
+      sids.forEach(function (sid) {
+        if (stationMap[sid]) stationMap[sid].lines.push(lineId);
+        if (!adjacency[sid]) adjacency[sid] = [];
+      });
+
+      for (var i = 0; i < sids.length; i++) {
+        if (i > 0) {
+          adjacency[sids[i]].push({ neighbor: sids[i - 1], lineId: lineId });
+        }
+        if (i < sids.length - 1) {
+          adjacency[sids[i]].push({ neighbor: sids[i + 1], lineId: lineId });
+        }
+      }
+      // Circular: connect last to first
+      if (isCirc && sids.length > 2) {
+        adjacency[sids[0]].push({ neighbor: sids[sids.length - 1], lineId: lineId });
+        adjacency[sids[sids.length - 1]].push({ neighbor: sids[0], lineId: lineId });
+      }
+    });
+
+    // Build groupInfo (for display and search)
+    Object.keys(groupMap).forEach(function (gid) {
+      var sids = groupMap[gid];
+      var first = stationMap[sids[0]];
+      var lineSet = {};
+      var lines = [];
+      sids.forEach(function (sid) {
+        var st = stationMap[sid];
+        st.lines.forEach(function (lid) {
+          if (!lineSet[lid]) {
+            lineSet[lid] = true;
+            var li = lineMap[lid];
+            if (li) lines.push({ id: li.id, name: li.name, color: li.color });
+          }
+        });
+      });
+      groupInfo[gid] = {
+        id: +gid,
+        name: first.name,
+        kana: first.kana,
+        pref: first.pref,
+        lines: lines,
+        sids: sids
+      };
+    });
+
+    // Search index: array of {gid, name, kana, pref}
+    var searchIndex = [];
+    Object.keys(groupInfo).forEach(function (gid) {
+      var g = groupInfo[gid];
+      searchIndex.push({
+        gid: +gid,
+        name: g.name,
+        kana: g.kana,
+        kanaHira: katakanaToHiragana(g.kana),
+        pref: g.pref
+      });
+    });
+
+    function katakanaToHiragana(str) {
+      return str.replace(/[\u30A1-\u30F6]/g, function (m) {
+        return String.fromCharCode(m.charCodeAt(0) - 0x60);
+      });
+    }
+
+    /* ========== Autocomplete ========== */
+    function searchStations(query, limit) {
+      if (!query) return [];
+      limit = limit || 20;
+      var q = query.toLowerCase();
+      var qHira = katakanaToHiragana(q);
+      var results = [];
+
+      for (var i = 0; i < searchIndex.length; i++) {
+        var s = searchIndex[i];
+        if (s.name.indexOf(q) !== -1 ||
+            s.kana.toLowerCase().indexOf(q) !== -1 ||
+            s.kanaHira.indexOf(qHira) !== -1) {
+          results.push(s);
+          if (results.length >= limit) break;
+        }
+      }
+      return results;
+    }
+
+    /* ========== BFS / Dijkstra ========== */
+    // MinHeap for Dijkstra
+    function MinHeap() {
+      this.data = [];
+    }
+    MinHeap.prototype.push = function (item) {
+      this.data.push(item);
+      this._bubbleUp(this.data.length - 1);
+    };
+    MinHeap.prototype.pop = function () {
+      var top = this.data[0];
+      var last = this.data.pop();
+      if (this.data.length > 0) {
+        this.data[0] = last;
+        this._sinkDown(0);
+      }
+      return top;
+    };
+    MinHeap.prototype.size = function () { return this.data.length; };
+    MinHeap.prototype._bubbleUp = function (i) {
+      while (i > 0) {
+        var p = (i - 1) >> 1;
+        if (this.data[p].cost <= this.data[i].cost) break;
+        var tmp = this.data[p]; this.data[p] = this.data[i]; this.data[i] = tmp;
+        i = p;
+      }
+    };
+    MinHeap.prototype._sinkDown = function (i) {
+      var n = this.data.length;
+      while (true) {
+        var l = 2 * i + 1, r = 2 * i + 2, smallest = i;
+        if (l < n && this.data[l].cost < this.data[smallest].cost) smallest = l;
+        if (r < n && this.data[r].cost < this.data[smallest].cost) smallest = r;
+        if (smallest === i) break;
+        var tmp = this.data[smallest]; this.data[smallest] = this.data[i]; this.data[i] = tmp;
+        i = smallest;
+      }
+    };
+
+    /**
+     * Combined search: finds reachable stations from an origin group.
+     * Returns: { groupId -> { transfers, minutes } }
+     * Uses Dijkstra with state (station_id, transfers, minutes)
+     */
+    function searchReachable(originGroupId, maxTransfers, maxMinutes) {
+      if (maxTransfers === null && maxMinutes === null) return {};
+      var mt = maxTransfers !== null ? maxTransfers : 99;
+      var mm = maxMinutes !== null ? maxMinutes : 9999;
+
+      var originSids = groupMap[originGroupId] || [];
+      if (originSids.length === 0) return {};
+
+      // State: (sid, transfers) -> best minutes
+      // We track best minutes for each (sid, transfers) pair
+      var best = {}; // key "sid_transfers" -> minutes
+
+      function key(sid, t) { return sid + '_' + t; }
+
+      var heap = new MinHeap();
+
+      // Initialize: start at each origin station with 0 transfers, 0 minutes
+      originSids.forEach(function (sid) {
+        var st = stationMap[sid];
+        if (!st) return;
+        // Start on each line this station is on
+        st.lines.forEach(function (lid) {
+          var k = key(sid, 0);
+          if (best[k] === undefined || best[k] > 0) {
+            best[k] = 0;
+            heap.push({ sid: sid, lineId: lid, transfers: 0, cost: 0 });
+          }
+        });
+      });
+
+      // groupResults: gid -> {transfers, minutes}
+      var groupResults = {};
+
+      while (heap.size() > 0) {
+        var cur = heap.pop();
+        var cSid = cur.sid;
+        var cLine = cur.lineId;
+        var cT = cur.transfers;
+        var cMin = cur.cost;
+
+        // Check bounds
+        if (cT > mt || cMin > mm) continue;
+
+        var k = key(cSid, cT);
+        if (best[k] !== undefined && best[k] < cMin) continue;
+
+        // Record result for this group
+        var gid = stationMap[cSid].groupId;
+        var existing = groupResults[gid];
+        if (!existing || cMin < existing.minutes || (cMin === existing.minutes && cT < existing.transfers)) {
+          groupResults[gid] = { transfers: cT, minutes: cMin };
+        }
+
+        // 1. Move along same line to adjacent stations (cost +2.5 min)
+        var adj = adjacency[cSid] || [];
+        for (var i = 0; i < adj.length; i++) {
+          if (adj[i].lineId !== cLine) continue;
+          var nSid = adj[i].neighbor;
+          var nMin = cMin + 2.5;
+          if (nMin > mm) continue;
+          var nk = key(nSid, cT);
+          if (best[nk] === undefined || best[nk] > nMin) {
+            best[nk] = nMin;
+            heap.push({ sid: nSid, lineId: cLine, transfers: cT, cost: nMin });
+          }
+        }
+
+        // 2. Transfer: move to other stations in same group, different line (+5 min, +1 transfer)
+        var nT = cT + 1;
+        if (nT <= mt) {
+          var gSids = groupMap[gid] || [];
+          for (var g = 0; g < gSids.length; g++) {
+            var tSid = gSids[g];
+            var tSt = stationMap[tSid];
+            if (!tSt) continue;
+            for (var li = 0; li < tSt.lines.length; li++) {
+              var tLine = tSt.lines[li];
+              if (tSid === cSid && tLine === cLine) continue;
+              var tMin = cMin + 5;
+              if (tMin > mm) continue;
+              var tk = key(tSid, nT);
+              if (best[tk] === undefined || best[tk] > tMin) {
+                best[tk] = tMin;
+                heap.push({ sid: tSid, lineId: tLine, transfers: nT, cost: tMin });
+              }
+            }
+          }
+        }
+      }
+
+      return groupResults;
+    }
+
+    /* ========== UI State ========== */
+    var origins = []; // [{groupId, name, maxTransfers, maxMinutes, el}]
+    var results = null; // [{gid, groupInfo, access:[{origin,transfers,minutes}]}]
+    var currentSort = 'name';
+    var currentPrefFilter = '';
+    var currentPage = 0;
+    var PAGE_SIZE = 50;
+
+    /* ========== UI: Origins ========== */
+    var originsEl = document.getElementById('origins');
+    var btnAdd = document.getElementById('btn-add-origin');
+    var btnSearch = document.getElementById('btn-search');
+    var resultsArea = document.getElementById('results-area');
+
+    function addOriginRow(presetGroupId, presetName, presetTransfers, presetMinutes) {
+      if (origins.length >= 5) return;
+
+      var row = document.createElement('div');
+      row.className = 'origin-row';
+
+      var idx = origins.length;
+      var origin = {
+        groupId: presetGroupId || null,
+        name: presetName || '',
+        maxTransfers: presetTransfers !== undefined ? presetTransfers : 3,
+        maxMinutes: presetMinutes !== undefined ? presetMinutes : null,
+        el: row
+      };
+
+      // Input wrapper
+      var inputWrap = document.createElement('div');
+      inputWrap.className = 'origin-input-wrap';
+
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'origin-input';
+      input.placeholder = '駅名を入力…';
+      input.setAttribute('autocomplete', 'off');
+      if (presetName) {
+        input.value = presetName;
+        input.classList.add('has-value');
+      }
+
+      var dropdown = document.createElement('div');
+      dropdown.className = 'ac-dropdown';
+
+      var activeIdx = -1;
+      var acItems = [];
+
+      function showAC(query) {
+        var matches = searchStations(query);
+        dropdown.innerHTML = '';
+        acItems = [];
+        activeIdx = -1;
+
+        if (matches.length === 0) {
+          dropdown.classList.remove('open');
+          return;
+        }
+
+        matches.forEach(function (m, i) {
+          var item = document.createElement('div');
+          item.className = 'ac-item';
+          var g = groupInfo[m.gid];
+          var lineNames = g.lines.slice(0, 3).map(function (l) { return l.name; }).join(', ');
+          if (g.lines.length > 3) lineNames += '…';
+          item.innerHTML = '<span class="ac-item-name">' + escapeHtml(m.name) + '</span>' +
+            '<span><span class="ac-item-lines">' + escapeHtml(lineNames) + '</span>' +
+            '<span class="ac-item-pref">' + escapeHtml(RD.prefNames[m.pref] || '') + '</span></span>';
+          item.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            selectStation(m);
+          });
+          dropdown.appendChild(item);
+          acItems.push(item);
+        });
+        dropdown.classList.add('open');
+      }
+
+      function selectStation(m) {
+        origin.groupId = m.gid;
+        origin.name = m.name;
+        input.value = m.name;
+        input.classList.add('has-value');
+        dropdown.classList.remove('open');
+      }
+
+      input.addEventListener('input', function () {
+        origin.groupId = null;
+        origin.name = '';
+        input.classList.remove('has-value');
+        showAC(input.value.trim());
+      });
+
+      input.addEventListener('focus', function () {
+        if (input.value.trim()) showAC(input.value.trim());
+      });
+
+      input.addEventListener('blur', function () {
+        setTimeout(function () { dropdown.classList.remove('open'); }, 150);
+      });
+
+      input.addEventListener('keydown', function (e) {
+        if (e.isComposing || e.keyCode === 229) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (acItems.length > 0) {
+            activeIdx = (activeIdx + 1) % acItems.length;
+            updateActiveAC();
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (acItems.length > 0) {
+            activeIdx = (activeIdx - 1 + acItems.length) % acItems.length;
+            updateActiveAC();
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (activeIdx >= 0) {
+            var matches = searchStations(input.value.trim());
+            if (matches[activeIdx]) selectStation(matches[activeIdx]);
+          } else {
+            var matches2 = searchStations(input.value.trim());
+            if (matches2.length === 1) selectStation(matches2[0]);
+          }
+        } else if (e.key === 'Escape') {
+          dropdown.classList.remove('open');
+        }
+      });
+
+      function updateActiveAC() {
+        acItems.forEach(function (el, i) {
+          el.classList.toggle('active', i === activeIdx);
+        });
+        if (activeIdx >= 0 && acItems[activeIdx]) {
+          acItems[activeIdx].scrollIntoView({ block: 'nearest' });
+        }
+      }
+
+      inputWrap.appendChild(input);
+      inputWrap.appendChild(dropdown);
+      row.appendChild(inputWrap);
+
+      // Condition
+      var condRow = document.createElement('div');
+      condRow.className = 'condition-row';
+
+      // Transfers
+      var tGroup = document.createElement('div');
+      tGroup.className = 'cond-group';
+      var tCheck = document.createElement('input');
+      tCheck.type = 'checkbox';
+      tCheck.checked = true;
+      tCheck.id = 'tc-' + idx;
+      var tLabel = document.createElement('label');
+      tLabel.htmlFor = tCheck.id;
+      tLabel.textContent = '乗換';
+      var tInput = document.createElement('input');
+      tInput.type = 'number';
+      tInput.min = '0';
+      tInput.max = '10';
+      tInput.value = origin.maxTransfers !== null ? origin.maxTransfers : '3';
+      var tSuffix = document.createElement('span');
+      tSuffix.textContent = '回以内';
+
+      tCheck.addEventListener('change', function () {
+        tInput.disabled = !tCheck.checked;
+        origin.maxTransfers = tCheck.checked ? parseInt(tInput.value) || 3 : null;
+      });
+      tInput.addEventListener('input', function () {
+        origin.maxTransfers = tCheck.checked ? (parseInt(tInput.value) || 0) : null;
+      });
+
+      tGroup.appendChild(tCheck);
+      tGroup.appendChild(tLabel);
+      tGroup.appendChild(tInput);
+      tGroup.appendChild(tSuffix);
+      condRow.appendChild(tGroup);
+
+      // Minutes
+      var mGroup = document.createElement('div');
+      mGroup.className = 'cond-group';
+      var mCheck = document.createElement('input');
+      mCheck.type = 'checkbox';
+      mCheck.checked = presetMinutes != null;
+      mCheck.id = 'mc-' + idx;
+      var mLabel = document.createElement('label');
+      mLabel.htmlFor = mCheck.id;
+      mLabel.textContent = '所要';
+      var mInput = document.createElement('input');
+      mInput.type = 'number';
+      mInput.min = '1';
+      mInput.max = '180';
+      mInput.value = presetMinutes || '30';
+      mInput.disabled = !mCheck.checked;
+      var mSuffix = document.createElement('span');
+      mSuffix.textContent = '分以内';
+
+      mCheck.addEventListener('change', function () {
+        mInput.disabled = !mCheck.checked;
+        origin.maxMinutes = mCheck.checked ? parseInt(mInput.value) || 30 : null;
+      });
+      mInput.addEventListener('input', function () {
+        origin.maxMinutes = mCheck.checked ? (parseInt(mInput.value) || 0) : null;
+      });
+      if (!mCheck.checked) origin.maxMinutes = null;
+
+      mGroup.appendChild(mCheck);
+      mGroup.appendChild(mLabel);
+      mGroup.appendChild(mInput);
+      mGroup.appendChild(mSuffix);
+      condRow.appendChild(mGroup);
+
+      row.appendChild(condRow);
+
+      // Remove button
+      if (origins.length > 0) {
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-origin';
+        removeBtn.textContent = '×';
+        removeBtn.title = '削除';
+        removeBtn.addEventListener('click', function () {
+          var i = origins.indexOf(origin);
+          if (i >= 0) {
+            origins.splice(i, 1);
+            row.remove();
+          }
+          if (origins.length < 5) btnAdd.style.display = '';
+        });
+        row.appendChild(removeBtn);
+      }
+
+      originsEl.appendChild(row);
+      origins.push(origin);
+
+      if (origins.length >= 5) btnAdd.style.display = 'none';
+
+      // Focus if no preset
+      if (!presetGroupId) input.focus();
+    }
+
+    btnAdd.addEventListener('click', function () { addOriginRow(); });
+
+    /* ========== Search ========== */
+    btnSearch.addEventListener('click', function () { runSearch(); });
+
+    function runSearch() {
+      // Validate
+      var validOrigins = origins.filter(function (o) { return o.groupId; });
+      if (validOrigins.length === 0) {
+        resultsArea.innerHTML = '<div class="no-results">出発地を選択してください</div>';
+        return;
+      }
+
+      // Show loading
+      resultsArea.innerHTML = '<div class="loading"><div class="loading-spinner"></div>検索中…</div>';
+
+      // Run async to allow UI update
+      setTimeout(function () {
+        var allResults = [];
+        validOrigins.forEach(function (o) {
+          allResults.push({
+            origin: o,
+            reachable: searchReachable(o.groupId, o.maxTransfers, o.maxMinutes)
+          });
+        });
+
+        // Intersect: find groups reachable from ALL origins
+        if (allResults.length === 0) { renderResults([]); return; }
+
+        var commonGids;
+        if (allResults.length === 1) {
+          commonGids = Object.keys(allResults[0].reachable);
+        } else {
+          commonGids = Object.keys(allResults[0].reachable);
+          for (var r = 1; r < allResults.length; r++) {
+            var rr = allResults[r].reachable;
+            commonGids = commonGids.filter(function (gid) { return rr[gid] !== undefined; });
+          }
+        }
+
+        // Build result entries
+        var entries = [];
+        commonGids.forEach(function (gid) {
+          var g = groupInfo[gid];
+          if (!g) return;
+          var access = [];
+          allResults.forEach(function (ar) {
+            var info = ar.reachable[gid];
+            access.push({
+              originName: ar.origin.name,
+              transfers: info.transfers,
+              minutes: info.minutes
+            });
+          });
+          entries.push({
+            gid: +gid,
+            info: g,
+            access: access,
+            totalTransfers: access.reduce(function (s, a) { return s + a.transfers; }, 0),
+            totalMinutes: access.reduce(function (s, a) { return s + a.minutes; }, 0),
+            maxTransfers: Math.max.apply(null, access.map(function (a) { return a.transfers; })),
+            maxMinutes: Math.max.apply(null, access.map(function (a) { return a.minutes; }))
+          });
+        });
+
+        // Exclude origin stations themselves
+        var originGids = {};
+        validOrigins.forEach(function (o) { originGids[o.groupId] = true; });
+        entries = entries.filter(function (e) { return !originGids[e.gid]; });
+
+        results = entries;
+        currentPage = 0;
+        currentPrefFilter = '';
+        renderResults(entries);
+        saveToHash();
+      }, 30);
+    }
+
+    /* ========== Render Results ========== */
+    function renderResults(entries) {
+      if (!entries || entries.length === 0) {
+        resultsArea.innerHTML = '<div class="no-results">条件を満たす駅が見つかりませんでした</div>';
+        return;
+      }
+
+      // Collect prefectures
+      var prefs = {};
+      entries.forEach(function (e) {
+        var pName = RD.prefNames[e.info.pref] || '';
+        if (pName) prefs[e.info.pref] = pName;
+      });
+
+      var html = '<div class="card"><div class="result-header">';
+      html += '<span class="result-count">' + entries.length + ' 駅が見つかりました</span>';
+      html += '<div class="result-controls">';
+
+      // Sort
+      html += '<select id="sort-select" aria-label="並び替え">';
+      html += '<option value="name"' + (currentSort === 'name' ? ' selected' : '') + '>名前順</option>';
+      html += '<option value="transfers"' + (currentSort === 'transfers' ? ' selected' : '') + '>乗換回数順</option>';
+      html += '<option value="minutes"' + (currentSort === 'minutes' ? ' selected' : '') + '>所要時間順</option>';
+      html += '</select>';
+
+      // Pref filter
+      var prefKeys = Object.keys(prefs).sort(function (a, b) { return +a - +b; });
+      if (prefKeys.length > 1) {
+        html += '<select id="pref-filter" aria-label="都道府県フィルタ">';
+        html += '<option value="">全都道府県</option>';
+        prefKeys.forEach(function (pk) {
+          html += '<option value="' + pk + '"' + (currentPrefFilter == pk ? ' selected' : '') + '>' + escapeHtml(prefs[pk]) + '</option>';
+        });
+        html += '</select>';
+      }
+
+      // Share
+      html += '<button class="btn-share" id="btn-share">共有</button>';
+
+      html += '</div></div>';
+
+      // Filter and sort
+      var filtered = entries;
+      if (currentPrefFilter) {
+        filtered = entries.filter(function (e) { return e.info.pref == currentPrefFilter; });
+      }
+
+      filtered = sortEntries(filtered, currentSort);
+
+      // Paging
+      var totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+      if (currentPage >= totalPages) currentPage = totalPages - 1;
+      if (currentPage < 0) currentPage = 0;
+      var start = currentPage * PAGE_SIZE;
+      var pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+      html += '<ul class="station-list">';
+      pageItems.forEach(function (e) {
+        html += renderStationItem(e);
+      });
+      html += '</ul>';
+
+      // Paging controls
+      if (totalPages > 1) {
+        html += '<div class="paging">';
+        html += '<button data-page="prev"' + (currentPage === 0 ? ' disabled' : '') + '>&lt;</button>';
+        for (var p = 0; p < totalPages; p++) {
+          if (totalPages > 7 && Math.abs(p - currentPage) > 2 && p !== 0 && p !== totalPages - 1) {
+            if (p === 1 || p === totalPages - 2) html += '<button disabled>…</button>';
+            continue;
+          }
+          html += '<button data-page="' + p + '"' + (p === currentPage ? ' class="active"' : '') + '>' + (p + 1) + '</button>';
+        }
+        html += '<button data-page="next"' + (currentPage === totalPages - 1 ? ' disabled' : '') + '>&gt;</button>';
+        html += '</div>';
+      }
+
+      html += '</div>';
+      resultsArea.innerHTML = html;
+
+      // Event listeners
+      var sortSel = document.getElementById('sort-select');
+      if (sortSel) {
+        sortSel.addEventListener('change', function () {
+          currentSort = sortSel.value;
+          currentPage = 0;
+          renderResults(results);
+        });
+      }
+
+      var prefFil = document.getElementById('pref-filter');
+      if (prefFil) {
+        prefFil.addEventListener('change', function () {
+          currentPrefFilter = prefFil.value;
+          currentPage = 0;
+          renderResults(results);
+        });
+      }
+
+      var shareBtn = document.getElementById('btn-share');
+      if (shareBtn) {
+        shareBtn.addEventListener('click', function () {
+          var url = location.href;
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(function () {
+              if (window.__TT_showToast) window.__TT_showToast('URLをコピーしました');
+            });
+          }
+        });
+      }
+
+      // Paging buttons
+      var pageBtns = resultsArea.querySelectorAll('.paging button');
+      pageBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var p = btn.getAttribute('data-page');
+          if (p === 'prev') currentPage--;
+          else if (p === 'next') currentPage++;
+          else currentPage = parseInt(p);
+          renderResults(results);
+          resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
+    }
+
+    function sortEntries(arr, sortKey) {
+      return arr.slice().sort(function (a, b) {
+        if (sortKey === 'transfers') return a.maxTransfers - b.maxTransfers || a.totalMinutes - b.totalMinutes;
+        if (sortKey === 'minutes') return a.maxMinutes - b.maxMinutes || a.totalMinutes - b.totalMinutes;
+        return a.info.name.localeCompare(b.info.name, 'ja');
+      });
+    }
+
+    function renderStationItem(e) {
+      var html = '<li class="station-item">';
+      html += '<div class="station-top">';
+      html += '<span class="station-name">' + escapeHtml(e.info.name) + '</span>';
+      html += '<span class="station-pref">' + escapeHtml(RD.prefNames[e.info.pref] || '') + '</span>';
+      html += '</div>';
+
+      // Line badges
+      html += '<div class="line-badges">';
+      e.info.lines.forEach(function (l) {
+        var bg = '#' + l.color;
+        // Ensure readable text on light colors
+        var textColor = isLightColor(l.color) ? '#333' : '#fff';
+        html += '<span class="line-badge" style="background:' + bg + ';color:' + textColor + '">' + escapeHtml(l.name) + '</span>';
+      });
+      html += '</div>';
+
+      // Access info
+      html += '<div class="access-info">';
+      e.access.forEach(function (a) {
+        html += '<div class="access-line">';
+        html += '<span class="access-origin">' + escapeHtml(a.originName) + 'から:</span>';
+        html += '<span class="access-detail">乗換' + a.transfers + '回 / 約' + formatMinutes(a.minutes) + '</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+
+      html += '</li>';
+      return html;
+    }
+
+    function formatMinutes(m) {
+      if (m === 0) return '0分';
+      var h = Math.floor(m / 60);
+      var min = Math.round(m % 60);
+      if (h > 0) return h + '時間' + (min > 0 ? min + '分' : '');
+      return min + '分';
+    }
+
+    function isLightColor(hex) {
+      var r = parseInt(hex.substr(0, 2), 16);
+      var g = parseInt(hex.substr(2, 2), 16);
+      var b = parseInt(hex.substr(4, 2), 16);
+      return (r * 299 + g * 587 + b * 114) / 1000 > 160;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /* ========== URL Hash ========== */
+    function saveToHash() {
+      var parts = [];
+      origins.forEach(function (o) {
+        if (!o.groupId) return;
+        var p = 'o=' + encodeURIComponent(o.name);
+        if (o.maxTransfers !== null) p += ',t' + o.maxTransfers;
+        if (o.maxMinutes !== null) p += ',m' + o.maxMinutes;
+        parts.push(p);
+      });
+      if (parts.length > 0) {
+        history.replaceState(null, '', '#' + parts.join('|'));
+      }
+    }
+
+    function loadFromHash() {
+      var hash = location.hash.substring(1);
+      if (!hash) return false;
+
+      var parts = hash.split('|');
+      var loaded = [];
+      parts.forEach(function (part) {
+        var params = {};
+        part.split(',').forEach(function (kv) {
+          if (kv.indexOf('o=') === 0) params.name = decodeURIComponent(kv.substring(2));
+          else if (kv.charAt(0) === 't') params.transfers = parseInt(kv.substring(1));
+          else if (kv.charAt(0) === 'm') params.minutes = parseInt(kv.substring(1));
+        });
+        if (params.name) {
+          // Find station by name
+          var match = searchIndex.find(function (s) { return s.name === params.name; });
+          if (match) {
+            loaded.push({
+              gid: match.gid,
+              name: match.name,
+              transfers: params.transfers !== undefined ? params.transfers : 3,
+              minutes: params.minutes !== undefined ? params.minutes : undefined
+            });
+          }
+        }
+      });
+
+      if (loaded.length > 0) {
+        loaded.forEach(function (l) {
+          addOriginRow(l.gid, l.name, l.transfers, l.minutes);
+        });
+        return true;
+      }
+      return false;
+    }
+
+    /* ========== Init ========== */
+    if (!loadFromHash()) {
+      addOriginRow();
+    } else {
+      // Auto-search on hash load
+      setTimeout(runSearch, 100);
+    }
+
+  })();
+  </script>
+</body>
+</html>
