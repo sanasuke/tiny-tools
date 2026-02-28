@@ -24,21 +24,47 @@
     }
     .card-title { font-size: 1rem; font-weight: 600; margin-bottom: .8rem; }
 
-    /* Origin row */
-    .origin-row {
-      display: flex; gap: .5rem; align-items: flex-start; margin-bottom: .75rem;
-      flex-wrap: wrap;
+    /* Origins table */
+    .origins-table {
+      width: 100%; border-collapse: separate; border-spacing: 0;
     }
-    .origin-input-wrap {
-      flex: 1; min-width: 160px; position: relative;
+    .origins-table th {
+      font-size: .75rem; font-weight: 500; color: #888; text-align: left;
+      padding: 0 .3rem .4rem; white-space: nowrap;
     }
+    .origins-table td {
+      padding: .2rem .3rem; vertical-align: middle;
+    }
+    .origins-table td:first-child { padding-left: 0; }
+    .origins-table td:last-child { padding-right: 0; }
+    .col-station { width: auto; }
+    .col-transfers { width: 72px; }
+    .col-minutes { width: 72px; }
+    .col-remove { width: 36px; }
+
+    .origin-input-wrap { position: relative; }
     .origin-input {
-      width: 100%; padding: .55rem .75rem; border: 1px solid #d0d0d0;
-      border-radius: 8px; font-size: .95rem; font-family: inherit;
+      width: 100%; padding: .45rem .6rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: .85rem; font-family: inherit;
       outline: none; transition: border-color .15s;
     }
     .origin-input:focus { border-color: #4a90d9; }
     .origin-input.has-value { border-color: #4a90d9; background: #f0f6ff; }
+
+    .cond-number {
+      width: 100%; padding: .35rem .3rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: .85rem; font-family: inherit;
+      text-align: center; outline: none;
+    }
+    .cond-number:focus { border-color: #4a90d9; }
+    .cond-number:disabled { opacity: .4; }
+
+    .remove-origin {
+      background: none; border: 1px solid #e0e0e0; border-radius: 6px;
+      color: #999; cursor: pointer; padding: .3rem .45rem; font-size: .8rem;
+      transition: color .15s, border-color .15s; line-height: 1;
+    }
+    .remove-origin:hover { color: #e55; border-color: #e55; }
 
     /* Autocomplete dropdown */
     .ac-dropdown {
@@ -57,29 +83,6 @@
     .ac-item-name { font-weight: 500; }
     .ac-item-lines { font-size: .75rem; color: #888; }
     .ac-item-pref { font-size: .75rem; color: #aaa; margin-left: .5rem; }
-
-    /* Condition selectors */
-    .condition-row {
-      display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
-    }
-    .cond-group {
-      display: flex; align-items: center; gap: .3rem; font-size: .85rem;
-    }
-    .cond-group label { white-space: nowrap; }
-    .cond-group input[type="number"] {
-      width: 56px; padding: .35rem .4rem; border: 1px solid #d0d0d0;
-      border-radius: 6px; font-size: .85rem; font-family: inherit;
-      text-align: center; outline: none;
-    }
-    .cond-group input[type="number"]:focus { border-color: #4a90d9; }
-    .cond-group input[type="checkbox"] { margin-right: .2rem; }
-
-    .remove-origin {
-      background: none; border: 1px solid #e0e0e0; border-radius: 6px;
-      color: #999; cursor: pointer; padding: .35rem .55rem; font-size: .85rem;
-      transition: color .15s, border-color .15s; flex-shrink: 0;
-    }
-    .remove-origin:hover { color: #e55; border-color: #e55; }
 
     .btn-row { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
     .btn-add {
@@ -253,6 +256,7 @@
     /* Dark mode */
     body.tt-dark { background: #1a1a2e; color: #e0e0e0; }
     body.tt-dark .card { background: #20203a; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+    body.tt-dark .origins-table th { color: #888; }
     body.tt-dark .origin-input {
       background: #252545; color: #e0e0e0; border-color: #3a3a5a;
     }
@@ -264,7 +268,7 @@
     }
     body.tt-dark .ac-item:hover, body.tt-dark .ac-item.active { background: #303060; }
     body.tt-dark .ac-item-name { color: #e0e0e0; }
-    body.tt-dark .cond-group input[type="number"] {
+    body.tt-dark .cond-number {
       background: #252545; color: #e0e0e0; border-color: #3a3a5a;
     }
     body.tt-dark .remove-origin { border-color: #3a3a5a; color: #777; }
@@ -318,8 +322,6 @@
 
     @media (max-width: 500px) {
       .container { padding: .75rem; }
-      .origin-row { gap: .4rem; }
-      .condition-row { gap: .4rem; }
       .station-item { padding: .8rem; }
       #map-container { height: 300px; }
     }
@@ -335,7 +337,15 @@
     <div id="search-view">
       <div class="card" id="search-card">
         <div class="card-title">検索条件</div>
-        <div id="origins"></div>
+        <table class="origins-table">
+          <thead><tr>
+            <th class="col-station">駅名</th>
+            <th class="col-transfers">乗換回数</th>
+            <th class="col-minutes">所要時間</th>
+            <th class="col-remove"></th>
+          </tr></thead>
+          <tbody id="origins"></tbody>
+        </table>
         <div class="btn-row">
           <button class="btn-add" id="btn-add-origin">+ 出発地を追加</button>
           <button class="btn-search" id="btn-search">検索</button>
@@ -806,8 +816,7 @@
     function addOriginRow(presetGroupId, presetName, presetTransfers, presetMinutes) {
       if (origins.length >= 5) return;
 
-      var row = document.createElement('div');
-      row.className = 'origin-row';
+      var row = document.createElement('tr');
 
       var idx = origins.length;
       var origin = {
@@ -818,6 +827,8 @@
         el: row
       };
 
+      // Station name cell
+      var tdStation = document.createElement('td');
       var inputWrap = document.createElement('div');
       inputWrap.className = 'origin-input-wrap';
 
@@ -909,38 +920,34 @@
 
       inputWrap.appendChild(input);
       inputWrap.appendChild(dropdown);
-      row.appendChild(inputWrap);
+      tdStation.appendChild(inputWrap);
+      row.appendChild(tdStation);
 
-      // Conditions
-      var condRow = document.createElement('div');
-      condRow.className = 'condition-row';
-
-      var tGroup = document.createElement('div');
-      tGroup.className = 'cond-group';
-      var tCheck = document.createElement('input'); tCheck.type = 'checkbox'; tCheck.checked = true; tCheck.id = 'tc-' + idx;
-      var tLabel = document.createElement('label'); tLabel.htmlFor = tCheck.id; tLabel.textContent = '乗換';
+      // Transfers cell
+      var tdTransfers = document.createElement('td');
       var tInput = document.createElement('input'); tInput.type = 'number'; tInput.min = '0'; tInput.max = '10';
+      tInput.className = 'cond-number';
       tInput.value = origin.maxTransfers !== null ? origin.maxTransfers : '1';
-      var tSuffix = document.createElement('span'); tSuffix.textContent = '回以内';
-      tCheck.addEventListener('change', function () { tInput.disabled = !tCheck.checked; origin.maxTransfers = tCheck.checked ? parseInt(tInput.value) || 1 : null; });
-      tInput.addEventListener('input', function () { origin.maxTransfers = tCheck.checked ? (parseInt(tInput.value) || 0) : null; });
-      tGroup.appendChild(tCheck); tGroup.appendChild(tLabel); tGroup.appendChild(tInput); tGroup.appendChild(tSuffix);
-      condRow.appendChild(tGroup);
+      tInput.addEventListener('input', function () { origin.maxTransfers = parseInt(tInput.value) || 0; });
+      tdTransfers.appendChild(tInput);
+      row.appendChild(tdTransfers);
 
-      var mGroup = document.createElement('div');
-      mGroup.className = 'cond-group';
-      var mCheck = document.createElement('input'); mCheck.type = 'checkbox'; mCheck.checked = presetMinutes != null; mCheck.id = 'mc-' + idx;
-      var mLabel = document.createElement('label'); mLabel.htmlFor = mCheck.id; mLabel.textContent = '所要';
+      // Minutes cell
+      var tdMinutes = document.createElement('td');
       var mInput = document.createElement('input'); mInput.type = 'number'; mInput.min = '1'; mInput.max = '180';
-      mInput.value = presetMinutes || '30'; mInput.disabled = !mCheck.checked;
-      var mSuffix = document.createElement('span'); mSuffix.textContent = '分以内';
-      mCheck.addEventListener('change', function () { mInput.disabled = !mCheck.checked; origin.maxMinutes = mCheck.checked ? parseInt(mInput.value) || 30 : null; });
-      mInput.addEventListener('input', function () { origin.maxMinutes = mCheck.checked ? (parseInt(mInput.value) || 0) : null; });
-      if (!mCheck.checked) origin.maxMinutes = null;
-      mGroup.appendChild(mCheck); mGroup.appendChild(mLabel); mGroup.appendChild(mInput); mGroup.appendChild(mSuffix);
-      condRow.appendChild(mGroup);
-      row.appendChild(condRow);
+      mInput.className = 'cond-number';
+      mInput.value = presetMinutes || '';
+      mInput.placeholder = '-';
+      mInput.addEventListener('input', function () {
+        var v = parseInt(mInput.value);
+        origin.maxMinutes = v > 0 ? v : null;
+      });
+      origin.maxMinutes = presetMinutes || null;
+      tdMinutes.appendChild(mInput);
+      row.appendChild(tdMinutes);
 
+      // Remove button cell
+      var tdRemove = document.createElement('td');
       var removeBtn = document.createElement('button');
       removeBtn.className = 'remove-origin'; removeBtn.textContent = '×'; removeBtn.title = '削除';
       removeBtn.addEventListener('click', function () {
@@ -950,7 +957,8 @@
         updateRemoveButtons();
         updateSearchButtonState();
       });
-      row.appendChild(removeBtn);
+      tdRemove.appendChild(removeBtn);
+      row.appendChild(tdRemove);
 
       originsEl.appendChild(row);
       origins.push(origin);
@@ -1553,7 +1561,7 @@
           if (match) {
             loaded.push({
               gid: match.gid, name: match.name,
-              transfers: params.transfers !== undefined ? params.transfers : 3,
+              transfers: params.transfers !== undefined ? params.transfers : 1,
               minutes: params.minutes !== undefined ? params.minutes : undefined
             });
           }
