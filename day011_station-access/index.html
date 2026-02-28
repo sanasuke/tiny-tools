@@ -1324,7 +1324,7 @@
 
       html += '<div class="line-badges">';
       e.info.lines.forEach(function (l) {
-        var bg = '#' + l.color;
+        var bg = '#' + ensureVisibleColor(l.color);
         var textColor = isLightColor(l.color) ? '#333' : '#fff';
         html += '<span class="line-badge" style="background:' + bg + ';color:' + textColor + '">' + escapeHtml(l.name) + '</span>';
       });
@@ -1367,7 +1367,7 @@
       html += '</div>';
       html += '<div class="line-badges">';
       g.lines.forEach(function (l) {
-        var bg = '#' + l.color;
+        var bg = '#' + ensureVisibleColor(l.color);
         var textColor = isLightColor(l.color) ? '#333' : '#fff';
         html += '<span class="line-badge" style="background:' + bg + ';color:' + textColor + '">' + escapeHtml(l.name) + '</span>';
       });
@@ -1400,7 +1400,7 @@
             if (si > 0) {
               html += '<div class="segment-transfer">乗換</div>';
             }
-            var color = '#' + seg.lineColor;
+            var color = '#' + ensureVisibleColor(seg.lineColor);
             html += '<div class="route-segment">';
             html += '<div class="segment-line-bar" style="background:' + color + '"></div>';
             html += '<div class="segment-content">';
@@ -1450,7 +1450,7 @@
           });
           if (latlngs.length > 1) {
             L.polyline(latlngs, {
-              color: '#' + seg.lineColor,
+              color: '#' + ensureVisibleColor(seg.lineColor),
               weight: 4,
               opacity: 0.85
             }).addTo(leafletMap);
@@ -1502,6 +1502,18 @@
       var g = parseInt(hex.substr(2, 2), 16);
       var b = parseInt(hex.substr(4, 2), 16);
       return (r * 299 + g * 587 + b * 114) / 1000 > 160;
+    }
+
+    function ensureVisibleColor(hex) {
+      var r = parseInt(hex.substr(0, 2), 16);
+      var g = parseInt(hex.substr(2, 2), 16);
+      var b = parseInt(hex.substr(4, 2), 16);
+      var maxC = Math.max(r, g, b);
+      var minC = Math.min(r, g, b);
+      if (maxC - minC <= 30 && minC >= 50 && maxC <= 200) {
+        return 'E8529A';
+      }
+      return hex;
     }
 
     function escapeHtml(str) {
