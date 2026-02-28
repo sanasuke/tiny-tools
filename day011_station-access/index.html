@@ -225,6 +225,22 @@
       border-left: 2px dashed #d0d0d0; margin-left: 1.5px; margin-bottom: .4rem;
     }
 
+    /* View toggle */
+    .view-toggle {
+      display: inline-flex; border: 1px solid #d0d0d0; border-radius: 6px; overflow: hidden;
+    }
+    .view-toggle button {
+      padding: .3rem .7rem; border: none; background: #fff; cursor: pointer;
+      font-size: .8rem; font-family: inherit; color: #555; transition: background .15s, color .15s;
+    }
+    .view-toggle button:not(:last-child) { border-right: 1px solid #d0d0d0; }
+    .view-toggle button.active { background: #4a90d9; color: #fff; }
+
+    #results-map-container {
+      width: 100%; height: 450px; border-radius: 10px; overflow: hidden;
+      margin-top: .75rem; box-shadow: 0 1px 4px rgba(0,0,0,.1);
+    }
+
     /* Dark mode */
     body.tt-dark { background: #1a1a2e; color: #e0e0e0; }
     body.tt-dark .card { background: #20203a; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
@@ -273,11 +289,11 @@
     body.tt-dark .segment-transfer { color: #777; border-left-color: #3a3a5a; }
     body.tt-dark .detail-station-name { color: #f0f0f0; }
     body.tt-dark #map-container { box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+    body.tt-dark #results-map-container { box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+    body.tt-dark .view-toggle { border-color: #3a3a5a; }
+    body.tt-dark .view-toggle button { background: #252545; color: #999; border-color: #3a3a5a; }
+    body.tt-dark .view-toggle button.active { background: #4a90d9; color: #fff; }
 
-    /* Dark mode: Leaflet tiles */
-    body.tt-dark .leaflet-tile-pane {
-      filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
-    }
     body.tt-dark .leaflet-control-attribution {
       background: rgba(32,32,58,.8) !important; color: #888 !important;
     }
@@ -696,7 +712,11 @@
         if (pi === 0 || step.isTransfer) {
           // Start new segment
           if (currentSeg) segments.push(currentSeg);
-          var line = lineMap[step.lineId];
+          var effectiveLineId = step.lineId;
+          if (effectiveLineId == null && pi + 1 < path.length) {
+            effectiveLineId = path[pi + 1].lineId;
+          }
+          var line = lineMap[effectiveLineId];
           currentSeg = {
             lineId: step.lineId,
             lineName: line ? line.name : '?',
@@ -722,11 +742,13 @@
     /* ========== UI State ========== */
     var origins = [];
     var results = null;
-    var currentSort = 'minutes';
+    var currentSort = 'minMinutes';
     var currentPrefFilter = '';
     var currentPage = 0;
-    var PAGE_SIZE = 50;
+    var PAGE_SIZE = 20;
     var leafletMap = null;
+    var resultsMapView = false;
+    var resultsLeafletMap = null;
     var currentDetailGid = null;
 
     /* ========== UI: Elements ========== */
@@ -740,6 +762,10 @@
     var btnBack = document.getElementById('btn-back');
 
     /* ========== View Switching ========== */
+    function cleanupResultsMap() {
+      if (resultsLeafletMap) { resultsLeafletMap.remove(); resultsLeafletMap = null; }
+    }
+
     function showSearchView() {
       searchView.style.display = 'block';
       detailView.style.display = 'none';
@@ -749,6 +775,7 @@
 
     function showDetailView(targetGid) {
       currentDetailGid = targetGid;
+      cleanupResultsMap();
       searchView.style.display = 'none';
       detailView.style.display = 'block';
       renderDetailView(targetGid);
@@ -823,11 +850,13 @@
         input.value = m.name;
         input.classList.add('has-value');
         dropdown.classList.remove('open');
+        updateSearchButtonState();
       }
 
       input.addEventListener('input', function () {
         origin.groupId = null; origin.name = '';
         input.classList.remove('has-value');
+        updateSearchButtonState();
         showAC(input.value.trim());
       });
       input.addEventListener('focus', function () {
@@ -846,12 +875,14 @@
           if (acItems.length > 0) { activeIdx = (activeIdx - 1 + acItems.length) % acItems.length; updateActiveAC(); }
         } else if (e.key === 'Enter') {
           e.preventDefault();
-          if (activeIdx >= 0) {
+          if (dropdown.classList.contains('open') && activeIdx >= 0) {
             var matches = searchStations(input.value.trim());
             if (matches[activeIdx]) selectStation(matches[activeIdx]);
-          } else {
+          } else if (dropdown.classList.contains('open')) {
             var matches2 = searchStations(input.value.trim());
             if (matches2.length === 1) selectStation(matches2[0]);
+          } else if (origin.groupId) {
+            runSearch();
           }
         } else if (e.key === 'Escape') { dropdown.classList.remove('open'); }
       });
@@ -895,21 +926,35 @@
       condRow.appendChild(mGroup);
       row.appendChild(condRow);
 
-      if (origins.length > 0) {
-        var removeBtn = document.createElement('button');
-        removeBtn.className = 'remove-origin'; removeBtn.textContent = '×'; removeBtn.title = '削除';
-        removeBtn.addEventListener('click', function () {
-          var i = origins.indexOf(origin);
-          if (i >= 0) { origins.splice(i, 1); row.remove(); }
-          if (origins.length < 5) btnAdd.style.display = '';
-        });
-        row.appendChild(removeBtn);
-      }
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'remove-origin'; removeBtn.textContent = '×'; removeBtn.title = '削除';
+      removeBtn.addEventListener('click', function () {
+        var i = origins.indexOf(origin);
+        if (i >= 0) { origins.splice(i, 1); row.remove(); }
+        if (origins.length < 5) btnAdd.style.display = '';
+        updateRemoveButtons();
+        updateSearchButtonState();
+      });
+      row.appendChild(removeBtn);
 
       originsEl.appendChild(row);
       origins.push(origin);
       if (origins.length >= 5) btnAdd.style.display = 'none';
+      updateRemoveButtons();
+      updateSearchButtonState();
       if (!presetGroupId) input.focus();
+    }
+
+    function updateRemoveButtons() {
+      var btns = originsEl.querySelectorAll('.remove-origin');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].style.visibility = origins.length <= 1 ? 'hidden' : 'visible';
+      }
+    }
+
+    function updateSearchButtonState() {
+      var hasValid = origins.some(function (o) { return o.groupId; });
+      btnSearch.disabled = !hasValid;
     }
 
     btnAdd.addEventListener('click', function () { addOriginRow(); });
@@ -917,14 +962,29 @@
     /* ========== Search ========== */
     btnSearch.addEventListener('click', function () { runSearch(); });
 
-    function runSearch() {
+    function executeSearch(options) {
+      var showLoading = options.showLoading !== false;
+      var resetPaging = options.resetPaging !== false;
+      var doSaveHash = options.saveHash !== false;
+      var callback = options.callback || null;
+
       var validOrigins = origins.filter(function (o) { return o.groupId; });
       if (validOrigins.length === 0) {
-        resultsArea.innerHTML = '<div class="no-results">出発地を選択してください</div>';
+        if (showLoading) resultsArea.innerHTML = '<div class="no-results">出発地を選択してください</div>';
         return;
       }
 
-      resultsArea.innerHTML = '<div class="loading"><div class="loading-spinner"></div>検索中…</div>';
+      var hasNoConstraint = validOrigins.some(function (o) {
+        return o.maxTransfers === null && o.maxMinutes === null;
+      });
+      if (hasNoConstraint) {
+        if (showLoading) resultsArea.innerHTML = '<div class="no-results">乗換回数または所要時間の条件を1つ以上設定してください</div>';
+        return;
+      }
+
+      if (showLoading) {
+        resultsArea.innerHTML = '<div class="loading"><div class="loading-spinner"></div>検索中…</div>';
+      }
 
       setTimeout(function () {
         var allResults = [];
@@ -959,7 +1019,8 @@
             totalTransfers: access.reduce(function (s, a) { return s + a.transfers; }, 0),
             totalMinutes: access.reduce(function (s, a) { return s + a.minutes; }, 0),
             maxTransfers: Math.max.apply(null, access.map(function (a) { return a.transfers; })),
-            maxMinutes: Math.max.apply(null, access.map(function (a) { return a.minutes; }))
+            maxMinutes: Math.max.apply(null, access.map(function (a) { return a.minutes; })),
+            minMinutes: Math.min.apply(null, access.map(function (a) { return a.minutes; }))
           });
         });
 
@@ -968,11 +1029,18 @@
         entries = entries.filter(function (e) { return !originGids[e.gid]; });
 
         results = entries;
-        currentPage = 0;
-        currentPrefFilter = '';
+        if (resetPaging) {
+          currentPage = 0;
+          currentPrefFilter = '';
+        }
         renderResults(entries);
-        saveToHash();
+        if (doSaveHash) saveToHash();
+        if (callback) callback();
       }, 30);
+    }
+
+    function runSearch() {
+      executeSearch({ showLoading: true, resetPaging: true, saveHash: true });
     }
 
     /* ========== Render Results ========== */
@@ -988,13 +1056,23 @@
         if (pName) prefs[e.info.pref] = pName;
       });
 
+      var filtered = entries;
+      if (currentPrefFilter) {
+        filtered = entries.filter(function (e) { return e.info.pref == currentPrefFilter; });
+      }
+
+      var countText = currentPrefFilter
+        ? filtered.length + ' / ' + entries.length + ' 駅'
+        : entries.length + ' 駅が見つかりました';
+
       var html = '<div class="card"><div class="result-header">';
-      html += '<span class="result-count">' + entries.length + ' 駅が見つかりました</span>';
+      html += '<span class="result-count">' + countText + '</span>';
       html += '<div class="result-controls">';
       html += '<select id="sort-select" aria-label="並び替え">';
       html += '<option value="name"' + (currentSort === 'name' ? ' selected' : '') + '>名前順</option>';
       html += '<option value="transfers"' + (currentSort === 'transfers' ? ' selected' : '') + '>乗換回数順</option>';
-      html += '<option value="minutes"' + (currentSort === 'minutes' ? ' selected' : '') + '>所要時間順</option>';
+      html += '<option value="minMinutes"' + (currentSort === 'minMinutes' ? ' selected' : '') + '>最短所要時間順</option>';
+      html += '<option value="avgMinutes"' + (currentSort === 'avgMinutes' ? ' selected' : '') + '>平均所要時間順</option>';
       html += '</select>';
 
       var prefKeys = Object.keys(prefs).sort(function (a, b) { return +a - +b; });
@@ -1006,41 +1084,57 @@
         });
         html += '</select>';
       }
+      html += '<div class="view-toggle" id="view-toggle">';
+      html += '<button data-view="list"' + (!resultsMapView ? ' class="active"' : '') + '>一覧</button>';
+      html += '<button data-view="map"' + (resultsMapView ? ' class="active"' : '') + '>地図</button>';
+      html += '</div>';
       html += '<button class="btn-share" id="btn-share">共有</button>';
       html += '</div></div>';
 
-      var filtered = entries;
-      if (currentPrefFilter) {
-        filtered = entries.filter(function (e) { return e.info.pref == currentPrefFilter; });
-      }
       filtered = sortEntries(filtered, currentSort);
 
-      var totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-      if (currentPage >= totalPages) currentPage = totalPages - 1;
-      if (currentPage < 0) currentPage = 0;
-      var start = currentPage * PAGE_SIZE;
-      var pageItems = filtered.slice(start, start + PAGE_SIZE);
+      if (resultsMapView) {
+        html += '<div id="results-map-container"></div>';
+      } else {
+        var totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+        if (currentPage >= totalPages) currentPage = totalPages - 1;
+        if (currentPage < 0) currentPage = 0;
+        var start = currentPage * PAGE_SIZE;
+        var pageItems = filtered.slice(start, start + PAGE_SIZE);
 
-      html += '<ul class="station-list">';
-      pageItems.forEach(function (e) { html += renderStationItem(e); });
-      html += '</ul>';
+        html += '<ul class="station-list">';
+        pageItems.forEach(function (e) { html += renderStationItem(e); });
+        html += '</ul>';
 
-      if (totalPages > 1) {
-        html += '<div class="paging">';
-        html += '<button data-page="prev"' + (currentPage === 0 ? ' disabled' : '') + '>&lt;</button>';
-        for (var p = 0; p < totalPages; p++) {
-          if (totalPages > 7 && Math.abs(p - currentPage) > 2 && p !== 0 && p !== totalPages - 1) {
-            if (p === 1 || p === totalPages - 2) html += '<button disabled>…</button>';
-            continue;
+        if (totalPages > 1) {
+          html += '<div class="paging">';
+          html += '<button data-page="prev"' + (currentPage === 0 ? ' disabled' : '') + '>&lt;</button>';
+          for (var p = 0; p < totalPages; p++) {
+            if (totalPages > 7 && Math.abs(p - currentPage) > 2 && p !== 0 && p !== totalPages - 1) {
+              if (p === 1 || p === totalPages - 2) html += '<button disabled>…</button>';
+              continue;
+            }
+            html += '<button data-page="' + p + '"' + (p === currentPage ? ' class="active"' : '') + '>' + (p + 1) + '</button>';
           }
-          html += '<button data-page="' + p + '"' + (p === currentPage ? ' class="active"' : '') + '>' + (p + 1) + '</button>';
+          html += '<button data-page="next"' + (currentPage === totalPages - 1 ? ' disabled' : '') + '>&gt;</button>';
+          html += '</div>';
         }
-        html += '<button data-page="next"' + (currentPage === totalPages - 1 ? ' disabled' : '') + '>&gt;</button>';
-        html += '</div>';
       }
 
       html += '</div>';
+      cleanupResultsMap();
       resultsArea.innerHTML = html;
+
+      // View toggle
+      var viewToggle = document.getElementById('view-toggle');
+      if (viewToggle) {
+        viewToggle.querySelectorAll('button').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            resultsMapView = btn.getAttribute('data-view') === 'map';
+            renderResults(results);
+          });
+        });
+      }
 
       // Event listeners
       var sortSel = document.getElementById('sort-select');
@@ -1056,35 +1150,105 @@
         }
       });
 
-      // Paging
-      resultsArea.querySelectorAll('.paging button').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var p = btn.getAttribute('data-page');
-          if (p === 'prev') currentPage--;
-          else if (p === 'next') currentPage++;
-          else currentPage = parseInt(p);
-          renderResults(results);
-          resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (resultsMapView) {
+        setTimeout(function () { initResultsMap(filtered); }, 50);
+      } else {
+        // Paging
+        resultsArea.querySelectorAll('.paging button').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var p = btn.getAttribute('data-page');
+            if (p === 'prev') currentPage--;
+            else if (p === 'next') currentPage++;
+            else currentPage = parseInt(p);
+            renderResults(results);
+            resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
         });
+
+        // Station click -> detail view
+        resultsArea.querySelectorAll('.station-item').forEach(function (el) {
+          el.addEventListener('click', function () {
+            var gid = el.getAttribute('data-gid');
+            if (gid) {
+              showDetailView(gid);
+              saveToHash();
+              window.scrollTo(0, 0);
+            }
+          });
+        });
+      }
+    }
+
+    function initResultsMap(filteredEntries) {
+      cleanupResultsMap();
+      var mapEl = document.getElementById('results-map-container');
+      if (!mapEl) return;
+
+      resultsLeafletMap = L.map(mapEl, { zoomControl: true });
+      var lightTile = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+      var darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      var isDark = document.body.classList.contains('tt-dark');
+      L.tileLayer(isDark ? darkTile : lightTile, {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 18
+      }).addTo(resultsLeafletMap);
+
+      var allBounds = [];
+
+      // Origin markers (red)
+      var validOrigins = origins.filter(function (o) { return o.groupId; });
+      validOrigins.forEach(function (o) {
+        var g = groupInfo[o.groupId];
+        if (!g) return;
+        var sids = g.sids;
+        for (var i = 0; i < sids.length; i++) {
+          var st = stationMap[sids[i]];
+          if (st && st.lat && st.lon) {
+            L.circleMarker([st.lat, st.lon], {
+              radius: 8, color: '#e55', fillColor: '#e55', fillOpacity: 1, weight: 2
+            }).bindTooltip(o.name + '（出発）', { permanent: false }).addTo(resultsLeafletMap);
+            allBounds.push([st.lat, st.lon]);
+            break;
+          }
+        }
       });
 
-      // Station click -> detail view
-      resultsArea.querySelectorAll('.station-item').forEach(function (el) {
-        el.addEventListener('click', function () {
-          var gid = el.getAttribute('data-gid');
-          if (gid) {
-            showDetailView(gid);
-            saveToHash();
-            window.scrollTo(0, 0);
+      // Result markers (blue)
+      filteredEntries.forEach(function (e) {
+        var sids = e.info.sids;
+        for (var i = 0; i < sids.length; i++) {
+          var st = stationMap[sids[i]];
+          if (st && st.lat && st.lon) {
+            var marker = L.circleMarker([st.lat, st.lon], {
+              radius: 5, color: '#4a90d9', fillColor: '#4a90d9', fillOpacity: 0.8, weight: 1
+            });
+            marker.bindTooltip(e.info.name);
+            (function (gid) {
+              marker.on('click', function () {
+                showDetailView(gid);
+                saveToHash();
+                window.scrollTo(0, 0);
+              });
+            })(e.gid);
+            marker.addTo(resultsLeafletMap);
+            allBounds.push([st.lat, st.lon]);
+            break;
           }
-        });
+        }
       });
+
+      if (allBounds.length > 0) {
+        resultsLeafletMap.fitBounds(allBounds, { padding: [30, 30] });
+      } else {
+        resultsLeafletMap.setView([36.5, 138], 6);
+      }
     }
 
     function sortEntries(arr, sortKey) {
       return arr.slice().sort(function (a, b) {
         if (sortKey === 'transfers') return a.maxTransfers - b.maxTransfers || a.totalMinutes - b.totalMinutes;
-        if (sortKey === 'minutes') return a.maxMinutes - b.maxMinutes || a.totalMinutes - b.totalMinutes;
+        if (sortKey === 'minMinutes') return a.minMinutes - b.minMinutes || a.totalMinutes - b.totalMinutes;
+        if (sortKey === 'avgMinutes') return a.totalMinutes - b.totalMinutes || a.minMinutes - b.minMinutes;
         return a.info.name.localeCompare(b.info.name, 'ja');
       });
     }
@@ -1203,8 +1367,11 @@
       if (!mapEl) return;
 
       leafletMap = L.map(mapEl, { zoomControl: true });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+      var lightTile = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+      var darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      var isDark = document.body.classList.contains('tt-dark');
+      L.tileLayer(isDark ? darkTile : lightTile, {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 18
       }).addTo(leafletMap);
 
@@ -1264,8 +1431,9 @@
     /* ========== Helpers ========== */
     function formatMinutes(m) {
       if (m === 0) return '0分';
-      var h = Math.floor(m / 60);
-      var min = Math.round(m % 60);
+      var total = Math.round(m);
+      var h = Math.floor(total / 60);
+      var min = total % 60;
       if (h > 0) return h + '時間' + (min > 0 ? min + '分' : '');
       return min + '分';
     }
@@ -1286,7 +1454,7 @@
       var parts = [];
       origins.forEach(function (o) {
         if (!o.groupId) return;
-        var p = 'o=' + encodeURIComponent(o.name);
+        var p = 'o=' + encodeURIComponent(o.name) + ',g' + o.groupId;
         if (o.maxTransfers !== null) p += ',t' + o.maxTransfers;
         if (o.maxMinutes !== null) p += ',m' + o.maxMinutes;
         parts.push(p);
@@ -1320,11 +1488,17 @@
         var params = {};
         part.split(',').forEach(function (kv) {
           if (kv.indexOf('o=') === 0) params.name = decodeURIComponent(kv.substring(2));
+          else if (kv.charAt(0) === 'g') params.groupId = kv.substring(1);
           else if (kv.charAt(0) === 't') params.transfers = parseInt(kv.substring(1));
           else if (kv.charAt(0) === 'm') params.minutes = parseInt(kv.substring(1));
         });
         if (params.name) {
-          var match = searchIndex.find(function (s) { return s.name === params.name; });
+          var match = null;
+          if (params.groupId && groupInfo[params.groupId]) {
+            match = { gid: params.groupId, name: groupInfo[params.groupId].name };
+          } else {
+            match = searchIndex.find(function (s) { return s.name === params.name; });
+          }
           if (match) {
             loaded.push({
               gid: match.gid, name: match.name,
@@ -1351,53 +1525,7 @@
     }
 
     function runSearchThen(callback) {
-      var validOrigins = origins.filter(function (o) { return o.groupId; });
-      if (validOrigins.length === 0) return;
-
-      setTimeout(function () {
-        var allResults = [];
-        validOrigins.forEach(function (o) {
-          allResults.push({ origin: o, reachable: searchReachable(o.groupId, o.maxTransfers, o.maxMinutes) });
-        });
-
-        var commonGids;
-        if (allResults.length === 1) {
-          commonGids = Object.keys(allResults[0].reachable);
-        } else {
-          commonGids = Object.keys(allResults[0].reachable);
-          for (var r = 1; r < allResults.length; r++) {
-            var rr = allResults[r].reachable;
-            commonGids = commonGids.filter(function (gid) { return rr[gid] !== undefined; });
-          }
-        }
-
-        var entries = [];
-        commonGids.forEach(function (gid) {
-          var g = groupInfo[gid];
-          if (!g) return;
-          var access = [];
-          allResults.forEach(function (ar) {
-            var info = ar.reachable[gid];
-            access.push({ originName: ar.origin.name, originGroupId: ar.origin.groupId, transfers: info.transfers, minutes: info.minutes, maxTransfers: ar.origin.maxTransfers, maxMinutes: ar.origin.maxMinutes });
-          });
-          entries.push({
-            gid: gid, info: g, access: access,
-            totalTransfers: access.reduce(function (s, a) { return s + a.transfers; }, 0),
-            totalMinutes: access.reduce(function (s, a) { return s + a.minutes; }, 0),
-            maxTransfers: Math.max.apply(null, access.map(function (a) { return a.transfers; })),
-            maxMinutes: Math.max.apply(null, access.map(function (a) { return a.minutes; }))
-          });
-        });
-
-        var originGids = {};
-        validOrigins.forEach(function (o) { originGids[o.groupId] = true; });
-        entries = entries.filter(function (e) { return !originGids[e.gid]; });
-
-        results = entries;
-        renderResults(entries);
-
-        if (callback) callback();
-      }, 30);
+      executeSearch({ showLoading: false, resetPaging: false, saveHash: false, callback: callback });
     }
 
     // Handle browser back/forward
