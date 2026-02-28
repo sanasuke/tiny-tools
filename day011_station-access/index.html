@@ -107,6 +107,12 @@
       padding: .3rem .5rem; border: 1px solid #d0d0d0; border-radius: 6px;
       font-size: .8rem; font-family: inherit; background: #fff; cursor: pointer;
     }
+    .sort-dir-btn {
+      padding: .3rem .5rem; border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: .8rem; font-family: inherit; background: #fff; cursor: pointer;
+      white-space: nowrap;
+    }
+    .sort-dir-btn:hover { border-color: #4a90d9; }
 
     .station-list { list-style: none; }
     .station-item {
@@ -270,6 +276,10 @@
     body.tt-dark .result-controls select {
       background: #252545; color: #e0e0e0; border-color: #3a3a5a;
     }
+    body.tt-dark .sort-dir-btn {
+      background: #252545; color: #e0e0e0; border-color: #3a3a5a;
+    }
+    body.tt-dark .sort-dir-btn:hover { border-color: #6ab0f3; }
     body.tt-dark .paging button {
       background: #252545; color: #e0e0e0; border-color: #3a3a5a;
     }
@@ -743,6 +753,8 @@
     var origins = [];
     var results = null;
     var currentSort = 'minMinutes';
+    var currentSortDir = 'asc';
+    var currentSortOrigin = '';
     var currentPrefFilter = '';
     var currentPage = 0;
     var PAGE_SIZE = 20;
@@ -798,7 +810,7 @@
       var origin = {
         groupId: presetGroupId || null,
         name: presetName || '',
-        maxTransfers: presetTransfers !== undefined ? presetTransfers : 3,
+        maxTransfers: presetTransfers !== undefined ? presetTransfers : 1,
         maxMinutes: presetMinutes !== undefined ? presetMinutes : null,
         el: row
       };
@@ -905,9 +917,9 @@
       var tCheck = document.createElement('input'); tCheck.type = 'checkbox'; tCheck.checked = true; tCheck.id = 'tc-' + idx;
       var tLabel = document.createElement('label'); tLabel.htmlFor = tCheck.id; tLabel.textContent = '乗換';
       var tInput = document.createElement('input'); tInput.type = 'number'; tInput.min = '0'; tInput.max = '10';
-      tInput.value = origin.maxTransfers !== null ? origin.maxTransfers : '3';
+      tInput.value = origin.maxTransfers !== null ? origin.maxTransfers : '1';
       var tSuffix = document.createElement('span'); tSuffix.textContent = '回以内';
-      tCheck.addEventListener('change', function () { tInput.disabled = !tCheck.checked; origin.maxTransfers = tCheck.checked ? parseInt(tInput.value) || 3 : null; });
+      tCheck.addEventListener('change', function () { tInput.disabled = !tCheck.checked; origin.maxTransfers = tCheck.checked ? parseInt(tInput.value) || 1 : null; });
       tInput.addEventListener('input', function () { origin.maxTransfers = tCheck.checked ? (parseInt(tInput.value) || 0) : null; });
       tGroup.appendChild(tCheck); tGroup.appendChild(tLabel); tGroup.appendChild(tInput); tGroup.appendChild(tSuffix);
       condRow.appendChild(tGroup);
@@ -1071,9 +1083,20 @@
       html += '<select id="sort-select" aria-label="並び替え">';
       html += '<option value="name"' + (currentSort === 'name' ? ' selected' : '') + '>名前順</option>';
       html += '<option value="transfers"' + (currentSort === 'transfers' ? ' selected' : '') + '>乗換回数順</option>';
-      html += '<option value="minMinutes"' + (currentSort === 'minMinutes' ? ' selected' : '') + '>最短所要時間順</option>';
+      html += '<option value="minMinutes"' + (currentSort === 'minMinutes' ? ' selected' : '') + '>所要時間順</option>';
       html += '<option value="avgMinutes"' + (currentSort === 'avgMinutes' ? ' selected' : '') + '>平均所要時間順</option>';
       html += '</select>';
+      html += '<button class="sort-dir-btn" id="sort-dir-btn">' + (currentSortDir === 'asc' ? '↑昇順' : '↓降順') + '</button>';
+
+      var validOrigins = origins.filter(function (o) { return o.groupId; });
+      if ((currentSort === 'transfers' || currentSort === 'minMinutes') && validOrigins.length >= 2) {
+        html += '<select id="sort-origin-select" aria-label="基準駅">';
+        html += '<option value=""' + (currentSortOrigin === '' ? ' selected' : '') + '>全体</option>';
+        validOrigins.forEach(function (o) {
+          html += '<option value="' + o.name + '"' + (currentSortOrigin === o.name ? ' selected' : '') + '>' + escapeHtml(o.name) + '</option>';
+        });
+        html += '</select>';
+      }
 
       var prefKeys = Object.keys(prefs).sort(function (a, b) { return +a - +b; });
       if (prefKeys.length > 1) {
@@ -1091,7 +1114,7 @@
       html += '<button class="btn-share" id="btn-share">共有</button>';
       html += '</div></div>';
 
-      filtered = sortEntries(filtered, currentSort);
+      filtered = sortEntries(filtered, currentSort, currentSortDir, currentSortOrigin);
 
       if (resultsMapView) {
         html += '<div id="results-map-container"></div>';
@@ -1140,6 +1163,20 @@
       var sortSel = document.getElementById('sort-select');
       if (sortSel) sortSel.addEventListener('change', function () { currentSort = sortSel.value; currentPage = 0; renderResults(results); });
 
+      var sortDirBtn = document.getElementById('sort-dir-btn');
+      if (sortDirBtn) sortDirBtn.addEventListener('click', function () {
+        currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+        currentPage = 0;
+        renderResults(results);
+      });
+
+      var sortOriginSel = document.getElementById('sort-origin-select');
+      if (sortOriginSel) sortOriginSel.addEventListener('change', function () {
+        currentSortOrigin = sortOriginSel.value;
+        currentPage = 0;
+        renderResults(results);
+      });
+
       var prefFil = document.getElementById('pref-filter');
       if (prefFil) prefFil.addEventListener('change', function () { currentPrefFilter = prefFil.value; currentPage = 0; renderResults(results); });
 
@@ -1185,11 +1222,13 @@
       if (!mapEl) return;
 
       resultsLeafletMap = L.map(mapEl, { zoomControl: true });
-      var lightTile = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+      var lightTile = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
       var darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
       var isDark = document.body.classList.contains('tt-dark');
       L.tileLayer(isDark ? darkTile : lightTile, {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        attribution: isDark
+          ? '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+          : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 18
       }).addTo(resultsLeafletMap);
 
@@ -1244,12 +1283,29 @@
       }
     }
 
-    function sortEntries(arr, sortKey) {
+    function sortEntries(arr, sortKey, sortDir, sortOrigin) {
       return arr.slice().sort(function (a, b) {
-        if (sortKey === 'transfers') return a.maxTransfers - b.maxTransfers || a.totalMinutes - b.totalMinutes;
-        if (sortKey === 'minMinutes') return a.minMinutes - b.minMinutes || a.totalMinutes - b.totalMinutes;
-        if (sortKey === 'avgMinutes') return a.totalMinutes - b.totalMinutes || a.minMinutes - b.minMinutes;
-        return a.info.name.localeCompare(b.info.name, 'ja');
+        var cmp = 0;
+        if (sortOrigin && (sortKey === 'transfers' || sortKey === 'minMinutes')) {
+          var aVal = null, bVal = null;
+          a.access.forEach(function (ac) { if (ac.originName === sortOrigin) aVal = ac; });
+          b.access.forEach(function (ac) { if (ac.originName === sortOrigin) bVal = ac; });
+          if (sortKey === 'transfers') {
+            var at = aVal ? aVal.transfers : 9999;
+            var bt = bVal ? bVal.transfers : 9999;
+            cmp = at - bt;
+          } else {
+            var am = aVal ? aVal.minutes : 9999;
+            var bm = bVal ? bVal.minutes : 9999;
+            cmp = am - bm;
+          }
+        } else {
+          if (sortKey === 'transfers') cmp = a.maxTransfers - b.maxTransfers || a.totalMinutes - b.totalMinutes;
+          else if (sortKey === 'minMinutes') cmp = a.minMinutes - b.minMinutes || a.totalMinutes - b.totalMinutes;
+          else if (sortKey === 'avgMinutes') cmp = a.totalMinutes - b.totalMinutes || a.minMinutes - b.minMinutes;
+          else cmp = a.info.name.localeCompare(b.info.name, 'ja');
+        }
+        return sortDir === 'desc' ? -cmp : cmp;
       });
     }
 
@@ -1367,11 +1423,13 @@
       if (!mapEl) return;
 
       leafletMap = L.map(mapEl, { zoomControl: true });
-      var lightTile = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+      var lightTile = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
       var darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
       var isDark = document.body.classList.contains('tt-dark');
       L.tileLayer(isDark ? darkTile : lightTile, {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        attribution: isDark
+          ? '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+          : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 18
       }).addTo(leafletMap);
 
