@@ -242,6 +242,9 @@
     .view-toggle button:not(:last-child) { border-right: 1px solid #d0d0d0; }
     .view-toggle button.active { background: #4a90d9; color: #fff; }
 
+    /* Map grayscale */
+    .leaflet-tile-pane { filter: grayscale(100%); }
+
     #results-map-container {
       width: 100%; height: 450px; border-radius: 10px; overflow: hidden;
       margin-top: .75rem; box-shadow: 0 1px 4px rgba(0,0,0,.1);
@@ -1222,13 +1225,8 @@
       if (!mapEl) return;
 
       resultsLeafletMap = L.map(mapEl, { zoomControl: true });
-      var lightTile = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-      var darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-      var isDark = document.body.classList.contains('tt-dark');
-      L.tileLayer(isDark ? darkTile : lightTile, {
-        attribution: isDark
-          ? '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
-          : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 18
       }).addTo(resultsLeafletMap);
 
@@ -1423,13 +1421,8 @@
       if (!mapEl) return;
 
       leafletMap = L.map(mapEl, { zoomControl: true });
-      var lightTile = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-      var darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-      var isDark = document.body.classList.contains('tt-dark');
-      L.tileLayer(isDark ? darkTile : lightTile, {
-        attribution: isDark
-          ? '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
-          : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 18
       }).addTo(leafletMap);
 
