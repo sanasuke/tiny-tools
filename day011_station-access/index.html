@@ -1091,7 +1091,7 @@
       var validOrigins = origins.filter(function (o) { return o.groupId; });
       if ((currentSort === 'transfers' || currentSort === 'minMinutes') && validOrigins.length >= 2) {
         html += '<select id="sort-origin-select" aria-label="基準駅">';
-        html += '<option value=""' + (currentSortOrigin === '' ? ' selected' : '') + '>全体</option>';
+        html += '<option value=""' + (currentSortOrigin === '' ? ' selected' : '') + '>全駅</option>';
         validOrigins.forEach(function (o) {
           html += '<option value="' + o.name + '"' + (currentSortOrigin === o.name ? ' selected' : '') + '>' + escapeHtml(o.name) + '</option>';
         });
