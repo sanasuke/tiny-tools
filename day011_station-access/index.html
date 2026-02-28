@@ -274,10 +274,6 @@
     body.tt-dark .detail-station-name { color: #f0f0f0; }
     body.tt-dark #map-container { box-shadow: 0 1px 4px rgba(0,0,0,.3); }
 
-    /* Dark mode: Leaflet tiles */
-    body.tt-dark .leaflet-tile-pane {
-      filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
-    }
     body.tt-dark .leaflet-control-attribution {
       background: rgba(32,32,58,.8) !important; color: #888 !important;
     }
@@ -696,7 +692,11 @@
         if (pi === 0 || step.isTransfer) {
           // Start new segment
           if (currentSeg) segments.push(currentSeg);
-          var line = lineMap[step.lineId];
+          var effectiveLineId = step.lineId;
+          if (effectiveLineId == null && pi + 1 < path.length) {
+            effectiveLineId = path[pi + 1].lineId;
+          }
+          var line = lineMap[effectiveLineId];
           currentSeg = {
             lineId: step.lineId,
             lineName: line ? line.name : '?',
@@ -722,10 +722,10 @@
     /* ========== UI State ========== */
     var origins = [];
     var results = null;
-    var currentSort = 'minutes';
+    var currentSort = 'maxMinutes';
     var currentPrefFilter = '';
     var currentPage = 0;
-    var PAGE_SIZE = 50;
+    var PAGE_SIZE = 20;
     var leafletMap = null;
     var currentDetailGid = null;
 
@@ -895,21 +895,28 @@
       condRow.appendChild(mGroup);
       row.appendChild(condRow);
 
-      if (origins.length > 0) {
-        var removeBtn = document.createElement('button');
-        removeBtn.className = 'remove-origin'; removeBtn.textContent = '×'; removeBtn.title = '削除';
-        removeBtn.addEventListener('click', function () {
-          var i = origins.indexOf(origin);
-          if (i >= 0) { origins.splice(i, 1); row.remove(); }
-          if (origins.length < 5) btnAdd.style.display = '';
-        });
-        row.appendChild(removeBtn);
-      }
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'remove-origin'; removeBtn.textContent = '×'; removeBtn.title = '削除';
+      removeBtn.addEventListener('click', function () {
+        var i = origins.indexOf(origin);
+        if (i >= 0) { origins.splice(i, 1); row.remove(); }
+        if (origins.length < 5) btnAdd.style.display = '';
+        updateRemoveButtons();
+      });
+      row.appendChild(removeBtn);
 
       originsEl.appendChild(row);
       origins.push(origin);
       if (origins.length >= 5) btnAdd.style.display = 'none';
+      updateRemoveButtons();
       if (!presetGroupId) input.focus();
+    }
+
+    function updateRemoveButtons() {
+      var btns = originsEl.querySelectorAll('.remove-origin');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].style.visibility = origins.length <= 1 ? 'hidden' : 'visible';
+      }
     }
 
     btnAdd.addEventListener('click', function () { addOriginRow(); });
@@ -994,7 +1001,8 @@
       html += '<select id="sort-select" aria-label="並び替え">';
       html += '<option value="name"' + (currentSort === 'name' ? ' selected' : '') + '>名前順</option>';
       html += '<option value="transfers"' + (currentSort === 'transfers' ? ' selected' : '') + '>乗換回数順</option>';
-      html += '<option value="minutes"' + (currentSort === 'minutes' ? ' selected' : '') + '>所要時間順</option>';
+      html += '<option value="maxMinutes"' + (currentSort === 'maxMinutes' ? ' selected' : '') + '>最大所要時間順</option>';
+      html += '<option value="avgMinutes"' + (currentSort === 'avgMinutes' ? ' selected' : '') + '>平均所要時間順</option>';
       html += '</select>';
 
       var prefKeys = Object.keys(prefs).sort(function (a, b) { return +a - +b; });
@@ -1084,7 +1092,8 @@
     function sortEntries(arr, sortKey) {
       return arr.slice().sort(function (a, b) {
         if (sortKey === 'transfers') return a.maxTransfers - b.maxTransfers || a.totalMinutes - b.totalMinutes;
-        if (sortKey === 'minutes') return a.maxMinutes - b.maxMinutes || a.totalMinutes - b.totalMinutes;
+        if (sortKey === 'maxMinutes') return a.maxMinutes - b.maxMinutes || a.totalMinutes - b.totalMinutes;
+        if (sortKey === 'avgMinutes') return a.totalMinutes - b.totalMinutes || a.maxMinutes - b.maxMinutes;
         return a.info.name.localeCompare(b.info.name, 'ja');
       });
     }
@@ -1203,8 +1212,11 @@
       if (!mapEl) return;
 
       leafletMap = L.map(mapEl, { zoomControl: true });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+      var lightTile = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+      var darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      var isDark = document.body.classList.contains('tt-dark');
+      L.tileLayer(isDark ? darkTile : lightTile, {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 18
       }).addTo(leafletMap);
 
