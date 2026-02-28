@@ -741,7 +741,7 @@
 
     /* ========== View Switching ========== */
     function showSearchView() {
-      searchView.style.display = '';
+      searchView.style.display = 'block';
       detailView.style.display = 'none';
       currentDetailGid = null;
       if (leafletMap) { leafletMap.remove(); leafletMap = null; }
@@ -750,7 +750,7 @@
     function showDetailView(targetGid) {
       currentDetailGid = targetGid;
       searchView.style.display = 'none';
-      detailView.style.display = '';
+      detailView.style.display = 'block';
       renderDetailView(targetGid);
     }
 
@@ -1338,7 +1338,7 @@
       if (loaded.length > 0) {
         loaded.forEach(function (l) { addOriginRow(l.gid, l.name, l.transfers, l.minutes); });
         if (detailGid) {
-          // Auto-search then show detail
+          currentDetailGid = detailGid;
           setTimeout(function () {
             runSearchThen(function () {
               showDetailView(detailGid);
