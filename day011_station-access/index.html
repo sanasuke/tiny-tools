@@ -722,7 +722,7 @@
     /* ========== UI State ========== */
     var origins = [];
     var results = null;
-    var currentSort = 'maxMinutes';
+    var currentSort = 'minMinutes';
     var currentPrefFilter = '';
     var currentPage = 0;
     var PAGE_SIZE = 20;
@@ -966,7 +966,8 @@
             totalTransfers: access.reduce(function (s, a) { return s + a.transfers; }, 0),
             totalMinutes: access.reduce(function (s, a) { return s + a.minutes; }, 0),
             maxTransfers: Math.max.apply(null, access.map(function (a) { return a.transfers; })),
-            maxMinutes: Math.max.apply(null, access.map(function (a) { return a.minutes; }))
+            maxMinutes: Math.max.apply(null, access.map(function (a) { return a.minutes; })),
+            minMinutes: Math.min.apply(null, access.map(function (a) { return a.minutes; }))
           });
         });
 
@@ -1001,7 +1002,7 @@
       html += '<select id="sort-select" aria-label="並び替え">';
       html += '<option value="name"' + (currentSort === 'name' ? ' selected' : '') + '>名前順</option>';
       html += '<option value="transfers"' + (currentSort === 'transfers' ? ' selected' : '') + '>乗換回数順</option>';
-      html += '<option value="maxMinutes"' + (currentSort === 'maxMinutes' ? ' selected' : '') + '>最大所要時間順</option>';
+      html += '<option value="minMinutes"' + (currentSort === 'minMinutes' ? ' selected' : '') + '>最短所要時間順</option>';
       html += '<option value="avgMinutes"' + (currentSort === 'avgMinutes' ? ' selected' : '') + '>平均所要時間順</option>';
       html += '</select>';
 
@@ -1092,8 +1093,8 @@
     function sortEntries(arr, sortKey) {
       return arr.slice().sort(function (a, b) {
         if (sortKey === 'transfers') return a.maxTransfers - b.maxTransfers || a.totalMinutes - b.totalMinutes;
-        if (sortKey === 'maxMinutes') return a.maxMinutes - b.maxMinutes || a.totalMinutes - b.totalMinutes;
-        if (sortKey === 'avgMinutes') return a.totalMinutes - b.totalMinutes || a.maxMinutes - b.maxMinutes;
+        if (sortKey === 'minMinutes') return a.minMinutes - b.minMinutes || a.totalMinutes - b.totalMinutes;
+        if (sortKey === 'avgMinutes') return a.totalMinutes - b.totalMinutes || a.minMinutes - b.minMinutes;
         return a.info.name.localeCompare(b.info.name, 'ja');
       });
     }
@@ -1397,7 +1398,8 @@
             totalTransfers: access.reduce(function (s, a) { return s + a.transfers; }, 0),
             totalMinutes: access.reduce(function (s, a) { return s + a.minutes; }, 0),
             maxTransfers: Math.max.apply(null, access.map(function (a) { return a.transfers; })),
-            maxMinutes: Math.max.apply(null, access.map(function (a) { return a.minutes; }))
+            maxMinutes: Math.max.apply(null, access.map(function (a) { return a.minutes; })),
+            minMinutes: Math.min.apply(null, access.map(function (a) { return a.minutes; }))
           });
         });
 
