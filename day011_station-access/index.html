@@ -224,7 +224,7 @@
 <body>
   <div class="container">
     <h1>駅アクセスチェッカー</h1>
-    <p class="app-desc">所要時間は概算です（駅間平均2.5分、乗換5分で計算）</p>
+    <p class="app-desc">所要時間は概算です（路線ごとの平均駅間時間＋乗換5分で計算）</p>
 
     <div class="card" id="search-card">
       <div class="card-title">検索条件</div>
@@ -261,7 +261,7 @@
 
     // Build lineMap
     RD.lines.forEach(function (l) {
-      lineMap[l[0]] = { id: l[0], name: l[1], color: l[2], stationIds: l[3] };
+      lineMap[l[0]] = { id: l[0], name: l[1], color: l[2], stationIds: l[3], interval: l[4] || 2.5 };
     });
 
     // Build stationMap
@@ -478,12 +478,13 @@
           groupResults[gid] = { transfers: cT, minutes: cMin };
         }
 
-        // 1. Move along same line to adjacent stations (cost +2.5 min)
+        // 1. Move along same line to adjacent stations (cost = line interval)
+        var lineInterval = lineMap[cLine] ? lineMap[cLine].interval : 2.5;
         var adj = adjacency[cSid] || [];
         for (var i = 0; i < adj.length; i++) {
           if (adj[i].lineId !== cLine) continue;
           var nSid = adj[i].neighbor;
-          var nMin = cMin + 2.5;
+          var nMin = cMin + lineInterval;
           if (nMin > mm) continue;
           var nk = key(nSid, cT);
           if (best[nk] === undefined || best[nk] > nMin) {
