@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QRコードツール | tiny-tools Day 12</title>
+  <meta name="description" content="QRコードの生成・読み取りツール。テキスト・URL・WiFi・メール・電話番号に対応。ブラウザ完結でプライバシーも安心。">
+  <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools" data-note="https://note.com/sana_suke"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 640px;
+      padding: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    /* ===== Mode Tabs ===== */
+    .mode-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 1rem;
+      background: #e8e8e8;
+      border-radius: 10px;
+      padding: 3px;
+    }
+
+    .mode-tab {
+      flex: 1;
+      padding: 0.6rem 1rem;
+      border: none;
+      background: transparent;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background 0.2s, color 0.2s;
+      font-family: inherit;
+    }
+
+    .mode-tab.active {
+      background: #fff;
+      color: #333;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    /* ===== Card ===== */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 1rem;
+    }
+
+    .card-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ===== Input Type Tabs ===== */
+    .type-tabs {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .type-tab {
+      padding: 0.35rem 0.75rem;
+      border: 1px solid #d0d0d0;
+      background: #fff;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      font-family: inherit;
+      color: #555;
+    }
+
+    .type-tab:hover {
+      border-color: #4a90d9;
+      color: #4a90d9;
+    }
+
+    .type-tab.active {
+      background: #4a90d9;
+      color: #fff;
+      border-color: #4a90d9;
+    }
+
+    /* ===== Form Elements ===== */
+    .input-group {
+      margin-bottom: 0.6rem;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 0.78rem;
+      color: #666;
+      margin-bottom: 0.25rem;
+      font-weight: 500;
+    }
+
+    .input-group input,
+    .input-group textarea,
+    .input-group select {
+      width: 100%;
+      padding: 0.5rem 0.7rem;
+      border: 1px solid #d0d0d0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .input-group input:focus,
+    .input-group textarea:focus,
+    .input-group select:focus {
+      border-color: #4a90d9;
+    }
+
+    .input-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    /* ===== Customize Row ===== */
+    .customize-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .customize-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .customize-item label {
+      font-size: 0.72rem;
+      color: #888;
+    }
+
+    .customize-item input[type="color"] {
+      width: 36px;
+      height: 32px;
+      border: 1px solid #d0d0d0;
+      border-radius: 6px;
+      padding: 2px;
+      cursor: pointer;
+      background: #fff;
+    }
+
+    .customize-item input[type="range"] {
+      width: 100px;
+    }
+
+    .customize-item select {
+      padding: 0.3rem 0.5rem;
+      border: 1px solid #d0d0d0;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .size-value {
+      font-size: 0.72rem;
+      color: #888;
+      min-width: 36px;
+      text-align: center;
+    }
+
+    /* ===== Logo Upload ===== */
+    .logo-upload {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo-upload-btn {
+      padding: 0.3rem 0.7rem;
+      border: 1px dashed #aaa;
+      border-radius: 6px;
+      background: transparent;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: #666;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+
+    .logo-upload-btn:hover {
+      border-color: #4a90d9;
+      color: #4a90d9;
+    }
+
+    .logo-preview {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      object-fit: contain;
+      display: none;
+    }
+
+    .logo-clear {
+      font-size: 0.72rem;
+      color: #e74c3c;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: inherit;
+      display: none;
+    }
+
+    /* ===== QR Output ===== */
+    .qr-output {
+      text-align: center;
+      padding: 1rem 0;
+    }
+
+    .qr-output canvas {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+
+    .qr-placeholder {
+      color: #aaa;
+      font-size: 0.85rem;
+      padding: 2rem 0;
+    }
+
+    /* ===== Action Buttons ===== */
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      border: 1px solid #d0d0d0;
+      background: #fff;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      color: #444;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .btn:hover {
+      border-color: #4a90d9;
+      color: #4a90d9;
+    }
+
+    .btn-primary {
+      background: #4a90d9;
+      color: #fff;
+      border-color: #4a90d9;
+    }
+
+    .btn-primary:hover {
+      background: #3a7bc8;
+    }
+
+    .btn-danger {
+      color: #e74c3c;
+      border-color: #e8b4b4;
+    }
+
+    .btn-danger:hover {
+      background: #fef2f2;
+      border-color: #e74c3c;
+    }
+
+    /* ===== Scanner ===== */
+    .scanner-container {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      margin: 0 auto;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .scanner-container video {
+      width: 100%;
+      display: block;
+    }
+
+    .scanner-container canvas {
+      display: none;
+    }
+
+    .scan-frame {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60%;
+      height: 0;
+      padding-bottom: 60%;
+      pointer-events: none;
+    }
+
+    .scan-frame::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 2px solid rgba(74, 144, 217, 0.7);
+      border-radius: 12px;
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 5%;
+      right: 5%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #4a90d9, transparent);
+      animation: scanMove 2s ease-in-out infinite;
+    }
+
+    @keyframes scanMove {
+      0%, 100% { top: 10%; }
+      50% { top: 85%; }
+    }
+
+    .scanner-controls {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-top: 0.75rem;
+    }
+
+    /* ===== Upload Zone ===== */
+    .upload-zone {
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      color: #888;
+      font-size: 0.85rem;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.dragover {
+      border-color: #4a90d9;
+      background: rgba(74, 144, 217, 0.05);
+    }
+
+    .upload-zone input {
+      display: none;
+    }
+
+    /* ===== Read Result ===== */
+    .read-result {
+      background: #f0f8ff;
+      border: 1px solid #d0e5f5;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-top: 0.75rem;
+      display: none;
+    }
+
+    .read-result-label {
+      font-size: 0.72rem;
+      color: #888;
+      margin-bottom: 0.3rem;
+    }
+
+    .read-result-text {
+      font-size: 0.9rem;
+      word-break: break-all;
+      color: #333;
+      margin-bottom: 0.5rem;
+      white-space: pre-wrap;
+    }
+
+    .read-result .actions {
+      justify-content: flex-start;
+      margin-top: 0.5rem;
+    }
+
+    /* ===== History ===== */
+    .history-list {
+      list-style: none;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.82rem;
+    }
+
+    .history-item:last-child {
+      border-bottom: none;
+    }
+
+    .history-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #444;
+    }
+
+    .history-time {
+      font-size: 0.7rem;
+      color: #aaa;
+      white-space: nowrap;
+    }
+
+    .history-copy {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.78rem;
+      color: #4a90d9;
+      font-family: inherit;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+    }
+
+    .history-copy:hover {
+      background: rgba(74, 144, 217, 0.1);
+    }
+
+    .history-empty {
+      text-align: center;
+      color: #aaa;
+      font-size: 0.82rem;
+      padding: 1rem 0;
+    }
+
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ===== Panel visibility ===== */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .input-fields { display: none; }
+    .input-fields.active { display: block; }
+
+    /* ===== Dark Mode ===== */
+    body.tt-dark .mode-tabs { background: #2a2a4a; }
+    body.tt-dark .mode-tab { color: #999; }
+    body.tt-dark .mode-tab.active { background: #353560; color: #e0e0e0; box-shadow: none; }
+
+    body.tt-dark .card { background: #20203a; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+    body.tt-dark .card-title { color: #aaa; }
+
+    body.tt-dark .type-tab { background: #252545; color: #ccc; border-color: #3a3a5a; }
+    body.tt-dark .type-tab:hover { border-color: #6ab0f3; color: #6ab0f3; }
+    body.tt-dark .type-tab.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+
+    body.tt-dark .input-group input,
+    body.tt-dark .input-group textarea,
+    body.tt-dark .input-group select { background: #252545; color: #e0e0e0; border-color: #3a3a5a; }
+
+    body.tt-dark .customize-item input[type="color"] { background: #252545; border-color: #3a3a5a; }
+    body.tt-dark .customize-item select { background: #252545; color: #e0e0e0; border-color: #3a3a5a; }
+    body.tt-dark .customize-item label { color: #888; }
+    body.tt-dark .size-value { color: #888; }
+
+    body.tt-dark .logo-upload-btn { border-color: #555; color: #aaa; }
+    body.tt-dark .logo-upload-btn:hover { border-color: #6ab0f3; color: #6ab0f3; }
+    body.tt-dark .logo-clear { color: #e74c3c; }
+
+    body.tt-dark .qr-placeholder { color: #666; }
+
+    body.tt-dark .btn { background: #252545; color: #ccc; border-color: #3a3a5a; }
+    body.tt-dark .btn:hover { border-color: #6ab0f3; color: #6ab0f3; }
+    body.tt-dark .btn-primary { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+    body.tt-dark .btn-primary:hover { background: #3a7bc8; }
+    body.tt-dark .btn-danger { color: #e74c3c; border-color: #5a3030; }
+    body.tt-dark .btn-danger:hover { background: #2a1a1a; border-color: #e74c3c; }
+
+    body.tt-dark .upload-zone { border-color: #3a3a5a; color: #888; }
+    body.tt-dark .upload-zone:hover,
+    body.tt-dark .upload-zone.dragover { border-color: #6ab0f3; background: rgba(106, 176, 243, 0.05); }
+
+    body.tt-dark .read-result { background: #1a2a3a; border-color: #2a3a5a; }
+    body.tt-dark .read-result-text { color: #e0e0e0; }
+
+    body.tt-dark .history-item { border-bottom-color: #2a2a4a; }
+    body.tt-dark .history-text { color: #ccc; }
+    body.tt-dark .history-time { color: #666; }
+    body.tt-dark .history-copy { color: #6ab0f3; }
+    body.tt-dark .history-copy:hover { background: rgba(106, 176, 243, 0.1); }
+    body.tt-dark .history-empty { color: #666; }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 480px) {
+      .container { padding: 0.75rem; }
+      .card { padding: 1rem; }
+      .customize-row { gap: 0.5rem; }
+      .customize-item input[type="range"] { width: 80px; }
+      .actions { gap: 0.4rem; }
+      .btn { padding: 0.45rem 0.75rem; font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Mode Tabs -->
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="generate">生成</button>
+      <button class="mode-tab" data-mode="read">読み取り</button>
+    </div>
+
+    <!-- ===== Generate Panel ===== -->
+    <div class="panel active" id="panel-generate">
+      <!-- Input Type -->
+      <div class="card">
+        <div class="type-tabs">
+          <button class="type-tab active" data-type="text">テキスト</button>
+          <button class="type-tab" data-type="url">URL</button>
+          <button class="type-tab" data-type="wifi">WiFi</button>
+          <button class="type-tab" data-type="email">メール</button>
+          <button class="type-tab" data-type="tel">電話</button>
+        </div>
+
+        <!-- Text -->
+        <div class="input-fields active" id="fields-text">
+          <div class="input-group">
+            <label for="input-text">テキスト</label>
+            <textarea id="input-text" placeholder="QRコードにしたいテキストを入力"></textarea>
+          </div>
+        </div>
+
+        <!-- URL -->
+        <div class="input-fields" id="fields-url">
+          <div class="input-group">
+            <label for="input-url">URL</label>
+            <input type="url" id="input-url" placeholder="https://example.com">
+          </div>
+        </div>
+
+        <!-- WiFi -->
+        <div class="input-fields" id="fields-wifi">
+          <div class="input-group">
+            <label for="input-ssid">SSID（ネットワーク名）</label>
+            <input type="text" id="input-ssid" placeholder="MyWiFi">
+          </div>
+          <div class="input-group">
+            <label for="input-wifi-pass">パスワード</label>
+            <input type="text" id="input-wifi-pass" placeholder="パスワード">
+          </div>
+          <div class="input-group">
+            <label for="input-wifi-enc">暗号化方式</label>
+            <select id="input-wifi-enc">
+              <option value="WPA">WPA/WPA2</option>
+              <option value="WEP">WEP</option>
+              <option value="nopass">なし（オープン）</option>
+            </select>
+          </div>
+          <div class="input-group" style="margin-top:0.25rem;">
+            <label>
+              <input type="checkbox" id="input-wifi-hidden"> ステルスSSID
+            </label>
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div class="input-fields" id="fields-email">
+          <div class="input-group">
+            <label for="input-email">メールアドレス</label>
+            <input type="email" id="input-email" placeholder="user@example.com">
+          </div>
+          <div class="input-group">
+            <label for="input-email-subject">件名（任意）</label>
+            <input type="text" id="input-email-subject" placeholder="件名">
+          </div>
+          <div class="input-group">
+            <label for="input-email-body">本文（任意）</label>
+            <textarea id="input-email-body" placeholder="本文" rows="3"></textarea>
+          </div>
+        </div>
+
+        <!-- Tel -->
+        <div class="input-fields" id="fields-tel">
+          <div class="input-group">
+            <label for="input-tel">電話番号</label>
+            <input type="tel" id="input-tel" placeholder="090-1234-5678">
+          </div>
+        </div>
+      </div>
+
+      <!-- Customize -->
+      <div class="card">
+        <div class="card-title">カスタマイズ</div>
+        <div class="customize-row">
+          <div class="customize-item">
+            <label>前景色</label>
+            <input type="color" id="qr-fg" value="#000000">
+          </div>
+          <div class="customize-item">
+            <label>背景色</label>
+            <input type="color" id="qr-bg" value="#ffffff">
+          </div>
+          <div class="customize-item">
+            <label>サイズ</label>
+            <div style="display:flex;align-items:center;gap:0.3rem;">
+              <input type="range" id="qr-size" min="128" max="512" value="256" step="8">
+              <span class="size-value" id="qr-size-label">256px</span>
+            </div>
+          </div>
+          <div class="customize-item">
+            <label>誤り訂正</label>
+            <select id="qr-ecl">
+              <option value="L">L (7%)</option>
+              <option value="M" selected>M (15%)</option>
+              <option value="Q">Q (25%)</option>
+              <option value="H">H (30%)</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:0.6rem;">
+          <div class="customize-item">
+            <label>ロゴ画像</label>
+            <div class="logo-upload">
+              <button class="logo-upload-btn" id="logo-btn">画像を選択</button>
+              <input type="file" id="logo-input" accept="image/*">
+              <img class="logo-preview" id="logo-preview" alt="ロゴ">
+              <button class="logo-clear" id="logo-clear">削除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QR Output -->
+      <div class="card">
+        <div class="qr-output" id="qr-output">
+          <div class="qr-placeholder" id="qr-placeholder">テキストを入力するとQRコードが表示されます</div>
+          <canvas id="qr-canvas" style="display:none;"></canvas>
+        </div>
+        <div class="actions" id="qr-actions" style="display:none;">
+          <button class="btn" id="btn-download">ダウンロード</button>
+          <button class="btn" id="btn-copy">コピー</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Read Panel ===== -->
+    <div class="panel" id="panel-read">
+      <!-- Camera -->
+      <div class="card" id="camera-card">
+        <div class="card-title">カメラでスキャン</div>
+        <div class="scanner-container" id="scanner-container" style="display:none;">
+          <video id="scanner-video" playsinline></video>
+          <canvas id="scanner-canvas"></canvas>
+          <div class="scan-frame">
+            <div class="scan-line"></div>
+          </div>
+        </div>
+        <div class="scanner-controls">
+          <button class="btn btn-primary" id="btn-camera-start">カメラを起動</button>
+          <button class="btn" id="btn-camera-stop" style="display:none;">停止</button>
+        </div>
+      </div>
+
+      <!-- Upload -->
+      <div class="card">
+        <div class="card-title">画像から読み取り</div>
+        <div class="upload-zone" id="upload-zone">
+          <div>QRコード画像をドラッグ&ドロップ<br>またはクリックして選択</div>
+          <input type="file" id="upload-input" accept="image/*">
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div class="read-result" id="read-result">
+        <div class="read-result-label">読み取り結果</div>
+        <div class="read-result-text" id="read-result-text"></div>
+        <div class="actions">
+          <button class="btn" id="btn-result-copy">コピー</button>
+          <a class="btn btn-primary" id="btn-result-open" href="#" target="_blank" rel="noopener noreferrer" style="display:none;text-decoration:none;">開く</a>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="card">
+        <div class="history-header">
+          <div class="card-title" style="margin-bottom:0;">読み取り履歴</div>
+          <button class="btn btn-danger" id="btn-history-clear" style="padding:0.25rem 0.5rem;font-size:0.72rem;">クリア</button>
+        </div>
+        <ul class="history-list" id="history-list"></ul>
+        <div class="history-empty" id="history-empty">履歴はありません</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    'use strict';
+
+    /* ===== Utilities ===== */
+    var debounceTimer;
+    function debounce(fn, delay) {
+      return function() {
+        var args = arguments;
+        var ctx = this;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() { fn.apply(ctx, args); }, delay);
+      };
+    }
+
+    function showToast(msg) {
+      if (window.__TT_showToast) window.__TT_showToast(msg);
+    }
+
+    /* ===== Mode Tabs ===== */
+    var modeTabs = document.querySelectorAll('.mode-tab');
+    var panels = document.querySelectorAll('.panel');
+
+    modeTabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var mode = tab.getAttribute('data-mode');
+        modeTabs.forEach(function(t) { t.classList.toggle('active', t === tab); });
+        panels.forEach(function(p) {
+          p.classList.toggle('active', p.id === 'panel-' + mode);
+        });
+        if (mode === 'read') {
+          renderHistory();
+        }
+        if (mode === 'generate') {
+          stopCamera();
+        }
+      });
+    });
+
+    /* ===== Input Type Tabs ===== */
+    var typeTabs = document.querySelectorAll('.type-tab');
+    var inputFields = document.querySelectorAll('.input-fields');
+    var activeType = 'text';
+
+    typeTabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        activeType = tab.getAttribute('data-type');
+        typeTabs.forEach(function(t) { t.classList.toggle('active', t === tab); });
+        inputFields.forEach(function(f) {
+          f.classList.toggle('active', f.id === 'fields-' + activeType);
+        });
+        updateQR();
+      });
+    });
+
+    /* ===== QR Data Builder ===== */
+    function getQRData() {
+      switch (activeType) {
+        case 'text':
+          return document.getElementById('input-text').value;
+        case 'url':
+          return document.getElementById('input-url').value;
+        case 'wifi': {
+          var ssid = document.getElementById('input-ssid').value;
+          if (!ssid) return '';
+          var pass = document.getElementById('input-wifi-pass').value;
+          var enc = document.getElementById('input-wifi-enc').value;
+          var hidden = document.getElementById('input-wifi-hidden').checked;
+          // Escape special characters in SSID and password
+          var escapedSsid = ssid.replace(/([\\;,:"])/g, '\\$1');
+          var escapedPass = pass.replace(/([\\;,:"])/g, '\\$1');
+          var str = 'WIFI:T:' + enc + ';S:' + escapedSsid + ';P:' + escapedPass + ';';
+          if (hidden) str += 'H:true;';
+          str += ';';
+          return str;
+        }
+        case 'email': {
+          var addr = document.getElementById('input-email').value;
+          if (!addr) return '';
+          var subj = document.getElementById('input-email-subject').value;
+          var body = document.getElementById('input-email-body').value;
+          var mailto = 'mailto:' + addr;
+          var params = [];
+          if (subj) params.push('subject=' + encodeURIComponent(subj));
+          if (body) params.push('body=' + encodeURIComponent(body));
+          if (params.length) mailto += '?' + params.join('&');
+          return mailto;
+        }
+        case 'tel': {
+          var tel = document.getElementById('input-tel').value;
+          if (!tel) return '';
+          return 'tel:' + tel.replace(/[-\s()]/g, '');
+        }
+        default:
+          return '';
+      }
+    }
+
+    /* ===== QR Generation ===== */
+    var qrCanvas = document.getElementById('qr-canvas');
+    var qrPlaceholder = document.getElementById('qr-placeholder');
+    var qrActions = document.getElementById('qr-actions');
+    var fgInput = document.getElementById('qr-fg');
+    var bgInput = document.getElementById('qr-bg');
+    var sizeInput = document.getElementById('qr-size');
+    var sizeLabel = document.getElementById('qr-size-label');
+    var eclSelect = document.getElementById('qr-ecl');
+    var logoImg = null;
+
+    function updateQR() {
+      var data = getQRData();
+      if (!data) {
+        qrCanvas.style.display = 'none';
+        qrPlaceholder.textContent = 'テキストを入力するとQRコードが表示されます';
+        qrPlaceholder.style.display = 'block';
+        qrActions.style.display = 'none';
+        return;
+      }
+
+      var ecl = eclSelect.value;
+      // Force H when logo is set
+      if (logoImg) ecl = 'H';
+
+      try {
+        var qr = qrcode(0, ecl);
+        qr.addData(data);
+        qr.make();
+      } catch (e) {
+        qrPlaceholder.textContent = 'データが大きすぎます。短くしてください。';
+        qrCanvas.style.display = 'none';
+        qrPlaceholder.style.display = 'block';
+        qrActions.style.display = 'none';
+        return;
+      }
+
+      var size = parseInt(sizeInput.value);
+      var moduleCount = qr.getModuleCount();
+      var cellSize = size / moduleCount;
+
+      qrCanvas.width = size;
+      qrCanvas.height = size;
+      var ctx = qrCanvas.getContext('2d');
+
+      var fg = fgInput.value;
+      var bg = bgInput.value;
+
+      // Draw background
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, size, size);
+
+      // Draw modules
+      ctx.fillStyle = fg;
+      for (var row = 0; row < moduleCount; row++) {
+        for (var col = 0; col < moduleCount; col++) {
+          if (qr.isDark(row, col)) {
+            ctx.fillRect(
+              Math.round(col * cellSize),
+              Math.round(row * cellSize),
+              Math.ceil(cellSize),
+              Math.ceil(cellSize)
+            );
+          }
+        }
+      }
+
+      // Draw logo overlay
+      if (logoImg) {
+        var logoSize = size * 0.2;
+        var logoX = (size - logoSize) / 2;
+        var logoY = (size - logoSize) / 2;
+        var padding = 4;
+        ctx.fillStyle = bg;
+        ctx.fillRect(logoX - padding, logoY - padding, logoSize + padding * 2, logoSize + padding * 2);
+        ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+      }
+
+      qrCanvas.style.display = 'inline-block';
+      qrPlaceholder.style.display = 'none';
+      qrActions.style.display = 'flex';
+    }
+
+    var debouncedUpdateQR = debounce(updateQR, 200);
+
+    /* Listen to all inputs */
+    var allInputs = document.querySelectorAll('#panel-generate input:not([type="color"]):not([type="range"]):not([type="file"]):not([type="checkbox"]), #panel-generate textarea');
+    allInputs.forEach(function(el) {
+      el.addEventListener('input', debouncedUpdateQR);
+    });
+    document.getElementById('input-wifi-hidden').addEventListener('change', debouncedUpdateQR);
+    document.getElementById('input-wifi-enc').addEventListener('change', debouncedUpdateQR);
+
+    fgInput.addEventListener('input', updateQR);
+    bgInput.addEventListener('input', updateQR);
+    sizeInput.addEventListener('input', function() {
+      sizeLabel.textContent = sizeInput.value + 'px';
+      updateQR();
+    });
+    eclSelect.addEventListener('change', updateQR);
+
+    /* ===== Logo ===== */
+    var logoInput = document.getElementById('logo-input');
+    var logoBtn = document.getElementById('logo-btn');
+    var logoPreview = document.getElementById('logo-preview');
+    var logoClear = document.getElementById('logo-clear');
+
+    logoBtn.addEventListener('click', function() { logoInput.click(); });
+
+    logoInput.addEventListener('change', function() {
+      if (!logoInput.files || !logoInput.files[0]) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          logoImg = img;
+          logoPreview.src = e.target.result;
+          logoPreview.style.display = 'inline-block';
+          logoClear.style.display = 'inline';
+          updateQR();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(logoInput.files[0]);
+    });
+
+    logoClear.addEventListener('click', function() {
+      logoImg = null;
+      logoInput.value = '';
+      logoPreview.style.display = 'none';
+      logoClear.style.display = 'none';
+      updateQR();
+    });
+
+    /* ===== Download & Copy ===== */
+    document.getElementById('btn-download').addEventListener('click', function() {
+      var link = document.createElement('a');
+      link.download = 'qrcode.png';
+      link.href = qrCanvas.toDataURL('image/png');
+      link.click();
+    });
+
+    document.getElementById('btn-copy').addEventListener('click', function() {
+      qrCanvas.toBlob(function(blob) {
+        if (!blob) {
+          showToast('コピーに失敗しました');
+          return;
+        }
+        navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]).then(function() {
+          showToast('クリップボードにコピーしました');
+        }).catch(function() {
+          showToast('コピーに失敗しました');
+        });
+      }, 'image/png');
+    });
+
+    /* ===== Camera Scanner ===== */
+    var video = document.getElementById('scanner-video');
+    var scannerCanvas = document.getElementById('scanner-canvas');
+    var scannerCtx = scannerCanvas.getContext('2d', { willReadFrequently: true });
+    var scannerContainer = document.getElementById('scanner-container');
+    var cameraCard = document.getElementById('camera-card');
+    var btnCameraStart = document.getElementById('btn-camera-start');
+    var btnCameraStop = document.getElementById('btn-camera-stop');
+    var cameraStream = null;
+    var scanRAF = null;
+
+    // Check camera support
+    var hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    if (!hasCamera) {
+      cameraCard.style.display = 'none';
+    }
+
+    function startCamera() {
+      if (!hasCamera) return;
+      navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      }).then(function(stream) {
+        cameraStream = stream;
+        video.srcObject = stream;
+        video.play();
+        scannerContainer.style.display = 'block';
+        btnCameraStart.style.display = 'none';
+        btnCameraStop.style.display = 'inline-flex';
+        scanLoop();
+      }).catch(function() {
+        showToast('カメラを起動できませんでした');
+      });
+    }
+
+    function stopCamera() {
+      if (scanRAF) {
+        cancelAnimationFrame(scanRAF);
+        scanRAF = null;
+      }
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(function(t) { t.stop(); });
+        cameraStream = null;
+      }
+      video.srcObject = null;
+      scannerContainer.style.display = 'none';
+      btnCameraStart.style.display = 'inline-flex';
+      btnCameraStop.style.display = 'none';
+    }
+
+    function scanLoop() {
+      if (!cameraStream) return;
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        scannerCanvas.width = video.videoWidth;
+        scannerCanvas.height = video.videoHeight;
+        scannerCtx.drawImage(video, 0, 0, scannerCanvas.width, scannerCanvas.height);
+        var imageData = scannerCtx.getImageData(0, 0, scannerCanvas.width, scannerCanvas.height);
+        var code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'dontInvert'
+        });
+        if (code && code.data) {
+          showReadResult(code.data);
+          addHistory(code.data);
+          stopCamera();
+          return;
+        }
+      }
+      scanRAF = requestAnimationFrame(scanLoop);
+    }
+
+    btnCameraStart.addEventListener('click', startCamera);
+    btnCameraStop.addEventListener('click', stopCamera);
+
+    /* ===== Upload ===== */
+    var uploadZone = document.getElementById('upload-zone');
+    var uploadInput = document.getElementById('upload-input');
+
+    uploadZone.addEventListener('click', function() { uploadInput.click(); });
+
+    uploadZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+
+    uploadZone.addEventListener('dragleave', function() {
+      uploadZone.classList.remove('dragover');
+    });
+
+    uploadZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        processUploadedFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    uploadInput.addEventListener('change', function() {
+      if (uploadInput.files && uploadInput.files[0]) {
+        processUploadedFile(uploadInput.files[0]);
+        uploadInput.value = '';
+      }
+    });
+
+    function processUploadedFile(file) {
+      if (!file.type.startsWith('image/')) {
+        showToast('画像ファイルを選択してください');
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          var canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          var ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          var code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'attemptBoth'
+          });
+          if (code && code.data) {
+            showReadResult(code.data);
+            addHistory(code.data);
+          } else {
+            showToast('QRコードを検出できませんでした');
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /* ===== Read Result ===== */
+    var readResultEl = document.getElementById('read-result');
+    var readResultText = document.getElementById('read-result-text');
+    var btnResultCopy = document.getElementById('btn-result-copy');
+    var btnResultOpen = document.getElementById('btn-result-open');
+
+    function showReadResult(text) {
+      readResultText.textContent = text;
+      readResultEl.style.display = 'block';
+
+      // Check if URL
+      var isUrl = /^https?:\/\//i.test(text);
+      if (isUrl) {
+        btnResultOpen.href = text;
+        btnResultOpen.style.display = 'inline-flex';
+      } else {
+        btnResultOpen.style.display = 'none';
+      }
+    }
+
+    btnResultCopy.addEventListener('click', function() {
+      var text = readResultText.textContent;
+      navigator.clipboard.writeText(text).then(function() {
+        showToast('コピーしました');
+      }).catch(function() {
+        showToast('コピーに失敗しました');
+      });
+    });
+
+    /* ===== History ===== */
+    var HISTORY_KEY = 'tt-qr-history';
+    var MAX_HISTORY = 50;
+
+    function getHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveHistory(history) {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    }
+
+    function addHistory(text) {
+      var history = getHistory();
+      // Remove duplicate if exists
+      history = history.filter(function(item) { return item.text !== text; });
+      history.unshift({ text: text, time: Date.now() });
+      if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+      saveHistory(history);
+      renderHistory();
+    }
+
+    function renderHistory() {
+      var history = getHistory();
+      var list = document.getElementById('history-list');
+      var empty = document.getElementById('history-empty');
+
+      list.innerHTML = '';
+
+      if (history.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+
+      empty.style.display = 'none';
+
+      history.forEach(function(item) {
+        var li = document.createElement('li');
+        li.className = 'history-item';
+
+        var textEl = document.createElement('span');
+        textEl.className = 'history-text';
+        textEl.textContent = item.text;
+        textEl.title = item.text;
+
+        var timeEl = document.createElement('span');
+        timeEl.className = 'history-time';
+        timeEl.textContent = formatTime(item.time);
+
+        var copyBtn = document.createElement('button');
+        copyBtn.className = 'history-copy';
+        copyBtn.textContent = 'コピー';
+        copyBtn.addEventListener('click', function() {
+          navigator.clipboard.writeText(item.text).then(function() {
+            showToast('コピーしました');
+          }).catch(function() {
+            showToast('コピーに失敗しました');
+          });
+        });
+
+        li.appendChild(textEl);
+        li.appendChild(timeEl);
+        li.appendChild(copyBtn);
+        list.appendChild(li);
+      });
+    }
+
+    function formatTime(ts) {
+      var d = new Date(ts);
+      var now = new Date();
+      var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+
+      if (d.toDateString() === now.toDateString()) {
+        return pad(d.getHours()) + ':' + pad(d.getMinutes());
+      }
+      return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+
+    document.getElementById('btn-history-clear').addEventListener('click', function() {
+      localStorage.removeItem(HISTORY_KEY);
+      renderHistory();
+      showToast('履歴をクリアしました');
+    });
+
+    /* Initial render */
+    renderHistory();
+  })();
+  </script>
+</body>
+</html>

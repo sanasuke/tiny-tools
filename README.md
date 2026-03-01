@@ -21,6 +21,7 @@
 | [009](https://tiny-tools-cjj.pages.dev/day009_packing-list/) | 持ち物チェックリストビルダー | シーン別テンプレートで旅行・出張の持ち物リストを作成・共有 |
 | [010](https://tiny-tools-cjj.pages.dev/day010_split-bill/) | 割り勘計算機 | 飲み会・旅行の割り勘を簡単計算。傾斜割り・飲み放題割り対応 |
 | [011](https://tiny-tools-cjj.pages.dev/day011_station-access/) | 駅アクセスチェッカー | 乗換回数・所要時間で到達可能な駅を検索。複数出発地の共通駅も探せる |
+| [012](https://tiny-tools-cjj.pages.dev/day012_qr-tool/) | QRコードツール | QRコードの生成・読み取り。テキスト・URL・WiFi・メール・電話に対応 |
 
 ## 使い方
 
@@ -63,6 +64,8 @@ tiny-tools/
 ├── day011_station-access/
 │   ├── index.html                    # 駅アクセスチェッカー
 │   └── data.js                       # 鉄道データ
+├── day012_qr-tool/
+│   └── index.html                    # QRコードツール
 ├── shared/
 │   └── header.js                     # 共通ヘッダー
 ├── .gitignore
