@@ -810,7 +810,7 @@
           if (!addr) return '';
           var subj = document.getElementById('input-email-subject').value;
           var body = document.getElementById('input-email-body').value;
-          var mailto = 'mailto:' + encodeURIComponent(addr);
+          var mailto = 'mailto:' + addr;
           var params = [];
           if (subj) params.push('subject=' + encodeURIComponent(subj));
           if (body) params.push('body=' + encodeURIComponent(body));
@@ -838,12 +838,11 @@
     var eclSelect = document.getElementById('qr-ecl');
     var logoImg = null;
 
-    var ECL_MAP = { L: 1, M: 0, Q: 3, H: 2 };
-
     function updateQR() {
       var data = getQRData();
       if (!data) {
         qrCanvas.style.display = 'none';
+        qrPlaceholder.textContent = 'テキストを入力するとQRコードが表示されます';
         qrPlaceholder.style.display = 'block';
         qrActions.style.display = 'none';
         return;
@@ -853,11 +852,8 @@
       // Force H when logo is set
       if (logoImg) ecl = 'H';
 
-      var typeNumber = 0; // auto
       try {
-        var qr = qrcode(typeNumber, ECL_MAP[ecl] !== undefined ? ['M', 'L', 'invalid', 'Q', 'H'][ECL_MAP[ecl]] : 'M');
-        // qrcode-generator uses different ECL mapping
-        qr = qrcode(typeNumber, ecl);
+        var qr = qrcode(0, ecl);
         qr.addData(data);
         qr.make();
       } catch (e) {
