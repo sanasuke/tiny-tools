@@ -15,3 +15,7 @@ node_modules/
 
 # Claude Code
 .claude/
+
+# Local data (not tracked)
+_local/
+tmp_data/
