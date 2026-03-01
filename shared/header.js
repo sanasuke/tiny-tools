@@ -26,7 +26,8 @@
     { day: 9, name: '持ち物チェックリストビルダー', desc: 'シーン別テンプレートで旅行・出張の持ち物リストを作成・共有', path: 'day009_packing-list', genres: ['utility'] },
     { day: 10, name: '割り勘計算機', desc: '飲み会・旅行の割り勘を簡単計算。傾斜割り・飲み放題割り対応', path: 'day010_split-bill', genres: ['utility'] },
     { day: 11, name: '駅アクセスチェッカー', desc: '乗換回数・所要時間で到達可能な駅を検索。複数出発地の共通駅も探せる', path: 'day011_station-access', genres: ['utility'] },
-    { day: 12, name: 'QRコードツール', desc: 'QRコードの生成・読み取り。テキスト・URL・WiFi・メール・電話に対応', path: 'day012_qr-tool', genres: ['utility'] }
+    { day: 12, name: 'QRコードツール', desc: 'QRコードの生成・読み取り。テキスト・URL・WiFi・メール・電話に対応', path: 'day012_qr-tool', genres: ['utility'] },
+    { day: 13, name: 'ルーレット', desc: 'ルーレット・抽選ツール。項目を自由に設定して回そう。重み付き・除外モード対応', path: 'day013_roulette', genres: ['utility'] }
   ];
 
   /* ---------- genres ---------- */
