@@ -279,6 +279,109 @@
       pointer-events: none; z-index: 2999;
     }
 
+    /* ===== Disabled State ===== */
+    button:disabled, input:disabled, select:disabled {
+      opacity: 0.5; cursor: not-allowed;
+    }
+
+    /* ===== Info Icon ===== */
+    .info-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #ccc; color: #666;
+      font-size: 0.7rem; font-weight: 700; font-style: italic;
+      cursor: help; position: relative;
+      transition: background 0.2s, color 0.2s;
+      flex-shrink: 0;
+    }
+    .info-icon:hover { background: #4a90d9; color: #fff; }
+    .info-icon::after {
+      content: attr(data-tooltip);
+      position: absolute; bottom: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%);
+      background: #333; color: #fff;
+      padding: 0.5rem 0.75rem; border-radius: 8px;
+      font-size: 0.8rem; font-style: normal; font-weight: 400;
+      white-space: normal; width: 220px; text-align: left;
+      pointer-events: none; opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 100;
+    }
+    .info-icon:hover::after { opacity: 1; }
+
+    /* ===== Bulk Add Button ===== */
+    .btn-bulk {
+      width: 100%; margin-bottom: 0.5rem;
+    }
+
+    /* ===== Preset Modal ===== */
+    .preset-modal-content {
+      max-width: 380px; text-align: left;
+    }
+    .preset-checkbox-list {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.4rem; margin: 0.75rem 0;
+    }
+    .preset-checkbox-list label {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.9rem; cursor: pointer; user-select: none;
+    }
+    .preset-checkbox-list input[type="checkbox"] {
+      width: 16px; height: 16px; cursor: pointer;
+      accent-color: #e74c3c;
+    }
+    .preset-number-inputs {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin: 0.75rem 0;
+    }
+    .preset-number-inputs label {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.9rem;
+    }
+    .preset-number-inputs input[type="number"] {
+      width: 80px; padding: 0.35rem 0.5rem;
+      border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: 0.9rem; text-align: center;
+      font-family: inherit; color: inherit;
+    }
+    .preset-number-inputs input[type="number"]:focus {
+      border-color: #4a90d9; outline: none;
+    }
+    .preset-modal-actions {
+      display: flex; justify-content: flex-end; gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    /* ===== Bulk Modal ===== */
+    .bulk-modal-content {
+      max-width: 400px; text-align: left;
+    }
+    .bulk-modal-content .input-group {
+      margin-bottom: 0.75rem;
+    }
+    .bulk-modal-content .input-group label {
+      display: block; font-size: 0.85rem; font-weight: 600;
+      margin-bottom: 0.3rem; color: #666;
+    }
+    .bulk-modal-content select {
+      width: 100%; padding: 0.4rem 0.6rem;
+      border: 1px solid #d0d0d0; border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit;
+      color: inherit; background: #fff; cursor: pointer;
+    }
+    .bulk-modal-content select:focus { border-color: #4a90d9; outline: none; }
+    #bulkText {
+      width: 100%; padding: 0.5rem 0.6rem;
+      border: 1px solid #d0d0d0; border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit;
+      color: inherit; background: #fff;
+      resize: vertical;
+    }
+    #bulkText:focus { border-color: #4a90d9; outline: none; }
+    .bulk-keep-label {
+      margin-top: 0.5rem;
+    }
+
     /* ===== Responsive ===== */
     @media (max-width: 480px) {
       .container { padding: 0.75rem; }
@@ -338,6 +441,33 @@
     body.tt-dark .pointer-indicator { border-top-color: #ff6b6b; }
     body.tt-dark .controls-label { color: #999; }
     body.tt-dark .item-count { color: #666; }
+
+    /* Dark: Info Icon */
+    body.tt-dark .info-icon { background: #3a3a5a; color: #aaa; }
+    body.tt-dark .info-icon:hover { background: #6ab0f3; color: #fff; }
+    body.tt-dark .info-icon::after {
+      background: #e0e0e0; color: #1a1a2e;
+    }
+
+    /* Dark: Preset Modal */
+    body.tt-dark .preset-checkbox-list label { color: #e0e0e0; }
+    body.tt-dark .preset-number-inputs input[type="number"] {
+      background: #252545; border-color: #3a3a5a; color: #e0e0e0;
+    }
+    body.tt-dark .preset-number-inputs input[type="number"]:focus {
+      border-color: #6ab0f3;
+    }
+
+    /* Dark: Bulk Modal */
+    body.tt-dark .bulk-modal-content .input-group label { color: #999; }
+    body.tt-dark .bulk-modal-content select {
+      background: #252545; border-color: #3a3a5a; color: #e0e0e0;
+    }
+    body.tt-dark .bulk-modal-content select:focus { border-color: #6ab0f3; }
+    body.tt-dark #bulkText {
+      background: #252545; border-color: #3a3a5a; color: #e0e0e0;
+    }
+    body.tt-dark #bulkText:focus { border-color: #6ab0f3; }
   </style>
 </head>
 <body>
@@ -368,6 +498,7 @@
           <input type="checkbox" id="chkElimination">
           <span>除外モード</span>
         </label>
+        <span class="info-icon" data-tooltip="一度当選した項目を次回以降の抽選から自動的に除外します。全項目が選ばれると自動でリセットされます。">i</span>
       </div>
     </div>
 
@@ -379,6 +510,7 @@
         <input type="text" id="inputNewItem" placeholder="新しい項目名..." maxlength="30">
         <button id="btnAddItem" class="btn btn-add">追加</button>
       </div>
+      <button id="btnBulkAdd" class="btn btn-bulk">一括登録</button>
       <div class="item-count" id="itemCount"></div>
     </div>
 
@@ -405,6 +537,41 @@
       <div class="modal-label">当選！</div>
       <div class="modal-result" id="modalResult"></div>
       <button id="btnModalClose" class="btn-modal-close">閉じる</button>
+    </div>
+  </div>
+
+  <!-- Preset Modal -->
+  <div id="presetModal" class="modal-overlay hidden">
+    <div class="modal-content preset-modal-content">
+      <div class="modal-label" id="presetModalTitle"></div>
+      <div id="presetModalBody"></div>
+      <div class="preset-modal-actions">
+        <button id="btnPresetCancel" class="btn">キャンセル</button>
+        <button id="btnPresetApply" class="btn-modal-close">適用</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Add Modal -->
+  <div id="bulkModal" class="modal-overlay hidden">
+    <div class="modal-content bulk-modal-content">
+      <div class="modal-label">一括登録</div>
+      <div class="input-group">
+        <label>区切り方式</label>
+        <select id="bulkDelimiter">
+          <option value="newline">改行区切り</option>
+          <option value="comma">カンマ区切り</option>
+        </select>
+      </div>
+      <textarea id="bulkText" rows="8" placeholder="項目名を入力..."></textarea>
+      <label class="toggle-label bulk-keep-label">
+        <input type="checkbox" id="chkBulkKeep">
+        <span>現在の選択肢を残す</span>
+      </label>
+      <div class="preset-modal-actions">
+        <button id="btnBulkCancel" class="btn">キャンセル</button>
+        <button id="btnBulkApply" class="btn-modal-close">確定</button>
+      </div>
     </div>
   </div>
 
@@ -483,6 +650,18 @@
     var $btnClearHistory = document.getElementById('btnClearHistory');
     var $btnShare = document.getElementById('btnShare');
     var $toast = document.getElementById('toast');
+    var $btnBulkAdd = document.getElementById('btnBulkAdd');
+    var $presetModal = document.getElementById('presetModal');
+    var $presetModalTitle = document.getElementById('presetModalTitle');
+    var $presetModalBody = document.getElementById('presetModalBody');
+    var $btnPresetCancel = document.getElementById('btnPresetCancel');
+    var $btnPresetApply = document.getElementById('btnPresetApply');
+    var $bulkModal = document.getElementById('bulkModal');
+    var $bulkText = document.getElementById('bulkText');
+    var $bulkDelimiter = document.getElementById('bulkDelimiter');
+    var $chkBulkKeep = document.getElementById('chkBulkKeep');
+    var $btnBulkCancel = document.getElementById('btnBulkCancel');
+    var $btnBulkApply = document.getElementById('btnBulkApply');
 
     var dpr = window.devicePixelRatio || 1;
 
@@ -491,6 +670,17 @@
       $toast.textContent = msg;
       $toast.classList.add('show');
       setTimeout(function() { $toast.classList.remove('show'); }, 2000);
+    }
+
+    function setControlsDisabled(disabled) {
+      document.querySelectorAll('.preset-btn').forEach(function(b) { b.disabled = disabled; });
+      $chkElimination.disabled = disabled;
+      $inputNewItem.disabled = disabled;
+      $btnAddItem.disabled = disabled;
+      $btnShare.disabled = disabled;
+      $btnClearHistory.disabled = disabled;
+      if ($btnBulkAdd) $btnBulkAdd.disabled = disabled;
+      $itemList.querySelectorAll('input, select, button').forEach(function(el) { el.disabled = disabled; });
     }
 
     function getColor(index, total) {
@@ -772,6 +962,7 @@
       state.spinning = true;
       $btnSpin.disabled = true;
       $btnSpin.textContent = '回転中…';
+      setControlsDisabled(true);
 
       spinState.velocity = 0.3 + Math.random() * 0.3;
       spinState.friction = 0.982 + Math.random() * 0.006;
@@ -806,6 +997,7 @@
       state.spinning = false;
       $btnSpin.disabled = false;
       $btnSpin.textContent = 'スタート';
+      setControlsDisabled(false);
 
       var winnerIndex = getSegmentAtPointer(spinState.angle);
       var activeItems = getActiveItems();
@@ -970,12 +1162,128 @@
     }
 
     /* ========== Presets ========== */
-    function applyPreset(key) {
-      var preset = PRESETS[key];
-      if (!preset) return;
-      state.items = deepCloneItems(preset);
+    var currentPresetKey = '';
+
+    var PRESET_LABELS = {
+      lunch: 'ランチ',
+      weekdays: '曜日',
+      numbers: '数字'
+    };
+
+    function openPresetModal(key) {
+      currentPresetKey = key;
+      $presetModalBody.innerHTML = '';
+
+      if (key === 'numbers') {
+        $presetModalTitle.textContent = '数字の範囲を指定';
+        var wrap = document.createElement('div');
+        wrap.className = 'preset-number-inputs';
+        wrap.innerHTML =
+          '<label>最小 <input type="number" id="presetNumMin" value="1" min="0"></label>' +
+          '<label>〜</label>' +
+          '<label>最大 <input type="number" id="presetNumMax" value="10" min="0"></label>';
+        $presetModalBody.appendChild(wrap);
+      } else {
+        $presetModalTitle.textContent = PRESET_LABELS[key] + 'の項目を選択';
+        var list = document.createElement('div');
+        list.className = 'preset-checkbox-list';
+        PRESETS[key].forEach(function(item) {
+          var label = document.createElement('label');
+          label.innerHTML = '<input type="checkbox" checked value="' + item.name + '"> ' + item.name;
+          list.appendChild(label);
+        });
+        $presetModalBody.appendChild(list);
+      }
+
+      $presetModal.classList.remove('hidden');
+    }
+
+    function applyPresetFromModal() {
+      var key = currentPresetKey;
+
+      if (key === 'numbers') {
+        var minVal = parseInt(document.getElementById('presetNumMin').value, 10);
+        var maxVal = parseInt(document.getElementById('presetNumMax').value, 10);
+        if (isNaN(minVal) || isNaN(maxVal) || !Number.isInteger(minVal) || !Number.isInteger(maxVal)) {
+          showToast('整数を入力してください');
+          return;
+        }
+        if (minVal > maxVal) {
+          showToast('最小値は最大値以下にしてください');
+          return;
+        }
+        var count = maxVal - minVal + 1;
+        if (count > MAX_ITEMS) {
+          showToast('項目数が' + MAX_ITEMS + 'を超えるため設定できません');
+          return;
+        }
+        if (count < MIN_ITEMS) {
+          showToast('最低' + MIN_ITEMS + '項目は必要です');
+          return;
+        }
+        var items = [];
+        for (var i = minVal; i <= maxVal; i++) {
+          items.push({ name: String(i), weight: 1 });
+        }
+        state.items = items;
+      } else {
+        var checked = [];
+        $presetModalBody.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+          if (cb.checked) checked.push({ name: cb.value, weight: 1 });
+        });
+        if (checked.length < MIN_ITEMS) {
+          showToast('最低' + MIN_ITEMS + '項目を選択してください');
+          return;
+        }
+        state.items = checked;
+      }
+
       state.eliminatedIndices = [];
       onItemsChanged();
+      $presetModal.classList.add('hidden');
+    }
+
+    function closePresetModal() {
+      $presetModal.classList.add('hidden');
+    }
+
+    /* ========== Bulk Add ========== */
+    function openBulkModal() {
+      $bulkText.value = '';
+      $chkBulkKeep.checked = false;
+      $bulkDelimiter.value = 'newline';
+      $bulkModal.classList.remove('hidden');
+    }
+
+    function closeBulkModal() {
+      $bulkModal.classList.add('hidden');
+    }
+
+    function applyBulkAdd() {
+      var delimiter = $bulkDelimiter.value === 'comma' ? ',' : '\n';
+      var raw = $bulkText.value.split(delimiter);
+      var newItems = [];
+      raw.forEach(function(s) {
+        var trimmed = s.trim().substring(0, 30);
+        if (trimmed) newItems.push({ name: trimmed, weight: 1 });
+      });
+
+      var existing = $chkBulkKeep.checked ? state.items.slice() : [];
+      var total = existing.length + newItems.length;
+
+      if (total > MAX_ITEMS) {
+        showToast('項目数の上限（' + MAX_ITEMS + '）を超えるため登録できません');
+        return;
+      }
+      if (total < MIN_ITEMS) {
+        showToast('最低' + MIN_ITEMS + '項目は必要です');
+        return;
+      }
+
+      state.items = existing.concat(newItems);
+      state.eliminatedIndices = [];
+      onItemsChanged();
+      closeBulkModal();
     }
 
     /* ========== History ========== */
@@ -1111,7 +1419,7 @@
 
     document.querySelectorAll('.preset-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        applyPreset(this.getAttribute('data-preset'));
+        openPresetModal(this.getAttribute('data-preset'));
       });
     });
 
@@ -1135,6 +1443,21 @@
     $btnModalClose.addEventListener('click', closeResult);
     $resultModal.addEventListener('click', function(e) {
       if (e.target === $resultModal) closeResult();
+    });
+
+    // Preset modal
+    $btnPresetCancel.addEventListener('click', closePresetModal);
+    $btnPresetApply.addEventListener('click', applyPresetFromModal);
+    $presetModal.addEventListener('click', function(e) {
+      if (e.target === $presetModal) closePresetModal();
+    });
+
+    // Bulk modal
+    $btnBulkAdd.addEventListener('click', openBulkModal);
+    $btnBulkCancel.addEventListener('click', closeBulkModal);
+    $btnBulkApply.addEventListener('click', applyBulkAdd);
+    $bulkModal.addEventListener('click', function(e) {
+      if (e.target === $bulkModal) closeBulkModal();
     });
 
     window.addEventListener('resize', function() {
