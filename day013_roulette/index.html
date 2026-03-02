@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ルーレット | tiny-tools Day 13</title>
+  <meta name="description" content="ルーレット・抽選ツール。項目を自由に設定して回そう。重み付き・除外モード・履歴・共有に対応">
+  <script src="../shared/header.js"
+    data-repo="https://github.com/sanasuke/tiny-tools"
+    data-note="https://note.com/sana_suke"></script>
+  <style>
+    /* ===== Reset & Base ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f5f5; color: #333;
+      line-height: 1.6; padding-bottom: 3rem;
+    }
+
+    /* ===== Container ===== */
+    .container {
+      max-width: 640px; margin: 0 auto;
+      padding: 1rem;
+    }
+
+    /* ===== Card ===== */
+    .card {
+      background: #fff; border-radius: 12px;
+      padding: 1rem; margin-bottom: 1rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card-title {
+      font-size: 0.95rem; font-weight: 700;
+      margin-bottom: 0.75rem; color: #444;
+    }
+
+    /* ===== Wheel Area ===== */
+    .wheel-area {
+      display: flex; justify-content: center;
+      margin-bottom: 0.75rem;
+    }
+    .wheel-wrap {
+      position: relative;
+      width: 100%; max-width: 360px;
+      aspect-ratio: 1 / 1;
+    }
+    .wheel-wrap canvas {
+      width: 100%; height: 100%; display: block;
+    }
+
+    /* ===== Pointer Indicator ===== */
+    .pointer-indicator {
+      position: absolute;
+      top: -10px; left: 50%;
+      transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-top: 22px solid #e74c3c;
+      z-index: 2;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+    }
+
+    /* ===== Spin Button ===== */
+    .spin-section {
+      display: flex; justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .btn-spin {
+      width: 100%; max-width: 360px;
+      padding: 0.85rem; font-size: 1.15rem;
+      font-weight: 700; background: #e74c3c;
+      color: #fff; border: none;
+      border-radius: 12px; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      letter-spacing: 0.1em;
+    }
+    .btn-spin:hover { background: #c0392b; }
+    .btn-spin:active { transform: scale(0.97); }
+    .btn-spin:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+
+    /* ===== Controls Card ===== */
+    .controls-row {
+      display: flex; flex-wrap: wrap;
+      align-items: center; gap: 0.5rem;
+    }
+    .controls-label {
+      font-size: 0.85rem; font-weight: 600; color: #666;
+    }
+    .preset-btns {
+      display: flex; flex-wrap: wrap;
+      align-items: center; gap: 0.4rem;
+      flex: 1;
+    }
+    .preset-btn {
+      padding: 0.35rem 0.7rem; font-size: 0.8rem;
+      background: #f0f0f0; border: 1px solid #d0d0d0;
+      border-radius: 6px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .preset-btn:hover { background: #e0e0e0; }
+    .toggle-label {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.85rem; cursor: pointer;
+      white-space: nowrap; user-select: none;
+    }
+    .toggle-label input[type="checkbox"] {
+      width: 16px; height: 16px; cursor: pointer;
+      accent-color: #e74c3c;
+    }
+
+    /* ===== Item List ===== */
+    .item-list { margin-bottom: 0.75rem; }
+    .item-row {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.45rem 0;
+      border-bottom: 1px solid #eee;
+    }
+    .item-color-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%; flex-shrink: 0;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+    .item-name-input {
+      flex: 1; border: 1px solid transparent;
+      background: transparent; font-size: 0.9rem;
+      padding: 0.3rem 0.5rem; border-radius: 6px;
+      min-width: 0; color: inherit;
+      font-family: inherit;
+    }
+    .item-name-input:focus {
+      border-color: #4a90d9; background: #fff;
+      outline: none;
+    }
+    .item-eliminated .item-name-input {
+      text-decoration: line-through;
+      opacity: 0.45;
+    }
+    .item-weight-select {
+      width: 56px; padding: 0.25rem;
+      border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: 0.8rem; text-align: center;
+      background: #fff; color: inherit;
+      cursor: pointer;
+    }
+    .item-del-btn {
+      width: 28px; height: 28px;
+      border: none; background: transparent;
+      color: #999; font-size: 1.1rem;
+      cursor: pointer; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .item-del-btn:hover { background: #fee; color: #e74c3c; }
+
+    /* ===== Add Row ===== */
+    .add-row {
+      display: flex; gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .add-row input {
+      flex: 1; padding: 0.4rem 0.6rem;
+      border: 1px solid #d0d0d0; border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit;
+      color: inherit; background: #fff;
+    }
+    .add-row input:focus { border-color: #4a90d9; outline: none; }
+    .btn { padding: 0.4rem 0.8rem; border: 1px solid #d0d0d0; border-radius: 8px;
+      background: #fff; cursor: pointer; font-size: 0.85rem; transition: background 0.15s; }
+    .btn:hover { background: #f0f0f0; }
+    .btn-add { font-weight: 600; color: #4a90d9; border-color: #4a90d9; }
+    .btn-add:hover { background: #eef5ff; }
+
+    .item-count {
+      font-size: 0.8rem; color: #999; text-align: right;
+    }
+
+    /* ===== Share Section ===== */
+    .share-section {
+      display: flex; justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .btn-share {
+      padding: 0.5rem 1.2rem; border: 1px solid #4a90d9;
+      border-radius: 8px; background: #fff;
+      color: #4a90d9; font-size: 0.9rem;
+      font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-share:hover { background: #eef5ff; }
+
+    /* ===== History Section ===== */
+    .history-toggle {
+      cursor: pointer; display: flex;
+      align-items: center; gap: 0.4rem;
+      user-select: none; margin-bottom: 0;
+    }
+    .toggle-arrow {
+      font-size: 0.7rem; transition: transform 0.2s;
+    }
+    .toggle-arrow.open { transform: rotate(180deg); }
+    .history-body { overflow: hidden; }
+    .history-body.collapsed { display: none; }
+    .history-list { margin-top: 0.5rem; }
+    .history-item {
+      display: flex; justify-content: space-between;
+      align-items: center; padding: 0.35rem 0;
+      border-bottom: 1px solid #eee;
+      font-size: 0.85rem;
+    }
+    .history-name { font-weight: 600; }
+    .history-time { color: #999; font-size: 0.75rem; }
+    .history-empty {
+      text-align: center; color: #999;
+      font-size: 0.85rem; padding: 1rem 0;
+    }
+    .btn-clear {
+      margin-top: 0.5rem; padding: 0.35rem 0.8rem;
+      border: 1px solid #e74c3c; border-radius: 6px;
+      background: #fff; color: #e74c3c;
+      font-size: 0.8rem; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-clear:hover { background: #fee; }
+
+    /* ===== Toast ===== */
+    .toast {
+      position: fixed; bottom: 1.5rem; left: 50%;
+      transform: translateX(-50%);
+      background: #333; color: #fff;
+      padding: 0.6rem 1.2rem; border-radius: 8px;
+      font-size: 0.85rem; z-index: 4000;
+      opacity: 0; transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* ===== Result Modal ===== */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 3000;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-content {
+      background: #fff; border-radius: 16px;
+      padding: 2rem; text-align: center;
+      max-width: 340px; width: 90%;
+      animation: modalPop 0.3s ease;
+    }
+    .modal-label {
+      font-size: 0.9rem; color: #888;
+      margin-bottom: 0.5rem;
+    }
+    .modal-result {
+      font-size: 1.8rem; font-weight: 700;
+      color: #e74c3c; margin-bottom: 1.5rem;
+      word-break: break-all;
+    }
+    .btn-modal-close {
+      padding: 0.5rem 2rem; border: none;
+      background: #e74c3c; color: #fff;
+      border-radius: 8px; font-size: 0.95rem;
+      font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-modal-close:hover { background: #c0392b; }
+    @keyframes modalPop {
+      from { transform: scale(0.8); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    /* ===== Confetti Canvas ===== */
+    .confetti-canvas {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 2999;
+    }
+
+    /* ===== Disabled State ===== */
+    button:disabled, input:disabled, select:disabled {
+      opacity: 0.5; cursor: not-allowed;
+    }
+
+    /* ===== Info Icon ===== */
+    .info-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #ccc; color: #666;
+      font-size: 0.7rem; font-weight: 700; font-style: italic;
+      cursor: help; position: relative;
+      transition: background 0.2s, color 0.2s;
+      flex-shrink: 0;
+    }
+    .info-icon:hover { background: #4a90d9; color: #fff; }
+    .info-icon::after {
+      content: attr(data-tooltip);
+      position: absolute; bottom: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%);
+      background: #333; color: #fff;
+      padding: 0.5rem 0.75rem; border-radius: 8px;
+      font-size: 0.8rem; font-style: normal; font-weight: 400;
+      white-space: normal; width: 220px; text-align: left;
+      pointer-events: none; opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 100;
+    }
+    .info-icon:hover::after { opacity: 1; }
+
+    /* ===== Bulk Add Button ===== */
+    .btn-bulk {
+      width: 100%; margin-bottom: 0.5rem;
+    }
+
+    /* ===== Preset Modal ===== */
+    .preset-modal-content {
+      max-width: 380px; text-align: left;
+    }
+    .preset-checkbox-list {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.4rem; margin: 0.75rem 0;
+    }
+    .preset-checkbox-list label {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.9rem; cursor: pointer; user-select: none;
+    }
+    .preset-checkbox-list input[type="checkbox"] {
+      width: 16px; height: 16px; cursor: pointer;
+      accent-color: #e74c3c;
+    }
+    .preset-number-inputs {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin: 0.75rem 0;
+    }
+    .preset-number-inputs label {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.9rem;
+    }
+    .preset-number-inputs input[type="number"] {
+      width: 80px; padding: 0.35rem 0.5rem;
+      border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: 0.9rem; text-align: center;
+      font-family: inherit; color: inherit;
+    }
+    .preset-number-inputs input[type="number"]:focus {
+      border-color: #4a90d9; outline: none;
+    }
+    .preset-modal-actions {
+      display: flex; justify-content: flex-end; gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    /* ===== Bulk Modal ===== */
+    .bulk-modal-content {
+      max-width: 400px; text-align: left;
+    }
+    .bulk-modal-content .input-group {
+      margin-bottom: 0.75rem;
+    }
+    .bulk-modal-content .input-group label {
+      display: block; font-size: 0.85rem; font-weight: 600;
+      margin-bottom: 0.3rem; color: #666;
+    }
+    .bulk-modal-content select {
+      width: 100%; padding: 0.4rem 0.6rem;
+      border: 1px solid #d0d0d0; border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit;
+      color: inherit; background: #fff; cursor: pointer;
+    }
+    .bulk-modal-content select:focus { border-color: #4a90d9; outline: none; }
+    #bulkText {
+      width: 100%; padding: 0.5rem 0.6rem;
+      border: 1px solid #d0d0d0; border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit;
+      color: inherit; background: #fff;
+      resize: vertical;
+    }
+    #bulkText:focus { border-color: #4a90d9; outline: none; }
+    .bulk-keep-label {
+      margin-top: 0.5rem;
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 480px) {
+      .container { padding: 0.75rem; }
+      .wheel-wrap { max-width: 300px; }
+      .btn-spin { font-size: 1rem; padding: 0.75rem; }
+      .modal-result { font-size: 1.5rem; }
+    }
+
+    /* ===== Dark Mode ===== */
+    body.tt-dark { background: #1a1a2e; color: #e0e0e0; }
+    body.tt-dark .card {
+      background: #20203a; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+    body.tt-dark .card-title { color: #ccc; }
+    body.tt-dark .item-row { border-bottom-color: #2a2a4a; }
+    body.tt-dark .item-name-input:focus {
+      background: #252545; border-color: #6ab0f3;
+    }
+    body.tt-dark .item-weight-select {
+      background: #252545; border-color: #3a3a5a; color: #e0e0e0;
+    }
+    body.tt-dark .item-del-btn { color: #666; }
+    body.tt-dark .item-del-btn:hover { background: #3a1a1a; color: #ff6b6b; }
+    body.tt-dark .add-row input {
+      background: #252545; border-color: #3a3a5a; color: #e0e0e0;
+    }
+    body.tt-dark .add-row input:focus { border-color: #6ab0f3; }
+    body.tt-dark .btn {
+      background: #252545; border-color: #3a3a5a; color: #ccc;
+    }
+    body.tt-dark .btn:hover { background: #2a2a5a; }
+    body.tt-dark .btn-add { color: #6ab0f3; border-color: #6ab0f3; }
+    body.tt-dark .btn-add:hover { background: #1a2a4a; }
+    body.tt-dark .preset-btn {
+      background: #252545; border-color: #3a3a5a; color: #ccc;
+    }
+    body.tt-dark .preset-btn:hover { background: #2a2a5a; }
+    body.tt-dark .btn-share {
+      background: #252545; border-color: #6ab0f3; color: #6ab0f3;
+    }
+    body.tt-dark .btn-share:hover { background: #1a2a4a; }
+    body.tt-dark .btn-spin { background: #c0392b; }
+    body.tt-dark .btn-spin:hover { background: #a93226; }
+    body.tt-dark .btn-spin:disabled { background: #3a3a5a; color: #666; }
+    body.tt-dark .history-item { border-bottom-color: #2a2a4a; }
+    body.tt-dark .history-time { color: #666; }
+    body.tt-dark .btn-clear {
+      background: #252545; border-color: #ff6b6b; color: #ff6b6b;
+    }
+    body.tt-dark .btn-clear:hover { background: #3a1a1a; }
+    body.tt-dark .modal-content { background: #20203a; }
+    body.tt-dark .modal-label { color: #888; }
+    body.tt-dark .modal-result { color: #ff6b6b; }
+    body.tt-dark .btn-modal-close { background: #c0392b; }
+    body.tt-dark .btn-modal-close:hover { background: #a93226; }
+    body.tt-dark .toast { background: #2a2a4a; color: #f0f0f0; }
+    body.tt-dark .pointer-indicator { border-top-color: #ff6b6b; }
+    body.tt-dark .controls-label { color: #999; }
+    body.tt-dark .item-count { color: #666; }
+
+    /* Dark: Info Icon */
+    body.tt-dark .info-icon { background: #3a3a5a; color: #aaa; }
+    body.tt-dark .info-icon:hover { background: #6ab0f3; color: #fff; }
+    body.tt-dark .info-icon::after {
+      background: #e0e0e0; color: #1a1a2e;
+    }
+
+    /* Dark: Preset Modal */
+    body.tt-dark .preset-checkbox-list label { color: #e0e0e0; }
+    body.tt-dark .preset-number-inputs input[type="number"] {
+      background: #252545; border-color: #3a3a5a; color: #e0e0e0;
+    }
+    body.tt-dark .preset-number-inputs input[type="number"]:focus {
+      border-color: #6ab0f3;
+    }
+
+    /* Dark: Bulk Modal */
+    body.tt-dark .bulk-modal-content .input-group label { color: #999; }
+    body.tt-dark .bulk-modal-content select {
+      background: #252545; border-color: #3a3a5a; color: #e0e0e0;
+    }
+    body.tt-dark .bulk-modal-content select:focus { border-color: #6ab0f3; }
+    body.tt-dark #bulkText {
+      background: #252545; border-color: #3a3a5a; color: #e0e0e0;
+    }
+    body.tt-dark #bulkText:focus { border-color: #6ab0f3; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Wheel -->
+    <div class="wheel-area">
+      <div class="wheel-wrap">
+        <div class="pointer-indicator"></div>
+        <canvas id="wheelCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Spin Button -->
+    <div class="spin-section">
+      <button id="btnSpin" class="btn-spin">スタート</button>
+    </div>
+
+    <!-- Controls: Presets & Elimination -->
+    <div class="card controls-card">
+      <div class="controls-row">
+        <div class="preset-btns">
+          <span class="controls-label">プリセット:</span>
+          <button class="preset-btn" data-preset="lunch">ランチ</button>
+          <button class="preset-btn" data-preset="numbers">数字 1〜10</button>
+          <button class="preset-btn" data-preset="weekdays">曜日</button>
+        </div>
+        <label class="toggle-label">
+          <input type="checkbox" id="chkElimination">
+          <span>除外モード</span>
+        </label>
+        <span class="info-icon" data-tooltip="一度当選した項目を次回以降の抽選から自動的に除外します。全項目が選ばれると自動でリセットされます。">i</span>
+      </div>
+    </div>
+
+    <!-- Item List -->
+    <div class="card items-card">
+      <div class="card-title">項目リスト</div>
+      <div id="itemList" class="item-list"></div>
+      <div class="add-row">
+        <input type="text" id="inputNewItem" placeholder="新しい項目名..." maxlength="30">
+        <button id="btnAddItem" class="btn btn-add">追加</button>
+      </div>
+      <button id="btnBulkAdd" class="btn btn-bulk">一括登録</button>
+      <div class="item-count" id="itemCount"></div>
+    </div>
+
+    <!-- Share -->
+    <div class="share-section">
+      <button id="btnShare" class="btn-share">共有リンクを作成</button>
+    </div>
+
+    <!-- History -->
+    <div class="card history-card">
+      <div class="card-title history-toggle" id="historyToggle">
+        履歴 <span class="toggle-arrow" id="historyArrow">&#9660;</span>
+      </div>
+      <div id="historyBody" class="history-body collapsed">
+        <div id="historyList" class="history-list"></div>
+        <button id="btnClearHistory" class="btn-clear" style="display:none">履歴をクリア</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result Modal -->
+  <div id="resultModal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-label">当選！</div>
+      <div class="modal-result" id="modalResult"></div>
+      <button id="btnModalClose" class="btn-modal-close">閉じる</button>
+    </div>
+  </div>
+
+  <!-- Preset Modal -->
+  <div id="presetModal" class="modal-overlay hidden">
+    <div class="modal-content preset-modal-content">
+      <div class="modal-label" id="presetModalTitle"></div>
+      <div id="presetModalBody"></div>
+      <div class="preset-modal-actions">
+        <button id="btnPresetCancel" class="btn">キャンセル</button>
+        <button id="btnPresetApply" class="btn-modal-close">適用</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Add Modal -->
+  <div id="bulkModal" class="modal-overlay hidden">
+    <div class="modal-content bulk-modal-content">
+      <div class="modal-label">一括登録</div>
+      <div class="input-group">
+        <label>区切り方式</label>
+        <select id="bulkDelimiter">
+          <option value="newline">改行区切り</option>
+          <option value="comma">カンマ区切り</option>
+        </select>
+      </div>
+      <textarea id="bulkText" rows="8" placeholder="項目名を入力..."></textarea>
+      <label class="toggle-label bulk-keep-label">
+        <input type="checkbox" id="chkBulkKeep">
+        <span>現在の選択肢を残す</span>
+      </label>
+      <div class="preset-modal-actions">
+        <button id="btnBulkCancel" class="btn">キャンセル</button>
+        <button id="btnBulkApply" class="btn-modal-close">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script>
+  (function() {
+    'use strict';
+
+    /* ========== Constants & Presets ========== */
+    var MAX_ITEMS = 50;
+    var MIN_ITEMS = 2;
+    var STORAGE_KEY = 'tt-roulette-history';
+
+    var PRESETS = {
+      lunch: [
+        { name: '和食', weight: 1 },
+        { name: '洋食', weight: 1 },
+        { name: '中華', weight: 1 },
+        { name: 'イタリアン', weight: 1 },
+        { name: 'カレー', weight: 1 },
+        { name: 'ラーメン', weight: 1 },
+        { name: '寿司', weight: 1 },
+        { name: 'ハンバーガー', weight: 1 },
+        { name: 'タイ料理', weight: 1 },
+        { name: '定食', weight: 1 }
+      ],
+      numbers: Array.from({ length: 10 }, function(_, i) {
+        return { name: String(i + 1), weight: 1 };
+      }),
+      weekdays: [
+        { name: '月', weight: 1 },
+        { name: '火', weight: 1 },
+        { name: '水', weight: 1 },
+        { name: '木', weight: 1 },
+        { name: '金', weight: 1 },
+        { name: '土', weight: 1 },
+        { name: '日', weight: 1 }
+      ]
+    };
+
+    /* ========== State ========== */
+    var state = {
+      items: [
+        { name: '項目1', weight: 1 },
+        { name: '項目2', weight: 1 }
+      ],
+      eliminatedIndices: [],
+      eliminationMode: false,
+      spinning: false,
+      history: []
+    };
+
+    /* ========== DOM References ========== */
+    var $canvas = document.getElementById('wheelCanvas');
+    var $ctx = $canvas.getContext('2d');
+    var $btnSpin = document.getElementById('btnSpin');
+    var $itemList = document.getElementById('itemList');
+    var $inputNewItem = document.getElementById('inputNewItem');
+    var $btnAddItem = document.getElementById('btnAddItem');
+    var $itemCount = document.getElementById('itemCount');
+    var $chkElimination = document.getElementById('chkElimination');
+    var $resultModal = document.getElementById('resultModal');
+    var $modalResult = document.getElementById('modalResult');
+    var $btnModalClose = document.getElementById('btnModalClose');
+    var $confettiCanvas = document.getElementById('confettiCanvas');
+    var $confettiCtx = $confettiCanvas.getContext('2d');
+    var $historyToggle = document.getElementById('historyToggle');
+    var $historyArrow = document.getElementById('historyArrow');
+    var $historyBody = document.getElementById('historyBody');
+    var $historyList = document.getElementById('historyList');
+    var $btnClearHistory = document.getElementById('btnClearHistory');
+    var $btnShare = document.getElementById('btnShare');
+    var $toast = document.getElementById('toast');
+    var $btnBulkAdd = document.getElementById('btnBulkAdd');
+    var $presetModal = document.getElementById('presetModal');
+    var $presetModalTitle = document.getElementById('presetModalTitle');
+    var $presetModalBody = document.getElementById('presetModalBody');
+    var $btnPresetCancel = document.getElementById('btnPresetCancel');
+    var $btnPresetApply = document.getElementById('btnPresetApply');
+    var $bulkModal = document.getElementById('bulkModal');
+    var $bulkText = document.getElementById('bulkText');
+    var $bulkDelimiter = document.getElementById('bulkDelimiter');
+    var $chkBulkKeep = document.getElementById('chkBulkKeep');
+    var $btnBulkCancel = document.getElementById('btnBulkCancel');
+    var $btnBulkApply = document.getElementById('btnBulkApply');
+
+    var dpr = window.devicePixelRatio || 1;
+
+    /* ========== Utility ========== */
+    function showToast(msg) {
+      $toast.textContent = msg;
+      $toast.classList.add('show');
+      setTimeout(function() { $toast.classList.remove('show'); }, 2000);
+    }
+
+    function setControlsDisabled(disabled) {
+      document.querySelectorAll('.preset-btn').forEach(function(b) { b.disabled = disabled; });
+      $chkElimination.disabled = disabled;
+      $inputNewItem.disabled = disabled;
+      $btnAddItem.disabled = disabled;
+      $btnShare.disabled = disabled;
+      $btnClearHistory.disabled = disabled;
+      if ($btnBulkAdd) $btnBulkAdd.disabled = disabled;
+      $itemList.querySelectorAll('input, select, button').forEach(function(el) { el.disabled = disabled; });
+    }
+
+    function getColor(index, total) {
+      var hue = (index * 360 / total + 10) % 360;
+      return 'hsl(' + hue + ', 70%, 55%)';
+    }
+
+    function getActiveItems() {
+      if (!state.eliminationMode) return state.items;
+      return state.items.filter(function(_, i) {
+        return state.eliminatedIndices.indexOf(i) === -1;
+      });
+    }
+
+    function deepCloneItems(items) {
+      return items.map(function(it) {
+        return { name: it.name, weight: it.weight };
+      });
+    }
+
+    /* ========== Canvas Setup ========== */
+    function resizeWheelCanvas() {
+      var wrap = $canvas.parentElement;
+      var rect = wrap.getBoundingClientRect();
+      var size = Math.min(rect.width, rect.height);
+      $canvas.width = size * dpr;
+      $canvas.height = size * dpr;
+      $canvas.style.width = size + 'px';
+      $canvas.style.height = size + 'px';
+      $ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function resizeConfettiCanvas() {
+      $confettiCanvas.width = window.innerWidth * dpr;
+      $confettiCanvas.height = window.innerHeight * dpr;
+      $confettiCanvas.style.width = window.innerWidth + 'px';
+      $confettiCanvas.style.height = window.innerHeight + 'px';
+      $confettiCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    /* ========== Wheel Drawing ========== */
+    function drawWheel(rotationAngle) {
+      var size = $canvas.width / dpr;
+      var cx = size / 2;
+      var cy = size / 2;
+      var radius = cx - 4;
+
+      $ctx.clearRect(0, 0, size, size);
+
+      var activeItems = getActiveItems();
+      if (activeItems.length === 0) {
+        $ctx.fillStyle = '#ccc';
+        $ctx.beginPath();
+        $ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        $ctx.fill();
+        $ctx.fillStyle = '#888';
+        $ctx.font = '14px sans-serif';
+        $ctx.textAlign = 'center';
+        $ctx.textBaseline = 'middle';
+        $ctx.fillText('項目がありません', cx, cy);
+        return;
+      }
+
+      $ctx.save();
+      $ctx.translate(cx, cy);
+      $ctx.rotate(rotationAngle);
+
+      var totalWeight = activeItems.reduce(function(s, it) { return s + it.weight; }, 0);
+      var startAngle = 0;
+
+      activeItems.forEach(function(item, i) {
+        var sliceAngle = (item.weight / totalWeight) * Math.PI * 2;
+        var endAngle = startAngle + sliceAngle;
+
+        // Segment
+        $ctx.beginPath();
+        $ctx.moveTo(0, 0);
+        $ctx.arc(0, 0, radius, startAngle, endAngle);
+        $ctx.closePath();
+        $ctx.fillStyle = getColor(i, activeItems.length);
+        $ctx.fill();
+        $ctx.strokeStyle = '#fff';
+        $ctx.lineWidth = 2;
+        $ctx.stroke();
+
+        // Label
+        if (sliceAngle > 0.12) {
+          var midAngle = startAngle + sliceAngle / 2;
+          $ctx.save();
+          $ctx.rotate(midAngle);
+          $ctx.textAlign = 'center';
+          $ctx.textBaseline = 'middle';
+          $ctx.fillStyle = '#fff';
+          var fontSize = Math.max(9, Math.min(15, 180 / activeItems.length));
+          $ctx.font = 'bold ' + fontSize + 'px sans-serif';
+          var maxLen = Math.max(3, Math.floor(sliceAngle * radius * 0.3 / fontSize));
+          var label = item.name.length > maxLen ? item.name.substring(0, maxLen - 1) + '…' : item.name;
+          var textRadius = radius * 0.62;
+          $ctx.shadowColor = 'rgba(0,0,0,0.4)';
+          $ctx.shadowBlur = 3;
+          $ctx.fillText(label, textRadius, 0);
+          $ctx.shadowBlur = 0;
+          $ctx.restore();
+        }
+
+        startAngle = endAngle;
+      });
+
+      // Center circle
+      $ctx.beginPath();
+      $ctx.arc(0, 0, radius * 0.1, 0, Math.PI * 2);
+      $ctx.fillStyle = '#fff';
+      $ctx.fill();
+      $ctx.strokeStyle = '#ddd';
+      $ctx.lineWidth = 2;
+      $ctx.stroke();
+
+      $ctx.restore();
+    }
+
+    /* ========== Sound Effects (Web Audio API) ========== */
+    var audioCtx = null;
+    var masterGain = null;
+
+    function ensureAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = 0.4;
+      masterGain.connect(audioCtx.destination);
+    }
+
+    function playTick() {
+      if (!audioCtx) return;
+      var now = audioCtx.currentTime;
+      var osc = audioCtx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1800, now);
+      osc.frequency.exponentialRampToValueAtTime(800, now + 0.03);
+      var gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    }
+
+    function playFanfare() {
+      if (!audioCtx) return;
+      var now = audioCtx.currentTime;
+      var freqs = [523.25, 659.25, 783.99, 1046.50];
+      var noteLen = 0.12;
+
+      freqs.forEach(function(freq, i) {
+        var t = now + i * noteLen;
+        var osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+        var gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.2, t + 0.01);
+        gain.gain.setValueAtTime(0.2, t + noteLen * 0.7);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + noteLen);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(t);
+        osc.stop(t + noteLen);
+      });
+
+      // Final chord
+      var chordTime = now + freqs.length * noteLen;
+      [523.25, 659.25, 783.99].forEach(function(freq) {
+        var osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        var gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.12, chordTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, chordTime + 0.6);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(chordTime);
+        osc.stop(chordTime + 0.7);
+      });
+    }
+
+    /* ========== Confetti Animation ========== */
+    var confettiParticles = [];
+    var confettiAnimId = null;
+
+    function launchConfetti() {
+      resizeConfettiCanvas();
+      confettiParticles = [];
+      var w = window.innerWidth;
+      for (var i = 0; i < 80; i++) {
+        confettiParticles.push({
+          x: w / 2 + (Math.random() - 0.5) * w * 0.4,
+          y: -20 - Math.random() * 40,
+          vx: (Math.random() - 0.5) * 8,
+          vy: Math.random() * 3 + 2,
+          size: Math.random() * 8 + 4,
+          color: 'hsl(' + Math.floor(Math.random() * 360) + ',80%,60%)',
+          rotation: Math.random() * Math.PI * 2,
+          rotSpeed: (Math.random() - 0.5) * 0.2,
+          gravity: 0.08 + Math.random() * 0.04,
+          life: 120 + Math.floor(Math.random() * 60)
+        });
+      }
+      if (!confettiAnimId) {
+        confettiAnimId = requestAnimationFrame(animateConfetti);
+      }
+    }
+
+    function animateConfetti() {
+      var w = window.innerWidth;
+      var h = window.innerHeight;
+      $confettiCtx.clearRect(0, 0, w, h);
+
+      var alive = false;
+      confettiParticles.forEach(function(p) {
+        if (p.life <= 0) return;
+        alive = true;
+        p.life--;
+        p.vy += p.gravity;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.99;
+        p.rotation += p.rotSpeed;
+
+        $confettiCtx.save();
+        $confettiCtx.translate(p.x, p.y);
+        $confettiCtx.rotate(p.rotation);
+        $confettiCtx.fillStyle = p.color;
+        $confettiCtx.globalAlpha = Math.min(1, p.life / 20);
+        $confettiCtx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+        $confettiCtx.restore();
+      });
+
+      if (alive) {
+        confettiAnimId = requestAnimationFrame(animateConfetti);
+      } else {
+        confettiAnimId = null;
+        $confettiCtx.clearRect(0, 0, w, h);
+      }
+    }
+
+    /* ========== Spin Animation ========== */
+    var spinState = {
+      angle: 0,
+      velocity: 0,
+      friction: 0.985,
+      minVelocity: 0.001,
+      animId: null,
+      lastTickSegment: -1
+    };
+
+    function getSegmentAtPointer(rotationAngle) {
+      // Pointer is at top (-PI/2 in canvas coords)
+      var pointerAngle = (-Math.PI / 2 - rotationAngle) % (Math.PI * 2);
+      if (pointerAngle < 0) pointerAngle += Math.PI * 2;
+
+      var activeItems = getActiveItems();
+      var totalWeight = activeItems.reduce(function(s, it) { return s + it.weight; }, 0);
+      var cumAngle = 0;
+
+      for (var i = 0; i < activeItems.length; i++) {
+        var sliceAngle = (activeItems[i].weight / totalWeight) * Math.PI * 2;
+        cumAngle += sliceAngle;
+        if (pointerAngle < cumAngle) return i;
+      }
+      return activeItems.length - 1;
+    }
+
+    function startSpin() {
+      var activeItems = getActiveItems();
+      if (state.spinning || activeItems.length < 2) return;
+
+      ensureAudio();
+      state.spinning = true;
+      $btnSpin.disabled = true;
+      $btnSpin.textContent = '回転中…';
+      setControlsDisabled(true);
+
+      spinState.velocity = 0.3 + Math.random() * 0.3;
+      spinState.friction = 0.982 + Math.random() * 0.006;
+      spinState.lastTickSegment = -1;
+
+      spinState.animId = requestAnimationFrame(animateSpin);
+    }
+
+    function animateSpin() {
+      spinState.angle += spinState.velocity;
+      spinState.velocity *= spinState.friction;
+
+      var normalizedAngle = spinState.angle % (Math.PI * 2);
+      if (normalizedAngle < 0) normalizedAngle += Math.PI * 2;
+
+      var currentSegment = getSegmentAtPointer(spinState.angle);
+      if (currentSegment !== spinState.lastTickSegment) {
+        playTick();
+        spinState.lastTickSegment = currentSegment;
+      }
+
+      drawWheel(spinState.angle);
+
+      if (spinState.velocity > spinState.minVelocity) {
+        spinState.animId = requestAnimationFrame(animateSpin);
+      } else {
+        onSpinComplete();
+      }
+    }
+
+    function onSpinComplete() {
+      state.spinning = false;
+      $btnSpin.disabled = false;
+      $btnSpin.textContent = 'スタート';
+      setControlsDisabled(false);
+
+      var winnerIndex = getSegmentAtPointer(spinState.angle);
+      var activeItems = getActiveItems();
+      var winner = activeItems[winnerIndex];
+
+      addHistory(winner);
+      showResult(winner);
+      playFanfare();
+      launchConfetti();
+
+      if (state.eliminationMode) {
+        var origIndex = state.items.indexOf(winner);
+        if (origIndex !== -1) {
+          state.eliminatedIndices.push(origIndex);
+        }
+        var remaining = getActiveItems();
+        if (remaining.length < 2) {
+          setTimeout(function() {
+            showToast('全項目が選ばれました。除外をリセットします');
+            state.eliminatedIndices = [];
+            renderItemList();
+            drawWheel(spinState.angle);
+          }, 1500);
+        } else {
+          renderItemList();
+          drawWheel(spinState.angle);
+        }
+      }
+    }
+
+    /* ========== Result Modal ========== */
+    function showResult(item) {
+      $modalResult.textContent = item.name;
+      $resultModal.classList.remove('hidden');
+    }
+
+    function closeResult() {
+      $resultModal.classList.add('hidden');
+    }
+
+    /* ========== Item Management ========== */
+    function addItem(name, weight) {
+      if (state.items.length >= MAX_ITEMS) {
+        showToast('項目数の上限（' + MAX_ITEMS + '）に達しています');
+        return;
+      }
+      name = (name || '').trim();
+      if (!name) return;
+      state.items.push({ name: name, weight: weight || 1 });
+      state.eliminatedIndices = [];
+      onItemsChanged();
+    }
+
+    function removeItem(index) {
+      if (state.items.length <= MIN_ITEMS) {
+        showToast('最低' + MIN_ITEMS + '項目は必要です');
+        return;
+      }
+      state.items.splice(index, 1);
+      // Fix eliminated indices
+      state.eliminatedIndices = state.eliminatedIndices
+        .filter(function(i) { return i !== index; })
+        .map(function(i) { return i > index ? i - 1 : i; });
+      onItemsChanged();
+    }
+
+    function updateItemName(index, name) {
+      state.items[index].name = name.substring(0, 30);
+      drawWheel(spinState.angle);
+    }
+
+    function updateItemWeight(index, weight) {
+      state.items[index].weight = Math.max(1, Math.min(10, parseInt(weight, 10) || 1));
+      drawWheel(spinState.angle);
+    }
+
+    function onItemsChanged() {
+      renderItemList();
+      resizeWheelCanvas();
+      drawWheel(spinState.angle);
+      updateSpinButton();
+    }
+
+    function updateSpinButton() {
+      var activeItems = getActiveItems();
+      $btnSpin.disabled = state.spinning || activeItems.length < 2;
+    }
+
+    /* ========== UI Rendering ========== */
+    function renderItemList() {
+      $itemList.innerHTML = '';
+      state.items.forEach(function(item, index) {
+        var isEliminated = state.eliminationMode && state.eliminatedIndices.indexOf(index) !== -1;
+        var activeItems = getActiveItems();
+        var activeIndex = -1;
+        if (!isEliminated) {
+          var count = 0;
+          for (var j = 0; j <= index; j++) {
+            if (state.eliminatedIndices.indexOf(j) === -1) {
+              if (j === index) activeIndex = count;
+              count++;
+            }
+          }
+        }
+
+        var row = document.createElement('div');
+        row.className = 'item-row' + (isEliminated ? ' item-eliminated' : '');
+
+        // Color dot
+        var dot = document.createElement('div');
+        dot.className = 'item-color-dot';
+        if (isEliminated || activeIndex === -1) {
+          dot.style.background = '#ccc';
+        } else {
+          dot.style.background = getColor(activeIndex, activeItems.length);
+        }
+        row.appendChild(dot);
+
+        // Name input
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'item-name-input';
+        nameInput.value = item.name;
+        nameInput.maxLength = 30;
+        nameInput.disabled = isEliminated;
+        nameInput.addEventListener('input', (function(idx) {
+          return function(e) { updateItemName(idx, e.target.value); };
+        })(index));
+        row.appendChild(nameInput);
+
+        // Weight select
+        var weightSel = document.createElement('select');
+        weightSel.className = 'item-weight-select';
+        weightSel.disabled = isEliminated;
+        for (var w = 1; w <= 10; w++) {
+          var opt = document.createElement('option');
+          opt.value = w;
+          opt.textContent = '×' + w;
+          if (w === item.weight) opt.selected = true;
+          weightSel.appendChild(opt);
+        }
+        weightSel.addEventListener('change', (function(idx) {
+          return function(e) { updateItemWeight(idx, e.target.value); };
+        })(index));
+        row.appendChild(weightSel);
+
+        // Delete button
+        var delBtn = document.createElement('button');
+        delBtn.className = 'item-del-btn';
+        delBtn.textContent = '×';
+        delBtn.title = '削除';
+        delBtn.addEventListener('click', (function(idx) {
+          return function() { removeItem(idx); };
+        })(index));
+        row.appendChild(delBtn);
+
+        $itemList.appendChild(row);
+      });
+
+      $itemCount.textContent = state.items.length + ' / ' + MAX_ITEMS + ' 項目';
+      updateSpinButton();
+    }
+
+    /* ========== Presets ========== */
+    var currentPresetKey = '';
+
+    var PRESET_LABELS = {
+      lunch: 'ランチ',
+      weekdays: '曜日',
+      numbers: '数字'
+    };
+
+    function openPresetModal(key) {
+      currentPresetKey = key;
+      $presetModalBody.innerHTML = '';
+
+      if (key === 'numbers') {
+        $presetModalTitle.textContent = '数字の範囲を指定';
+        var wrap = document.createElement('div');
+        wrap.className = 'preset-number-inputs';
+        wrap.innerHTML =
+          '<label>最小 <input type="number" id="presetNumMin" value="1" min="0"></label>' +
+          '<label>〜</label>' +
+          '<label>最大 <input type="number" id="presetNumMax" value="10" min="0"></label>';
+        $presetModalBody.appendChild(wrap);
+      } else {
+        $presetModalTitle.textContent = PRESET_LABELS[key] + 'の項目を選択';
+        var list = document.createElement('div');
+        list.className = 'preset-checkbox-list';
+        PRESETS[key].forEach(function(item) {
+          var label = document.createElement('label');
+          label.innerHTML = '<input type="checkbox" checked value="' + item.name + '"> ' + item.name;
+          list.appendChild(label);
+        });
+        $presetModalBody.appendChild(list);
+      }
+
+      $presetModal.classList.remove('hidden');
+    }
+
+    function applyPresetFromModal() {
+      var key = currentPresetKey;
+
+      if (key === 'numbers') {
+        var minVal = parseInt(document.getElementById('presetNumMin').value, 10);
+        var maxVal = parseInt(document.getElementById('presetNumMax').value, 10);
+        if (isNaN(minVal) || isNaN(maxVal) || !Number.isInteger(minVal) || !Number.isInteger(maxVal)) {
+          showToast('整数を入力してください');
+          return;
+        }
+        if (minVal > maxVal) {
+          showToast('最小値は最大値以下にしてください');
+          return;
+        }
+        var count = maxVal - minVal + 1;
+        if (count > MAX_ITEMS) {
+          showToast('項目数が' + MAX_ITEMS + 'を超えるため設定できません');
+          return;
+        }
+        if (count < MIN_ITEMS) {
+          showToast('最低' + MIN_ITEMS + '項目は必要です');
+          return;
+        }
+        var items = [];
+        for (var i = minVal; i <= maxVal; i++) {
+          items.push({ name: String(i), weight: 1 });
+        }
+        state.items = items;
+      } else {
+        var checked = [];
+        $presetModalBody.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+          if (cb.checked) checked.push({ name: cb.value, weight: 1 });
+        });
+        if (checked.length < MIN_ITEMS) {
+          showToast('最低' + MIN_ITEMS + '項目を選択してください');
+          return;
+        }
+        state.items = checked;
+      }
+
+      state.eliminatedIndices = [];
+      onItemsChanged();
+      $presetModal.classList.add('hidden');
+    }
+
+    function closePresetModal() {
+      $presetModal.classList.add('hidden');
+    }
+
+    /* ========== Bulk Add ========== */
+    function openBulkModal() {
+      $bulkText.value = '';
+      $chkBulkKeep.checked = false;
+      $bulkDelimiter.value = 'newline';
+      $bulkModal.classList.remove('hidden');
+    }
+
+    function closeBulkModal() {
+      $bulkModal.classList.add('hidden');
+    }
+
+    function applyBulkAdd() {
+      var delimiter = $bulkDelimiter.value === 'comma' ? ',' : '\n';
+      var raw = $bulkText.value.split(delimiter);
+      var newItems = [];
+      raw.forEach(function(s) {
+        var trimmed = s.trim().substring(0, 30);
+        if (trimmed) newItems.push({ name: trimmed, weight: 1 });
+      });
+
+      var existing = $chkBulkKeep.checked ? state.items.slice() : [];
+      var total = existing.length + newItems.length;
+
+      if (total > MAX_ITEMS) {
+        showToast('項目数の上限（' + MAX_ITEMS + '）を超えるため登録できません');
+        return;
+      }
+      if (total < MIN_ITEMS) {
+        showToast('最低' + MIN_ITEMS + '項目は必要です');
+        return;
+      }
+
+      state.items = existing.concat(newItems);
+      state.eliminatedIndices = [];
+      onItemsChanged();
+      closeBulkModal();
+    }
+
+    /* ========== History ========== */
+    function loadHistory() {
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) state.history = JSON.parse(raw);
+      } catch (e) {
+        state.history = [];
+      }
+    }
+
+    function addHistory(item) {
+      state.history.unshift({
+        name: item.name,
+        time: new Date().toISOString()
+      });
+      if (state.history.length > 50) state.history = state.history.slice(0, 50);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.history));
+      } catch (e) { /* ignore */ }
+      renderHistory();
+    }
+
+    function clearHistory() {
+      state.history = [];
+      localStorage.removeItem(STORAGE_KEY);
+      renderHistory();
+    }
+
+    function renderHistory() {
+      $historyList.innerHTML = '';
+      if (state.history.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'history-empty';
+        empty.textContent = 'まだ履歴はありません';
+        $historyList.appendChild(empty);
+        $btnClearHistory.style.display = 'none';
+        return;
+      }
+      $btnClearHistory.style.display = '';
+      state.history.forEach(function(entry) {
+        var row = document.createElement('div');
+        row.className = 'history-item';
+        var nameSpan = document.createElement('span');
+        nameSpan.className = 'history-name';
+        nameSpan.textContent = entry.name;
+        var timeSpan = document.createElement('span');
+        timeSpan.className = 'history-time';
+        var d = new Date(entry.time);
+        timeSpan.textContent = d.toLocaleDateString('ja-JP') + ' ' +
+          d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        row.appendChild(nameSpan);
+        row.appendChild(timeSpan);
+        $historyList.appendChild(row);
+      });
+    }
+
+    /* ========== URL Sharing ========== */
+    function encodeItemsToHash() {
+      var data = state.items.map(function(it) {
+        return { n: it.name, w: it.weight };
+      });
+      var json = JSON.stringify(data);
+      return btoa(unescape(encodeURIComponent(json)));
+    }
+
+    function decodeItemsFromHash() {
+      var hash = location.hash.replace(/^#/, '');
+      if (!hash) return false;
+      try {
+        var json = decodeURIComponent(escape(atob(hash)));
+        var data = JSON.parse(json);
+        if (!Array.isArray(data) || data.length < MIN_ITEMS) return false;
+        state.items = data.slice(0, MAX_ITEMS).map(function(d) {
+          return {
+            name: String(d.n || '').substring(0, 30) || '項目',
+            weight: Math.max(1, Math.min(10, parseInt(d.w, 10) || 1))
+          };
+        });
+        if (state.items.length < MIN_ITEMS) return false;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function shareItems() {
+      var hash = encodeItemsToHash();
+      var url = location.origin + location.pathname + '#' + hash;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function() {
+          showToast('共有リンクをコピーしました');
+        }, function() {
+          fallbackCopy(url);
+        });
+      } else {
+        fallbackCopy(url);
+      }
+    }
+
+    function fallbackCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('共有リンクをコピーしました');
+      } catch (e) {
+        showToast('コピーに失敗しました');
+      }
+      document.body.removeChild(ta);
+    }
+
+    /* ========== Event Listeners ========== */
+    $btnSpin.addEventListener('click', startSpin);
+
+    $btnAddItem.addEventListener('click', function() {
+      addItem($inputNewItem.value);
+      $inputNewItem.value = '';
+      $inputNewItem.focus();
+    });
+
+    $inputNewItem.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        addItem($inputNewItem.value);
+        $inputNewItem.value = '';
+      }
+    });
+
+    document.querySelectorAll('.preset-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        openPresetModal(this.getAttribute('data-preset'));
+      });
+    });
+
+    $chkElimination.addEventListener('change', function() {
+      state.eliminationMode = this.checked;
+      state.eliminatedIndices = [];
+      onItemsChanged();
+    });
+
+    $btnShare.addEventListener('click', shareItems);
+
+    $historyToggle.addEventListener('click', function() {
+      var collapsed = $historyBody.classList.toggle('collapsed');
+      $historyArrow.classList.toggle('open', !collapsed);
+    });
+
+    $btnClearHistory.addEventListener('click', function() {
+      clearHistory();
+    });
+
+    $btnModalClose.addEventListener('click', closeResult);
+    $resultModal.addEventListener('click', function(e) {
+      if (e.target === $resultModal) closeResult();
+    });
+
+    // Preset modal
+    $btnPresetCancel.addEventListener('click', closePresetModal);
+    $btnPresetApply.addEventListener('click', applyPresetFromModal);
+    $presetModal.addEventListener('click', function(e) {
+      if (e.target === $presetModal) closePresetModal();
+    });
+
+    // Bulk modal
+    $btnBulkAdd.addEventListener('click', openBulkModal);
+    $btnBulkCancel.addEventListener('click', closeBulkModal);
+    $btnBulkApply.addEventListener('click', applyBulkAdd);
+    $bulkModal.addEventListener('click', function(e) {
+      if (e.target === $bulkModal) closeBulkModal();
+    });
+
+    window.addEventListener('resize', function() {
+      resizeWheelCanvas();
+      drawWheel(spinState.angle);
+    });
+
+    /* ========== Initialization ========== */
+    function init() {
+      loadHistory();
+      decodeItemsFromHash();
+      resizeWheelCanvas();
+      renderItemList();
+      drawWheel(0);
+      renderHistory();
+    }
+
+    init();
+  })();
+  </script>
+</body>
+</html>
