@@ -1,0 +1,384 @@
+/* ===== Reset & Base ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #fdf6f0; color: #333;
+  line-height: 1.6; padding-bottom: 3rem;
+}
+
+/* ===== Container ===== */
+.container {
+  max-width: 640px; margin: 0 auto;
+  padding: 1rem;
+}
+
+/* ===== Card ===== */
+.card {
+  background: #fff; border-radius: 12px;
+  padding: 1rem; margin-bottom: 1rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.card-title {
+  font-size: 0.95rem; font-weight: 700;
+  margin-bottom: 0.75rem; color: #444;
+}
+.card-title.clickable {
+  cursor: pointer; user-select: none;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.card-title .arrow {
+  font-size: 0.75rem; color: #999;
+  transition: transform 0.2s;
+}
+
+/* ===== Collapsible ===== */
+.collapsible {
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.collapsible.open {
+  max-height: 800px;
+}
+
+/* ===== Tomato SVG Timer ===== */
+.timer-card {
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+.tomato-wrap {
+  max-width: 280px;
+  margin: 0 auto 1rem;
+}
+.tomato-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Tomato body */
+.tomato-grad-inner { stop-color: #ff6b6b; }
+.tomato-grad-outer { stop-color: #e74c3c; }
+.tomato-body { opacity: 0.15; }
+.tomato-segment {
+  stroke: #e74c3c; stroke-width: 1;
+  opacity: 0.08;
+}
+.tomato-stem { fill: #4caf50; }
+.tomato-leaf { fill: #66bb6a; }
+
+/* Progress ring */
+.progress-track {
+  fill: none;
+  stroke: #eee;
+  stroke-width: 8;
+}
+.progress-arc {
+  fill: none;
+  stroke: #e74c3c;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s linear, stroke 0.5s ease;
+}
+
+/* Time & phase text */
+.time-text {
+  font-size: 3rem;
+  font-weight: 700;
+  fill: #333;
+  font-family: 'SF Mono', 'Fira Mono', 'Roboto Mono', monospace;
+}
+.phase-text {
+  font-size: 0.9rem;
+  fill: #888;
+  font-weight: 500;
+}
+
+/* Phase color variations */
+.phase-short-break .progress-arc { stroke: #4caf50; }
+.phase-long-break .progress-arc { stroke: #2e7d32; }
+.phase-short-break .tomato-grad-inner { stop-color: #81c784; }
+.phase-short-break .tomato-grad-outer { stop-color: #4caf50; }
+.phase-short-break .tomato-body { opacity: 0.12; }
+.phase-short-break .tomato-segment { stroke: #4caf50; }
+.phase-long-break .tomato-grad-inner { stop-color: #66bb6a; }
+.phase-long-break .tomato-grad-outer { stop-color: #2e7d32; }
+.phase-long-break .tomato-body { opacity: 0.12; }
+.phase-long-break .tomato-segment { stroke: #2e7d32; }
+
+/* Pulse animation when running */
+.timer-card.is-running .tomato-body {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.25; }
+}
+
+/* ===== Phase Dots ===== */
+.phase-dots {
+  display: flex; justify-content: center; gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #ddd;
+  transition: background 0.3s, transform 0.3s;
+}
+.dot.filled {
+  background: #e74c3c;
+  transform: scale(1.1);
+}
+.dot.active {
+  animation: dot-pulse 1.5s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+
+/* ===== Timer Controls ===== */
+.timer-controls {
+  display: flex; justify-content: center; gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  border: none; border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: #e74c3c; color: #fff;
+}
+.btn-primary:hover { background: #c0392b; }
+
+.btn-secondary {
+  background: #f39c12; color: #fff;
+}
+.btn-secondary:hover { background: #d68910; }
+
+.btn-skip {
+  background: #eee; color: #666;
+}
+.btn-skip:hover { background: #ddd; }
+
+.btn-reset {
+  background: #eee; color: #666;
+}
+.btn-reset:hover { background: #ddd; }
+
+.btn-clear {
+  display: block; width: 100%;
+  margin-top: 0.75rem;
+  background: #fff; color: #e74c3c;
+  border: 1px solid #e74c3c;
+  border-radius: 8px; padding: 0.5rem;
+  font-size: 0.85rem; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-clear:hover { background: #fdf0f0; }
+
+/* ===== Task Input ===== */
+.task-input {
+  width: 100%;
+  border: 1px solid #ddd; border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+  background: #fafafa;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.task-input:focus {
+  border-color: #e74c3c;
+}
+.task-input::placeholder { color: #bbb; }
+
+/* ===== Settings ===== */
+.setting-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-row label:first-child {
+  font-size: 0.9rem; color: #555;
+  min-width: 80px;
+}
+.setting-control {
+  display: flex; align-items: center; gap: 0.5rem;
+  flex: 1; justify-content: flex-end;
+}
+.setting-value {
+  font-size: 0.85rem; color: #888;
+  min-width: 70px; text-align: right;
+}
+input[type="range"] {
+  width: 120px;
+  accent-color: #e74c3c;
+}
+
+/* Toggle switch */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px; height: 24px;
+  cursor: pointer;
+}
+.toggle input { display: none; }
+.toggle-slider {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: #ccc; border-radius: 24px;
+  transition: background 0.3s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  left: 3px; bottom: 3px;
+  background: #fff; border-radius: 50%;
+  transition: transform 0.3s;
+}
+.toggle input:checked + .toggle-slider {
+  background: #e74c3c;
+}
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+/* ===== Stats ===== */
+.stats-summary {
+  display: flex; gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.stat-item {
+  flex: 1; text-align: center;
+  padding: 0.5rem;
+  background: #fdf6f0; border-radius: 8px;
+}
+.stat-value {
+  font-size: 1.5rem; font-weight: 700;
+  color: #e74c3c;
+}
+.stat-label {
+  font-size: 0.75rem; color: #888;
+  margin-top: 0.15rem;
+}
+
+/* History */
+.history-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+.history-item {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.history-item:last-child { border-bottom: none; }
+.history-main {
+  display: flex; justify-content: space-between;
+  align-items: center;
+}
+.history-task {
+  font-size: 0.9rem; color: #333;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1; margin-right: 0.5rem;
+}
+.history-duration {
+  font-size: 0.85rem; font-weight: 600;
+  color: #e74c3c; white-space: nowrap;
+}
+.history-time {
+  font-size: 0.75rem; color: #999;
+  margin-top: 0.1rem;
+}
+.history-empty {
+  text-align: center; color: #bbb;
+  padding: 1rem; font-size: 0.85rem;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 480px) {
+  .tomato-wrap { max-width: 240px; }
+  .time-text { font-size: 2.5rem; }
+  .setting-row label:first-child { min-width: 60px; font-size: 0.85rem; }
+  input[type="range"] { width: 90px; }
+  .setting-value { min-width: 60px; }
+  .stats-summary { flex-direction: column; gap: 0.5rem; }
+}
+
+/* ===== Dark Mode ===== */
+body.tt-dark { background: #1a1a2e; color: #e0e0e0; }
+body.tt-dark .card {
+  background: #20203a; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+body.tt-dark .card-title { color: #ccc; }
+body.tt-dark .card-title .arrow { color: #666; }
+
+/* Dark: Tomato */
+body.tt-dark .tomato-grad-inner { stop-color: #ff6b6b; }
+body.tt-dark .tomato-grad-outer { stop-color: #e74c3c; }
+body.tt-dark .tomato-segment { stroke: #ff6b6b; }
+body.tt-dark .progress-track { stroke: #2a2a4a; }
+body.tt-dark .progress-arc { stroke: #ff6b6b; }
+body.tt-dark .time-text { fill: #e0e0e0; }
+body.tt-dark .phase-text { fill: #999; }
+
+body.tt-dark .phase-short-break .progress-arc { stroke: #66bb6a; }
+body.tt-dark .phase-long-break .progress-arc { stroke: #43a047; }
+body.tt-dark .phase-short-break .tomato-grad-inner { stop-color: #81c784; }
+body.tt-dark .phase-short-break .tomato-grad-outer { stop-color: #66bb6a; }
+body.tt-dark .phase-short-break .tomato-segment { stroke: #66bb6a; }
+body.tt-dark .phase-long-break .tomato-grad-inner { stop-color: #66bb6a; }
+body.tt-dark .phase-long-break .tomato-grad-outer { stop-color: #43a047; }
+body.tt-dark .phase-long-break .tomato-segment { stroke: #43a047; }
+
+/* Dark: Dots */
+body.tt-dark .dot { background: #3a3a5a; }
+body.tt-dark .dot.filled { background: #ff6b6b; }
+
+/* Dark: Buttons */
+body.tt-dark .btn-primary { background: #c0392b; }
+body.tt-dark .btn-primary:hover { background: #a93226; }
+body.tt-dark .btn-secondary { background: #d68910; }
+body.tt-dark .btn-secondary:hover { background: #b7791f; }
+body.tt-dark .btn-skip { background: #252545; color: #ccc; }
+body.tt-dark .btn-skip:hover { background: #2a2a5a; }
+body.tt-dark .btn-reset { background: #252545; color: #ccc; }
+body.tt-dark .btn-reset:hover { background: #2a2a5a; }
+body.tt-dark .btn-clear {
+  background: #20203a; color: #ff6b6b; border-color: #ff6b6b;
+}
+body.tt-dark .btn-clear:hover { background: #3a1a1a; }
+
+/* Dark: Task input */
+body.tt-dark .task-input {
+  background: #252545; border-color: #3a3a5a; color: #e0e0e0;
+}
+body.tt-dark .task-input:focus { border-color: #ff6b6b; }
+body.tt-dark .task-input::placeholder { color: #666; }
+
+/* Dark: Settings */
+body.tt-dark .setting-row { border-bottom-color: #2a2a4a; }
+body.tt-dark .setting-row label:first-child { color: #ccc; }
+body.tt-dark .setting-value { color: #999; }
+body.tt-dark input[type="range"] { accent-color: #ff6b6b; }
+body.tt-dark .toggle-slider { background: #3a3a5a; }
+body.tt-dark .toggle input:checked + .toggle-slider { background: #ff6b6b; }
+
+/* Dark: Stats */
+body.tt-dark .stat-item { background: #252545; }
+body.tt-dark .stat-value { color: #ff6b6b; }
+body.tt-dark .stat-label { color: #888; }
+body.tt-dark .history-item { border-bottom-color: #2a2a4a; }
+body.tt-dark .history-task { color: #e0e0e0; }
+body.tt-dark .history-duration { color: #ff6b6b; }
+body.tt-dark .history-time { color: #666; }
+body.tt-dark .history-empty { color: #555; }
