@@ -243,7 +243,7 @@
         </div>
         <div class="setting-group" id="quality-group" style="display:none">
           <label for="quality-slider">品質 <span class="quality-value" id="quality-value">92%</span></label>
-          <input type="range" id="quality-slider" min="0.1" max="1" step="0.01" value="0.92">
+          <input type="range" id="quality-slider" min="0.01" max="1" step="0.01" value="0.92">
         </div>
         <div class="setting-group">
           <label>背景色</label>
@@ -394,7 +394,10 @@
     var reader = new FileReader();
     reader.onload = function (e) {
       var img = new Image();
-      img.onload = function () { onImageLoaded(img); };
+      img.onload = function () {
+          if (state.originalImage) { onImageChanged(img); }
+          else { onImageLoaded(img); }
+        };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
@@ -631,18 +634,24 @@
 
   // Change image
   btnChange.addEventListener('click', function () {
-    state.originalImage = null;
-    state.customSizes = [];
-    state.nextCustomId = 1;
-    cropEditor.classList.remove('visible');
-    settingsSection.style.display = 'none';
-    platformSection.style.display = 'none';
-    customSection.style.display = 'none';
-    actionBar.classList.remove('visible');
-    uploadZone.style.display = '';
     fileInput.value = '';
-    platformGrid.innerHTML = '';
+    fileInput.click();
   });
+
+  function onImageChanged(img) {
+    state.originalImage = img;
+    var minDim = Math.min(img.width, img.height);
+    state.cropSize = minDim;
+    state.cropX = (img.width - minDim) / 2;
+    state.cropY = (img.height - minDim) / 2;
+    state.zoomFactor = 1.0;
+    zoomSlider.value = 1;
+
+    initCropCanvas();
+    drawCropCanvas();
+    updateAllPreviews();
+    updateSelectedCount();
+  }
 
   // Resize on window resize
   window.addEventListener('resize', function () {
