@@ -24,6 +24,7 @@
 | [012](https://tiny-tools-cjj.pages.dev/day012_qr-tool/) | QRコードツール | QRコードの生成・読み取り。テキスト・URL・WiFi・メール・電話に対応 |
 | [013](https://tiny-tools-cjj.pages.dev/day013_roulette/) | ルーレット | ルーレット・抽選ツール。項目を自由に設定して回そう。重み付き・除外モード対応 |
 | [014](https://tiny-tools-cjj.pages.dev/day014_pomodoro/) | ポモドーロタイマー | トマト型タイマーで集中管理。作業/休憩サイクル・セッション記録対応 |
+| [015](https://tiny-tools-cjj.pages.dev/day015_icon-resize/) | SNSアイコンリサイズ | SNS用アイコン画像を一括リサイズ。8プラットフォーム対応・円形プレビュー付き |
 
 ## 使い方
 
@@ -74,6 +75,8 @@ tiny-tools/
 │   ├── index.html                    # ポモドーロタイマー
 │   ├── style.css
 │   └── js/
+├── day015_icon-resize/
+│   └── index.html                    # SNSアイコンリサイズ
 ├── shared/
 │   └── header.js                     # 共通ヘッダー
 ├── .gitignore
