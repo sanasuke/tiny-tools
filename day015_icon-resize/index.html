@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SNSアイコンリサイズ | tiny-tools Day 15</title>
   <meta name="description" content="SNS用アイコン画像を一括リサイズ。8プラットフォーム対応・円形プレビュー付き">
   <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools" data-note="https://note.com/sana_suke"></script>
@@ -225,7 +225,6 @@
         <label>ズーム</label>
         <input type="range" id="zoom-slider" min="1" max="5" step="0.01" value="1">
         <button class="btn" id="btn-fit" type="button">フィット</button>
-        <button class="btn" id="btn-reset" type="button">リセット</button>
         <button class="btn btn-danger" id="btn-change" type="button">画像を変更</button>
       </div>
     </div>
@@ -239,6 +238,7 @@
           <select id="format-select">
             <option value="png">PNG（透過対応）</option>
             <option value="jpeg">JPEG（高圧縮）</option>
+            <option value="webp">WebP（軽量・高画質）</option>
           </select>
         </div>
         <div class="setting-group" id="quality-group" style="display:none">
@@ -334,7 +334,6 @@
   var cropCtx = cropCanvas.getContext('2d');
   var zoomSlider = document.getElementById('zoom-slider');
   var btnFit = document.getElementById('btn-fit');
-  var btnReset = document.getElementById('btn-reset');
   var btnChange = document.getElementById('btn-change');
   var settingsSection = document.getElementById('settings-section');
   var formatSelect = document.getElementById('format-select');
@@ -630,12 +629,6 @@
     debouncedUpdatePreviews();
   });
 
-  // Reset button
-  btnReset.addEventListener('click', function () {
-    if (!state.originalImage) return;
-    onImageLoaded(state.originalImage);
-  });
-
   // Change image
   btnChange.addEventListener('click', function () {
     state.originalImage = null;
@@ -661,13 +654,15 @@
   /* ========== Output settings ========== */
   formatSelect.addEventListener('change', function () {
     state.format = formatSelect.value;
-    qualityGroup.style.display = state.format === 'jpeg' ? '' : 'none';
+    qualityGroup.style.display = (state.format === 'jpeg' || state.format === 'webp') ? '' : 'none';
     if (state.format === 'jpeg') {
       bgTransparentCheck.checked = false;
       bgTransparentCheck.disabled = true;
       state.bgTransparent = false;
     } else {
       bgTransparentCheck.disabled = false;
+      bgTransparentCheck.checked = true;
+      state.bgTransparent = true;
     }
     debouncedUpdatePreviews();
   });
@@ -756,7 +751,7 @@
     dlBtn.className = 'platform-dl-btn';
     dlBtn.type = 'button';
     dlBtn.innerHTML = '&#11015; ダウンロード';
-    dlBtn.addEventListener('click', function () { downloadSingle(id, size, name); });
+    dlBtn.addEventListener('click', function () { downloadSingle(id, size); });
     card.appendChild(dlBtn);
 
     return card;
@@ -771,7 +766,7 @@
       ctx.clearRect(0, 0, 160, 160);
 
       // Background
-      if (state.format === 'png' && state.bgTransparent) {
+      if (state.format !== 'jpeg' && state.bgTransparent) {
         drawCheckerboard(ctx, 160);
       } else {
         ctx.fillStyle = state.bgColor;
@@ -890,8 +885,9 @@
   function getBlob(targetSize) {
     return new Promise(function (resolve) {
       var canvas = resizeImage(targetSize);
-      var mimeType = state.format === 'jpeg' ? 'image/jpeg' : 'image/png';
-      var quality = state.format === 'jpeg' ? state.quality : undefined;
+      var mimeTypes = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp' };
+      var mimeType = mimeTypes[state.format] || 'image/png';
+      var quality = (state.format === 'jpeg' || state.format === 'webp') ? state.quality : undefined;
       canvas.toBlob(function (blob) {
         resolve(blob);
       }, mimeType, quality);
@@ -899,7 +895,8 @@
   }
 
   function getFilename(platformId, size) {
-    var ext = state.format === 'jpeg' ? 'jpg' : 'png';
+    var extMap = { png: 'png', jpeg: 'jpg', webp: 'webp' };
+    var ext = extMap[state.format] || 'png';
     return 'icon_' + platformId + '_' + size + 'x' + size + '.' + ext;
   }
 
