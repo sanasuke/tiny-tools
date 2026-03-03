@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SNSアイコンリサイズ | tiny-tools Day 15</title>
+  <meta name="description" content="SNS用アイコン画像を一括リサイズ。8プラットフォーム対応・円形プレビュー付き">
+  <script src="../shared/header.js" data-repo="https://github.com/sanasuke/tiny-tools" data-note="https://note.com/sana_suke"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5; color: #333; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .container { width: 100%; max-width: 800px; padding: 1.5rem 1rem 6rem; }
+    h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .page-desc { font-size: 0.85rem; color: #888; margin-bottom: 1.5rem; }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed #c0c0c0; border-radius: 12px; padding: 3rem 1rem;
+      text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+      background: #fff;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: #4a90d9; background: #f0f6ff;
+    }
+    .upload-zone-icon { font-size: 2.5rem; margin-bottom: 0.5rem; color: #aaa; }
+    .upload-zone-text { font-size: 0.95rem; color: #666; }
+    .upload-zone-sub { font-size: 0.8rem; color: #aaa; margin-top: 0.3rem; }
+
+    /* Section */
+    .section { margin-top: 1.5rem; }
+    .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+
+    /* Crop editor */
+    .crop-editor { display: none; }
+    .crop-editor.visible { display: block; }
+    .crop-canvas-wrap {
+      position: relative; width: 100%; max-width: 400px; margin: 0 auto;
+      aspect-ratio: 1; background: #e0e0e0; border-radius: 8px; overflow: hidden;
+      touch-action: none; cursor: grab;
+    }
+    .crop-canvas-wrap:active { cursor: grabbing; }
+    .crop-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+    .crop-controls {
+      display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem;
+      flex-wrap: wrap; justify-content: center;
+    }
+    .crop-controls label { font-size: 0.8rem; color: #666; }
+    .crop-controls input[type="range"] { width: 140px; }
+    .btn {
+      padding: 0.4rem 0.9rem; border: 1px solid #d0d0d0; border-radius: 6px;
+      background: #fff; color: #333; font-size: 0.8rem; cursor: pointer;
+      font-family: inherit; transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover { border-color: #4a90d9; color: #4a90d9; }
+    .btn-primary {
+      background: #4a90d9; color: #fff; border-color: #4a90d9;
+    }
+    .btn-primary:hover { background: #3a7bc8; }
+    .btn-danger { color: #e74c3c; border-color: #e5a9a3; }
+    .btn-danger:hover { background: #fdf0ef; border-color: #e74c3c; }
+
+    /* Output settings */
+    .settings-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem; background: #fff; padding: 1rem; border-radius: 8px;
+      border: 1px solid #e8e8e8;
+    }
+    .setting-group label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 0.3rem; }
+    .setting-group select, .setting-group input[type="range"], .setting-group input[type="number"] {
+      width: 100%; padding: 0.35rem 0.5rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: 0.85rem; font-family: inherit; background: #fff;
+    }
+    .setting-group .color-row {
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .setting-group input[type="color"] {
+      width: 36px; height: 30px; border: 1px solid #d0d0d0; border-radius: 4px;
+      cursor: pointer; padding: 0;
+    }
+    .setting-group .checkbox-row {
+      display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #555;
+      margin-top: 0.3rem;
+    }
+    .setting-group .checkbox-row input[type="checkbox"] { margin: 0; }
+    .quality-value { font-size: 0.75rem; color: #888; margin-left: 0.3rem; }
+
+    /* Platform grid */
+    .select-all-row {
+      display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;
+      font-size: 0.85rem; color: #555;
+    }
+    .select-all-row input[type="checkbox"] { margin: 0; }
+    .platform-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem;
+    }
+    .platform-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 10px;
+      padding: 0.75rem; text-align: center; transition: border-color 0.15s;
+    }
+    .platform-card:hover { border-color: #4a90d9; }
+    .platform-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .platform-card-header label {
+      display: flex; align-items: center; gap: 0.3rem;
+      font-size: 0.8rem; font-weight: 600; color: #333; cursor: pointer;
+    }
+    .platform-card-header input[type="checkbox"] { margin: 0; }
+    .platform-card-size { font-size: 0.7rem; color: #999; }
+    .platform-preview {
+      width: 80px; height: 80px; border-radius: 50%; overflow: hidden;
+      margin: 0.5rem auto; background: #f0f0f0; position: relative;
+    }
+    .platform-preview canvas { width: 100%; height: 100%; display: block; }
+    .platform-dl-btn {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.3rem 0.7rem; border: 1px solid #d0d0d0; border-radius: 6px;
+      background: #fff; color: #4a90d9; font-size: 0.75rem; cursor: pointer;
+      font-family: inherit; transition: background 0.15s;
+    }
+    .platform-dl-btn:hover { background: #f0f6ff; }
+    .custom-card .platform-remove-btn {
+      border: none; background: none; color: #e74c3c; cursor: pointer;
+      font-size: 0.9rem; padding: 0 0.2rem; line-height: 1;
+    }
+
+    /* Custom size */
+    .custom-size-row {
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      background: #fff; padding: 0.75rem 1rem; border-radius: 8px;
+      border: 1px solid #e8e8e8;
+    }
+    .custom-size-row label { font-size: 0.8rem; color: #666; }
+    .custom-size-row input[type="number"] {
+      width: 80px; padding: 0.35rem 0.5rem; border: 1px solid #d0d0d0;
+      border-radius: 6px; font-size: 0.85rem; font-family: inherit;
+    }
+
+    /* Action bar */
+    .action-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #fff; border-top: 1px solid #e0e0e0;
+      padding: 0.75rem 1rem; display: none; z-index: 100;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    }
+    .action-bar.visible { display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
+    .action-bar .btn-zip {
+      padding: 0.6rem 1.5rem; font-size: 0.95rem; font-weight: 600;
+      background: #4a90d9; color: #fff; border: none; border-radius: 8px;
+      cursor: pointer; font-family: inherit; transition: background 0.15s;
+    }
+    .action-bar .btn-zip:hover { background: #3a7bc8; }
+    .action-bar .btn-zip:disabled { background: #ccc; cursor: not-allowed; }
+    .action-bar .selected-count { font-size: 0.8rem; color: #888; }
+
+    /* Dark mode */
+    body.tt-dark { background: #1a1a2e !important; color: #e0e0e0 !important; }
+    body.tt-dark .upload-zone { background: #20203a; border-color: #3a3a5a; }
+    body.tt-dark .upload-zone:hover, body.tt-dark .upload-zone.dragover {
+      border-color: #6ab0f3; background: #252550;
+    }
+    body.tt-dark .upload-zone-text { color: #bbb; }
+    body.tt-dark .upload-zone-sub { color: #777; }
+    body.tt-dark .upload-zone-icon { color: #666; }
+    body.tt-dark .settings-grid { background: #20203a; border-color: #2a2a4a; }
+    body.tt-dark .platform-card { background: #252545; border-color: #2a2a4a; }
+    body.tt-dark .platform-card:hover { border-color: #6ab0f3; }
+    body.tt-dark .platform-card-header label { color: #e0e0e0; }
+    body.tt-dark .platform-card-size { color: #777; }
+    body.tt-dark .platform-preview { background: #1a1a2e; }
+    body.tt-dark .platform-dl-btn { background: #252545; border-color: #3a3a5a; color: #6ab0f3; }
+    body.tt-dark .platform-dl-btn:hover { background: #2a2a5a; }
+    body.tt-dark .custom-size-row { background: #20203a; border-color: #2a2a4a; }
+    body.tt-dark .btn { background: #252545; color: #e0e0e0; border-color: #3a3a5a; }
+    body.tt-dark .btn:hover { border-color: #6ab0f3; color: #6ab0f3; }
+    body.tt-dark .btn-primary { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+    body.tt-dark .btn-primary:hover { background: #3a7bc8; }
+    body.tt-dark .action-bar { background: #1a1a2e; border-color: #2a2a4a; }
+    body.tt-dark .action-bar .selected-count { color: #999; }
+    body.tt-dark .crop-canvas-wrap { background: #1a1a2e; }
+    body.tt-dark .setting-group label { color: #aaa; }
+    body.tt-dark .select-all-row { color: #ccc; }
+    body.tt-dark .crop-controls label { color: #aaa; }
+    body.tt-dark .quality-value { color: #777; }
+    body.tt-dark .custom-size-row label { color: #aaa; }
+    body.tt-dark h1 { color: #f0f0f0 !important; }
+    body.tt-dark .page-desc { color: #999; }
+    body.tt-dark .section-title { color: #e0e0e0; }
+
+    @media (max-width: 480px) {
+      .platform-grid { grid-template-columns: repeat(2, 1fr); }
+      .crop-controls { gap: 0.4rem; }
+      .settings-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SNSアイコンリサイズ</h1>
+    <p class="page-desc">画像をドロップするだけで8プラットフォーム分のアイコンを一括生成</p>
+
+    <!-- Upload zone -->
+    <div class="upload-zone" id="upload-zone">
+      <div class="upload-zone-icon">&#128247;</div>
+      <div class="upload-zone-text">画像をドラッグ&ドロップ<br>またはクリックして選択</div>
+      <div class="upload-zone-sub">PNG / JPG / WebP 対応</div>
+      <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden>
+    </div>
+
+    <!-- Crop editor -->
+    <div class="crop-editor section" id="crop-editor">
+      <div class="section-title">切り抜き位置の調整</div>
+      <div class="crop-canvas-wrap" id="crop-canvas-wrap">
+        <canvas id="crop-canvas"></canvas>
+      </div>
+      <div class="crop-controls">
+        <label>ズーム</label>
+        <input type="range" id="zoom-slider" min="1" max="5" step="0.01" value="1">
+        <button class="btn" id="btn-fit" type="button">フィット</button>
+        <button class="btn" id="btn-reset" type="button">リセット</button>
+        <button class="btn btn-danger" id="btn-change" type="button">画像を変更</button>
+      </div>
+    </div>
+
+    <!-- Output settings -->
+    <div class="section" id="settings-section" style="display:none">
+      <div class="section-title">出力設定</div>
+      <div class="settings-grid">
+        <div class="setting-group">
+          <label for="format-select">出力形式</label>
+          <select id="format-select">
+            <option value="png">PNG（透過対応）</option>
+            <option value="jpeg">JPEG（高圧縮）</option>
+          </select>
+        </div>
+        <div class="setting-group" id="quality-group" style="display:none">
+          <label for="quality-slider">品質 <span class="quality-value" id="quality-value">92%</span></label>
+          <input type="range" id="quality-slider" min="0.1" max="1" step="0.01" value="0.92">
+        </div>
+        <div class="setting-group">
+          <label>背景色</label>
+          <div class="color-row">
+            <input type="color" id="bg-color" value="#ffffff">
+            <span id="bg-color-label" style="font-size:0.8rem;color:#888">#ffffff</span>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="bg-transparent" checked>
+            <label for="bg-transparent">透明のまま（PNG時のみ）</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Platform grid -->
+    <div class="section" id="platform-section" style="display:none">
+      <div class="section-title">プラットフォーム別プレビュー</div>
+      <div class="select-all-row">
+        <input type="checkbox" id="select-all" checked>
+        <label for="select-all">すべて選択</label>
+      </div>
+      <div class="platform-grid" id="platform-grid"></div>
+    </div>
+
+    <!-- Custom size -->
+    <div class="section" id="custom-section" style="display:none">
+      <div class="section-title">カスタムサイズ追加</div>
+      <div class="custom-size-row">
+        <label>サイズ:</label>
+        <input type="number" id="custom-size" min="16" max="4096" value="256" placeholder="px">
+        <span style="font-size:0.8rem;color:#888">px (正方形)</span>
+        <button class="btn btn-primary" id="btn-add-custom" type="button">追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action bar -->
+  <div class="action-bar" id="action-bar">
+    <span class="selected-count" id="selected-count">8件選択中</span>
+    <button class="btn-zip" id="btn-zip" type="button">ZIP一括ダウンロード</button>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ========== Platform definitions ========== */
+  var PLATFORMS = [
+    { id: 'twitter',   name: 'Twitter / X', size: 400 },
+    { id: 'instagram', name: 'Instagram',    size: 720 },
+    { id: 'youtube',   name: 'YouTube',      size: 800 },
+    { id: 'line',      name: 'LINE',         size: 720 },
+    { id: 'discord',   name: 'Discord',      size: 500 },
+    { id: 'tiktok',    name: 'TikTok',       size: 720 },
+    { id: 'facebook',  name: 'Facebook',     size: 720 },
+    { id: 'github',    name: 'GitHub',       size: 500 }
+  ];
+
+  /* ========== State ========== */
+  var state = {
+    originalImage: null,
+    cropX: 0,
+    cropY: 0,
+    cropSize: 0,
+    zoomFactor: 1.0,
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    dragStartCropX: 0,
+    dragStartCropY: 0,
+    pinchStartDist: 0,
+    pinchStartZoom: 1.0,
+    format: 'png',
+    quality: 0.92,
+    bgColor: '#ffffff',
+    bgTransparent: true,
+    customSizes: [],
+    nextCustomId: 1
+  };
+
+  /* ========== DOM refs ========== */
+  var uploadZone = document.getElementById('upload-zone');
+  var fileInput = document.getElementById('file-input');
+  var cropEditor = document.getElementById('crop-editor');
+  var cropCanvasWrap = document.getElementById('crop-canvas-wrap');
+  var cropCanvas = document.getElementById('crop-canvas');
+  var cropCtx = cropCanvas.getContext('2d');
+  var zoomSlider = document.getElementById('zoom-slider');
+  var btnFit = document.getElementById('btn-fit');
+  var btnReset = document.getElementById('btn-reset');
+  var btnChange = document.getElementById('btn-change');
+  var settingsSection = document.getElementById('settings-section');
+  var formatSelect = document.getElementById('format-select');
+  var qualityGroup = document.getElementById('quality-group');
+  var qualitySlider = document.getElementById('quality-slider');
+  var qualityValue = document.getElementById('quality-value');
+  var bgColorInput = document.getElementById('bg-color');
+  var bgColorLabel = document.getElementById('bg-color-label');
+  var bgTransparentCheck = document.getElementById('bg-transparent');
+  var platformSection = document.getElementById('platform-section');
+  var platformGrid = document.getElementById('platform-grid');
+  var selectAllCheck = document.getElementById('select-all');
+  var customSection = document.getElementById('custom-section');
+  var customSizeInput = document.getElementById('custom-size');
+  var btnAddCustom = document.getElementById('btn-add-custom');
+  var actionBar = document.getElementById('action-bar');
+  var selectedCountEl = document.getElementById('selected-count');
+  var btnZip = document.getElementById('btn-zip');
+
+  /* ========== Helpers ========== */
+  function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+
+  function showToast(msg) {
+    if (window.__TT_showToast) window.__TT_showToast(msg);
+  }
+
+  var previewDebounceTimer = null;
+  function debouncedUpdatePreviews() {
+    clearTimeout(previewDebounceTimer);
+    previewDebounceTimer = setTimeout(updateAllPreviews, 80);
+  }
+
+  /* ========== Upload ========== */
+  uploadZone.addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function () {
+    if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  uploadZone.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+  });
+  uploadZone.addEventListener('dragleave', function () {
+    uploadZone.classList.remove('dragover');
+  });
+  uploadZone.addEventListener('drop', function (e) {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    var files = e.dataTransfer.files;
+    if (files && files[0]) handleFile(files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.type.match(/^image\/(png|jpeg|webp)$/)) {
+      showToast('PNG / JPG / WebP のみ対応しています');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onload = function () { onImageLoaded(img); };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function onImageLoaded(img) {
+    state.originalImage = img;
+    var minDim = Math.min(img.width, img.height);
+    state.cropSize = minDim;
+    state.cropX = (img.width - minDim) / 2;
+    state.cropY = (img.height - minDim) / 2;
+    state.zoomFactor = 1.0;
+    zoomSlider.value = 1;
+
+    if (minDim < 100) {
+      showToast('画像が小さいため拡大されます。画質が低下する場合があります');
+    }
+
+    uploadZone.style.display = 'none';
+    cropEditor.classList.add('visible');
+    settingsSection.style.display = '';
+    platformSection.style.display = '';
+    customSection.style.display = '';
+    actionBar.classList.add('visible');
+
+    initCropCanvas();
+    drawCropCanvas();
+    renderPlatformGrid();
+    updateAllPreviews();
+    updateSelectedCount();
+  }
+
+  /* ========== Crop editor ========== */
+  function initCropCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    var displaySize = cropCanvasWrap.clientWidth;
+    cropCanvas.width = displaySize * dpr;
+    cropCanvas.height = displaySize * dpr;
+    cropCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawCropCanvas() {
+    if (!state.originalImage) return;
+    var displaySize = cropCanvasWrap.clientWidth;
+    var img = state.originalImage;
+
+    cropCtx.clearRect(0, 0, displaySize, displaySize);
+
+    // Draw checkerboard for transparency
+    drawCheckerboard(cropCtx, displaySize);
+
+    // Draw image
+    cropCtx.drawImage(
+      img,
+      state.cropX, state.cropY, state.cropSize, state.cropSize,
+      0, 0, displaySize, displaySize
+    );
+
+    // Circular mask overlay
+    cropCtx.save();
+    cropCtx.beginPath();
+    cropCtx.rect(0, 0, displaySize, displaySize);
+    cropCtx.arc(displaySize / 2, displaySize / 2, displaySize / 2, 0, Math.PI * 2);
+    cropCtx.clip('evenodd');
+    var isDark = document.body.classList.contains('tt-dark');
+    cropCtx.fillStyle = isDark ? 'rgba(26,26,46,0.7)' : 'rgba(0,0,0,0.4)';
+    cropCtx.fillRect(0, 0, displaySize, displaySize);
+    cropCtx.restore();
+
+    // Circle guide border
+    cropCtx.beginPath();
+    cropCtx.arc(displaySize / 2, displaySize / 2, displaySize / 2 - 1, 0, Math.PI * 2);
+    cropCtx.strokeStyle = 'rgba(255,255,255,0.7)';
+    cropCtx.lineWidth = 2;
+    cropCtx.stroke();
+  }
+
+  function drawCheckerboard(ctx, size) {
+    var tileSize = 8;
+    var cols = Math.ceil(size / tileSize);
+    for (var r = 0; r < cols; r++) {
+      for (var c = 0; c < cols; c++) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? '#ccc' : '#fff';
+        ctx.fillRect(c * tileSize, r * tileSize, tileSize, tileSize);
+      }
+    }
+  }
+
+  function recalcCrop() {
+    if (!state.originalImage) return;
+    var img = state.originalImage;
+    var minDim = Math.min(img.width, img.height);
+    state.cropSize = minDim / state.zoomFactor;
+    state.cropX = clamp(state.cropX, 0, img.width - state.cropSize);
+    state.cropY = clamp(state.cropY, 0, img.height - state.cropSize);
+  }
+
+  function handleZoom(delta, anchorXNorm, anchorYNorm) {
+    if (!state.originalImage) return;
+    var img = state.originalImage;
+    var minDim = Math.min(img.width, img.height);
+
+    var oldCropSize = state.cropSize;
+    var oldZoom = state.zoomFactor;
+    state.zoomFactor = clamp(oldZoom * (1 + delta), 1.0, 5.0);
+    state.cropSize = minDim / state.zoomFactor;
+
+    // Anchor-based pan
+    var sizeDiff = oldCropSize - state.cropSize;
+    state.cropX += sizeDiff * anchorXNorm;
+    state.cropY += sizeDiff * anchorYNorm;
+
+    state.cropX = clamp(state.cropX, 0, img.width - state.cropSize);
+    state.cropY = clamp(state.cropY, 0, img.height - state.cropSize);
+
+    zoomSlider.value = state.zoomFactor;
+    drawCropCanvas();
+    debouncedUpdatePreviews();
+  }
+
+  // Mouse drag
+  cropCanvasWrap.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    state.isDragging = true;
+    state.dragStartX = e.clientX;
+    state.dragStartY = e.clientY;
+    state.dragStartCropX = state.cropX;
+    state.dragStartCropY = state.cropY;
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (!state.isDragging) return;
+    var displaySize = cropCanvasWrap.clientWidth;
+    var scale = state.cropSize / displaySize;
+    var dx = (e.clientX - state.dragStartX) * scale;
+    var dy = (e.clientY - state.dragStartY) * scale;
+    state.cropX = state.dragStartCropX - dx;
+    state.cropY = state.dragStartCropY - dy;
+    recalcCrop();
+    drawCropCanvas();
+    debouncedUpdatePreviews();
+  });
+  document.addEventListener('mouseup', function () { state.isDragging = false; });
+
+  // Mouse wheel zoom
+  cropCanvasWrap.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var rect = cropCanvasWrap.getBoundingClientRect();
+    var anchorX = (e.clientX - rect.left) / rect.width;
+    var anchorY = (e.clientY - rect.top) / rect.height;
+    var delta = e.deltaY < 0 ? 0.1 : -0.1;
+    handleZoom(delta, anchorX, anchorY);
+  }, { passive: false });
+
+  // Touch drag & pinch
+  cropCanvasWrap.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      state.isDragging = true;
+      state.dragStartX = e.touches[0].clientX;
+      state.dragStartY = e.touches[0].clientY;
+      state.dragStartCropX = state.cropX;
+      state.dragStartCropY = state.cropY;
+    } else if (e.touches.length === 2) {
+      state.isDragging = false;
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      state.pinchStartDist = Math.sqrt(dx * dx + dy * dy);
+      state.pinchStartZoom = state.zoomFactor;
+    }
+  }, { passive: false });
+  cropCanvasWrap.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    if (e.touches.length === 1 && state.isDragging) {
+      var displaySize = cropCanvasWrap.clientWidth;
+      var scale = state.cropSize / displaySize;
+      var dx = (e.touches[0].clientX - state.dragStartX) * scale;
+      var dy = (e.touches[0].clientY - state.dragStartY) * scale;
+      state.cropX = state.dragStartCropX - dx;
+      state.cropY = state.dragStartCropY - dy;
+      recalcCrop();
+      drawCropCanvas();
+      debouncedUpdatePreviews();
+    } else if (e.touches.length === 2) {
+      var tdx = e.touches[0].clientX - e.touches[1].clientX;
+      var tdy = e.touches[0].clientY - e.touches[1].clientY;
+      var dist = Math.sqrt(tdx * tdx + tdy * tdy);
+      var ratio = dist / state.pinchStartDist;
+      state.zoomFactor = clamp(state.pinchStartZoom * ratio, 1.0, 5.0);
+      var minDim = Math.min(state.originalImage.width, state.originalImage.height);
+      var oldCropSize = state.cropSize;
+      state.cropSize = minDim / state.zoomFactor;
+      var sizeDiff = oldCropSize - state.cropSize;
+      state.cropX += sizeDiff * 0.5;
+      state.cropY += sizeDiff * 0.5;
+      recalcCrop();
+      zoomSlider.value = state.zoomFactor;
+      drawCropCanvas();
+      debouncedUpdatePreviews();
+    }
+  }, { passive: false });
+  cropCanvasWrap.addEventListener('touchend', function (e) {
+    if (e.touches.length === 0) state.isDragging = false;
+  });
+
+  // Zoom slider
+  zoomSlider.addEventListener('input', function () {
+    state.zoomFactor = parseFloat(zoomSlider.value);
+    var img = state.originalImage;
+    if (!img) return;
+    var minDim = Math.min(img.width, img.height);
+    var oldCropSize = state.cropSize;
+    state.cropSize = minDim / state.zoomFactor;
+    var sizeDiff = oldCropSize - state.cropSize;
+    state.cropX += sizeDiff * 0.5;
+    state.cropY += sizeDiff * 0.5;
+    recalcCrop();
+    drawCropCanvas();
+    debouncedUpdatePreviews();
+  });
+
+  // Fit button
+  btnFit.addEventListener('click', function () {
+    if (!state.originalImage) return;
+    var img = state.originalImage;
+    var minDim = Math.min(img.width, img.height);
+    state.zoomFactor = 1.0;
+    state.cropSize = minDim;
+    state.cropX = (img.width - minDim) / 2;
+    state.cropY = (img.height - minDim) / 2;
+    zoomSlider.value = 1;
+    drawCropCanvas();
+    debouncedUpdatePreviews();
+  });
+
+  // Reset button
+  btnReset.addEventListener('click', function () {
+    if (!state.originalImage) return;
+    onImageLoaded(state.originalImage);
+  });
+
+  // Change image
+  btnChange.addEventListener('click', function () {
+    state.originalImage = null;
+    state.customSizes = [];
+    state.nextCustomId = 1;
+    cropEditor.classList.remove('visible');
+    settingsSection.style.display = 'none';
+    platformSection.style.display = 'none';
+    customSection.style.display = 'none';
+    actionBar.classList.remove('visible');
+    uploadZone.style.display = '';
+    fileInput.value = '';
+    platformGrid.innerHTML = '';
+  });
+
+  // Resize on window resize
+  window.addEventListener('resize', function () {
+    if (!state.originalImage) return;
+    initCropCanvas();
+    drawCropCanvas();
+  });
+
+  /* ========== Output settings ========== */
+  formatSelect.addEventListener('change', function () {
+    state.format = formatSelect.value;
+    qualityGroup.style.display = state.format === 'jpeg' ? '' : 'none';
+    if (state.format === 'jpeg') {
+      bgTransparentCheck.checked = false;
+      bgTransparentCheck.disabled = true;
+      state.bgTransparent = false;
+    } else {
+      bgTransparentCheck.disabled = false;
+    }
+    debouncedUpdatePreviews();
+  });
+
+  qualitySlider.addEventListener('input', function () {
+    state.quality = parseFloat(qualitySlider.value);
+    qualityValue.textContent = Math.round(state.quality * 100) + '%';
+  });
+
+  bgColorInput.addEventListener('input', function () {
+    state.bgColor = bgColorInput.value;
+    bgColorLabel.textContent = state.bgColor;
+    debouncedUpdatePreviews();
+  });
+
+  bgTransparentCheck.addEventListener('change', function () {
+    state.bgTransparent = bgTransparentCheck.checked;
+    debouncedUpdatePreviews();
+  });
+
+  /* ========== Platform grid ========== */
+  function renderPlatformGrid() {
+    platformGrid.innerHTML = '';
+    PLATFORMS.forEach(function (p) {
+      platformGrid.appendChild(createPlatformCard(p.id, p.name, p.size, false));
+    });
+    state.customSizes.forEach(function (c) {
+      platformGrid.appendChild(createPlatformCard(c.id, c.name, c.size, true));
+    });
+  }
+
+  function createPlatformCard(id, name, size, isCustom) {
+    var card = document.createElement('div');
+    card.className = 'platform-card' + (isCustom ? ' custom-card' : '');
+    card.setAttribute('data-id', id);
+
+    var header = document.createElement('div');
+    header.className = 'platform-card-header';
+
+    var labelWrap = document.createElement('label');
+    var checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    checkbox.setAttribute('data-id', id);
+    checkbox.addEventListener('change', function () {
+      updateSelectedCount();
+      updateSelectAll();
+    });
+    labelWrap.appendChild(checkbox);
+    labelWrap.appendChild(document.createTextNode(' ' + name));
+    header.appendChild(labelWrap);
+
+    var sizeLabel = document.createElement('span');
+    sizeLabel.className = 'platform-card-size';
+    sizeLabel.textContent = size + 'x' + size;
+    header.appendChild(sizeLabel);
+
+    if (isCustom) {
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'platform-remove-btn';
+      removeBtn.type = 'button';
+      removeBtn.textContent = '\u00d7';
+      removeBtn.title = '削除';
+      removeBtn.addEventListener('click', function () {
+        state.customSizes = state.customSizes.filter(function (c) { return c.id !== id; });
+        renderPlatformGrid();
+        updateAllPreviews();
+        updateSelectedCount();
+        updateSelectAll();
+      });
+      header.appendChild(removeBtn);
+    }
+
+    card.appendChild(header);
+
+    var previewWrap = document.createElement('div');
+    previewWrap.className = 'platform-preview';
+    var previewCanvas = document.createElement('canvas');
+    previewCanvas.width = 160;
+    previewCanvas.height = 160;
+    previewCanvas.setAttribute('data-preview-id', id);
+    previewWrap.appendChild(previewCanvas);
+    card.appendChild(previewWrap);
+
+    var dlBtn = document.createElement('button');
+    dlBtn.className = 'platform-dl-btn';
+    dlBtn.type = 'button';
+    dlBtn.innerHTML = '&#11015; ダウンロード';
+    dlBtn.addEventListener('click', function () { downloadSingle(id, size, name); });
+    card.appendChild(dlBtn);
+
+    return card;
+  }
+
+  function updateAllPreviews() {
+    if (!state.originalImage) return;
+    var canvases = platformGrid.querySelectorAll('canvas[data-preview-id]');
+    for (var i = 0; i < canvases.length; i++) {
+      var c = canvases[i];
+      var ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, 160, 160);
+
+      // Background
+      if (state.format === 'png' && state.bgTransparent) {
+        drawCheckerboard(ctx, 160);
+      } else {
+        ctx.fillStyle = state.bgColor;
+        ctx.fillRect(0, 0, 160, 160);
+      }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(
+        state.originalImage,
+        state.cropX, state.cropY, state.cropSize, state.cropSize,
+        0, 0, 160, 160
+      );
+    }
+  }
+
+  /* ========== Select all ========== */
+  selectAllCheck.addEventListener('change', function () {
+    var checks = platformGrid.querySelectorAll('input[type="checkbox"]');
+    for (var i = 0; i < checks.length; i++) {
+      checks[i].checked = selectAllCheck.checked;
+    }
+    updateSelectedCount();
+  });
+
+  function updateSelectAll() {
+    var checks = platformGrid.querySelectorAll('input[type="checkbox"]');
+    var allChecked = true;
+    for (var i = 0; i < checks.length; i++) {
+      if (!checks[i].checked) { allChecked = false; break; }
+    }
+    selectAllCheck.checked = allChecked;
+  }
+
+  function updateSelectedCount() {
+    var checks = platformGrid.querySelectorAll('input[type="checkbox"]:checked');
+    selectedCountEl.textContent = checks.length + '件選択中';
+    btnZip.disabled = checks.length === 0;
+  }
+
+  /* ========== Custom size ========== */
+  btnAddCustom.addEventListener('click', function () {
+    var size = parseInt(customSizeInput.value, 10);
+    if (isNaN(size) || size < 16 || size > 4096) {
+      showToast('16〜4096px の範囲で入力してください');
+      return;
+    }
+    var customId = 'custom_' + state.nextCustomId++;
+    state.customSizes.push({ id: customId, name: 'カスタム ' + size + 'px', size: size });
+    renderPlatformGrid();
+    updateAllPreviews();
+    updateSelectedCount();
+    updateSelectAll();
+    showToast(size + 'px のカスタムサイズを追加しました');
+  });
+
+  /* ========== Resize & download ========== */
+  function resizeImage(targetSize) {
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+
+    // If we need to step down
+    var srcCanvas = document.createElement('canvas');
+    var srcCtx = srcCanvas.getContext('2d');
+    var currentSize = Math.min(state.cropSize, 4096);
+
+    // First, crop to a canvas
+    srcCanvas.width = currentSize;
+    srcCanvas.height = currentSize;
+
+    // Background
+    if (state.format === 'jpeg' || !state.bgTransparent) {
+      srcCtx.fillStyle = state.bgColor;
+      srcCtx.fillRect(0, 0, currentSize, currentSize);
+    }
+
+    srcCtx.imageSmoothingEnabled = true;
+    srcCtx.imageSmoothingQuality = 'high';
+    srcCtx.drawImage(
+      state.originalImage,
+      state.cropX, state.cropY, state.cropSize, state.cropSize,
+      0, 0, currentSize, currentSize
+    );
+
+    // Step-down resize if more than 2x reduction
+    while (currentSize > targetSize * 2) {
+      var halfSize = Math.round(currentSize / 2);
+      var tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = halfSize;
+      tmpCanvas.height = halfSize;
+      var tmpCtx = tmpCanvas.getContext('2d');
+      tmpCtx.imageSmoothingEnabled = true;
+      tmpCtx.imageSmoothingQuality = 'high';
+      tmpCtx.drawImage(srcCanvas, 0, 0, halfSize, halfSize);
+      srcCanvas = tmpCanvas;
+      srcCtx = tmpCtx;
+      currentSize = halfSize;
+    }
+
+    // Final resize
+    canvas.width = targetSize;
+    canvas.height = targetSize;
+
+    if (state.format === 'jpeg' || !state.bgTransparent) {
+      ctx.fillStyle = state.bgColor;
+      ctx.fillRect(0, 0, targetSize, targetSize);
+    }
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(srcCanvas, 0, 0, targetSize, targetSize);
+
+    return canvas;
+  }
+
+  function getBlob(targetSize) {
+    return new Promise(function (resolve) {
+      var canvas = resizeImage(targetSize);
+      var mimeType = state.format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      var quality = state.format === 'jpeg' ? state.quality : undefined;
+      canvas.toBlob(function (blob) {
+        resolve(blob);
+      }, mimeType, quality);
+    });
+  }
+
+  function getFilename(platformId, size) {
+    var ext = state.format === 'jpeg' ? 'jpg' : 'png';
+    return 'icon_' + platformId + '_' + size + 'x' + size + '.' + ext;
+  }
+
+  function downloadSingle(id, size) {
+    getBlob(size).then(function (blob) {
+      saveAs(blob, getFilename(id, size));
+      showToast(size + 'x' + size + ' をダウンロードしました');
+    });
+  }
+
+  /* ========== ZIP download ========== */
+  btnZip.addEventListener('click', function () {
+    var checkedItems = [];
+    var checks = platformGrid.querySelectorAll('input[type="checkbox"]:checked');
+    for (var i = 0; i < checks.length; i++) {
+      var id = checks[i].getAttribute('data-id');
+      // Find in platforms or custom
+      var found = PLATFORMS.find(function (p) { return p.id === id; });
+      if (!found) {
+        found = state.customSizes.find(function (c) { return c.id === id; });
+      }
+      if (found) checkedItems.push(found);
+    }
+
+    if (checkedItems.length === 0) {
+      showToast('ダウンロードするプラットフォームを選択してください');
+      return;
+    }
+
+    btnZip.disabled = true;
+    btnZip.textContent = '生成中...';
+
+    var zip = new JSZip();
+    var promises = checkedItems.map(function (item) {
+      return getBlob(item.size).then(function (blob) {
+        zip.file(getFilename(item.id, item.size), blob);
+      });
+    });
+
+    Promise.all(promises).then(function () {
+      return zip.generateAsync({ type: 'blob' });
+    }).then(function (content) {
+      saveAs(content, 'sns-icons.zip');
+      showToast('ZIPファイルをダウンロードしました');
+      btnZip.disabled = false;
+      btnZip.textContent = 'ZIP一括ダウンロード';
+      updateSelectedCount();
+    }).catch(function () {
+      showToast('エラーが発生しました');
+      btnZip.disabled = false;
+      btnZip.textContent = 'ZIP一括ダウンロード';
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
