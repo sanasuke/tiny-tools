@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ポモドーロタイマー | tiny-tools Day 14</title>
+  <meta name="description" content="トマト型タイマーで集中管理。作業25分/休憩5分サイクル。カスタム時間・セッション記録対応">
+  <link rel="stylesheet" href="style.css">
+  <script src="../shared/header.js"
+    data-repo="https://github.com/sanasuke/tiny-tools"
+    data-note="https://note.com/sana_suke"></script>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Timer Display -->
+    <div class="card timer-card">
+      <div class="tomato-wrap">
+        <svg class="tomato-svg" viewBox="0 0 300 300">
+          <!-- Tomato body background -->
+          <defs>
+            <radialGradient id="tomatoGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" class="tomato-grad-inner" />
+              <stop offset="100%" class="tomato-grad-outer" />
+            </radialGradient>
+          </defs>
+          <circle cx="150" cy="160" r="120" fill="url(#tomatoGrad)" class="tomato-body" />
+          <!-- Tomato inner segments (decorative) -->
+          <line x1="150" y1="60" x2="150" y2="260" class="tomato-segment" />
+          <line x1="50" y1="160" x2="250" y2="160" class="tomato-segment" />
+          <!-- Progress track -->
+          <circle cx="150" cy="160" r="105" class="progress-track" />
+          <!-- Progress arc -->
+          <circle cx="150" cy="160" r="105" class="progress-arc" id="progressArc"
+                  transform="rotate(-90 150 160)" />
+          <!-- Stem -->
+          <rect x="146" y="28" width="8" height="18" rx="3" class="tomato-stem" />
+          <!-- Leaf -->
+          <path d="M154 38 Q170 20 180 30 Q172 42 154 38Z" class="tomato-leaf" />
+          <path d="M146 38 Q130 20 120 30 Q128 42 146 38Z" class="tomato-leaf" />
+          <!-- Time display -->
+          <text x="150" y="155" class="time-text" id="timeText" text-anchor="middle" dominant-baseline="middle">25:00</text>
+          <!-- Phase label -->
+          <text x="150" y="185" class="phase-text" id="phaseText" text-anchor="middle" dominant-baseline="middle">作業</text>
+        </svg>
+      </div>
+
+      <!-- Phase dots -->
+      <div class="phase-dots" id="phaseDots">
+        <span class="dot" data-index="0"></span>
+        <span class="dot" data-index="1"></span>
+        <span class="dot" data-index="2"></span>
+        <span class="dot" data-index="3"></span>
+      </div>
+
+      <!-- Controls -->
+      <div class="timer-controls">
+        <button class="btn btn-primary" id="btnStart">スタート</button>
+        <button class="btn btn-secondary" id="btnPause" style="display:none">一時停止</button>
+        <button class="btn btn-primary" id="btnResume" style="display:none">再開</button>
+        <button class="btn btn-skip" id="btnSkip">スキップ ▶</button>
+        <button class="btn btn-reset" id="btnReset">リセット</button>
+      </div>
+    </div>
+
+    <!-- Task Label -->
+    <div class="card task-card">
+      <div class="card-title">タスク</div>
+      <input type="text" class="task-input" id="taskInput"
+             placeholder="今取り組んでいること…" maxlength="100">
+    </div>
+
+    <!-- Settings (collapsible) -->
+    <div class="card settings-card">
+      <div class="card-title clickable" id="settingsToggle">
+        設定 <span class="arrow" id="settingsArrow">▶</span>
+      </div>
+      <div class="collapsible" id="settingsBody">
+        <div class="setting-row">
+          <label>作業時間</label>
+          <div class="setting-control">
+            <input type="range" id="workMin" min="1" max="60" value="25">
+            <span class="setting-value" id="workMinLabel">25分</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label>小休憩</label>
+          <div class="setting-control">
+            <input type="range" id="shortBreakMin" min="1" max="30" value="5">
+            <span class="setting-value" id="shortBreakMinLabel">5分</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label>大休憩</label>
+          <div class="setting-control">
+            <input type="range" id="longBreakMin" min="1" max="60" value="15">
+            <span class="setting-value" id="longBreakMinLabel">15分</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label>大休憩まで</label>
+          <div class="setting-control">
+            <input type="range" id="sessionsCount" min="2" max="8" value="4">
+            <span class="setting-value" id="sessionsCountLabel">4セッション</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label>通知音</label>
+          <label class="toggle">
+            <input type="checkbox" id="soundEnabled" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <label>自動スタート</label>
+          <label class="toggle">
+            <input type="checkbox" id="autoStart">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats & History (collapsible) -->
+    <div class="card stats-card">
+      <div class="card-title clickable" id="statsToggle">
+        今日の記録 <span class="arrow" id="statsArrow">▶</span>
+      </div>
+      <div class="collapsible" id="statsBody">
+        <div class="stats-summary">
+          <div class="stat-item">
+            <div class="stat-value" id="statSessions">0</div>
+            <div class="stat-label">完了セッション</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="statTotalTime">0分</div>
+            <div class="stat-label">合計作業時間</div>
+          </div>
+        </div>
+        <div class="history-list" id="historyList"></div>
+        <button class="btn btn-clear" id="btnClearStats" style="display:none">記録をクリア</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/timer.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
