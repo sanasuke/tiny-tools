@@ -97,6 +97,17 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column;
 .template-card .tc-size{font-size:11px;color:#888;margin-top:2px}
 .modal-hint{font-size:11px;color:#aaa}
 
+/* ===== Auto-place Modal ===== */
+.auto-place-options{display:flex;gap:12px;justify-content:center;margin-bottom:16px}
+.auto-place-card{padding:20px 24px;border:2px solid #ddd;border-radius:10px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center;min-width:100px}
+.auto-place-card:hover{border-color:#4a90d9;background:#f0f6ff}
+.ap-icon{font-size:24px;margin-bottom:4px}
+.ap-name{font-size:14px;font-weight:600}
+.ap-desc{font-size:11px;color:#888;margin-top:2px}
+body.tt-dark .auto-place-card{border-color:#0f3460;color:#e0e0e0}
+body.tt-dark .auto-place-card:hover{border-color:#4a90d9;background:rgba(74,144,217,0.15)}
+body.tt-dark .ap-desc{color:#888}
+
 /* ===== Cursor Classes ===== */
 .cursor-default canvas{cursor:default}
 .cursor-pointer canvas{cursor:pointer}
@@ -152,7 +163,7 @@ body.tt-dark ::-webkit-scrollbar-thumb{background:#0f3460;border-radius:4px}
 
 /* ===== Print ===== */
 @media print{
-  #tt-header,#tt-overlay,#tt-toast,.toolbar,.tool-panel,.sidebar,.statusbar,.modal-overlay{display:none!important}
+  #tt-header,#tt-overlay,#tt-toast,.toolbar,.tool-panel,.sidebar,.statusbar,.modal-overlay,#auto-place-modal{display:none!important}
   body{background:white!important;overflow:visible!important;height:auto!important}
   .app{display:block!important}
   .canvas-area{position:static!important;width:100%!important;height:auto!important;background:white!important}
@@ -198,6 +209,10 @@ body.tt-dark ::-webkit-scrollbar-thumb{background:#0f3460;border-radius:4px}
       <button class="tb-btn" id="btn-png" title="PNG画像でエクスポート">PNG</button>
       <button class="tb-btn" id="btn-svg" title="SVG画像でエクスポート">SVG</button>
       <button class="tb-btn" id="btn-print" title="印刷 (A4横)">🖨</button>
+    </div>
+    <div class="toolbar-sep"></div>
+    <div class="toolbar-group">
+      <button class="tb-btn" id="btn-auto-place" title="おまかせ家具配置">🪄 おまかせ</button>
     </div>
     <div class="toolbar-sep"></div>
     <div class="toolbar-group">
@@ -283,6 +298,32 @@ body.tt-dark ::-webkit-scrollbar-thumb{background:#0f3460;border-radius:4px}
     <button class="stat-btn" id="btn-zoom-out" title="ズームアウト">−</button>
     <button class="stat-btn" id="btn-zoom-in" title="ズームイン">+</button>
     <button class="stat-btn" id="btn-zoom-fit" title="全体表示">⊞</button>
+  </div>
+</div>
+
+<!-- Auto-place Modal -->
+<div class="modal-overlay hidden" id="auto-place-modal">
+  <div class="modal">
+    <h3>🪄 おまかせ家具配置</h3>
+    <p class="modal-desc">家具の量を選んでください:</p>
+    <div class="auto-place-options">
+      <div class="auto-place-card" data-density="light">
+        <div class="ap-icon">🪶</div>
+        <div class="ap-name">少なめ</div>
+        <div class="ap-desc">最低限</div>
+      </div>
+      <div class="auto-place-card" data-density="normal">
+        <div class="ap-icon">🏠</div>
+        <div class="ap-name">普通</div>
+        <div class="ap-desc">おすすめ</div>
+      </div>
+      <div class="auto-place-card" data-density="full">
+        <div class="ap-icon">📦</div>
+        <div class="ap-name">多め</div>
+        <div class="ap-desc">フル装備</div>
+      </div>
+    </div>
+    <p class="modal-hint">※ 部屋ラベルから種類を自動判定<br>※ 既存の家具はそのまま残ります</p>
   </div>
 </div>
 
@@ -958,6 +999,9 @@ function applyForward(a) {
   else if (a.type === 'modify') {
     var obj = findObj(a.objType, a.id);
     if (obj) Object.assign(obj, deepCopy(a.after));
+  } else if (a.type === 'add_multi') {
+    var objs = deepCopy(a.objs);
+    for (var i = 0; i < objs.length; i++) arr.push(objs[i]);
   }
 }
 function applyReverse(a) {
@@ -967,6 +1011,8 @@ function applyReverse(a) {
   else if (a.type === 'modify') {
     var obj = findObj(a.objType, a.id);
     if (obj) Object.assign(obj, deepCopy(a.before));
+  } else if (a.type === 'add_multi') {
+    for (var i = 0; i < a.objs.length; i++) removeObj(a.objType, a.objs[i].id);
   }
 }
 function getArr(t) {
@@ -1480,6 +1526,8 @@ document.addEventListener('keydown', function(e) {
     setTool('select');
     var modal = document.getElementById('welcome-modal');
     if (!modal.classList.contains('hidden')) modal.classList.add('hidden');
+    var apModal = document.getElementById('auto-place-modal');
+    if (!apModal.classList.contains('hidden')) apModal.classList.add('hidden');
     scheduleRender();
     return;
   }
@@ -1871,6 +1919,254 @@ document.getElementById('btn-print').addEventListener('click', function() {
     S.zoom = origZoom; S.panX = origPanX; S.panY = origPanY; S.showGrid = origGrid;
     scheduleRender();
   });
+});
+
+/* ===== Auto-place Furniture ===== */
+var ROOM_PRESETS = {
+  living_dining: {
+    light:  ['sofa_2seat', 'coffee_table', 'tv_stand', 'dining_table_2', 'dining_chair', 'dining_chair'],
+    normal: ['sofa_2seat', 'coffee_table', 'tv_stand', 'tv', 'rug', 'dining_table_4', 'dining_chair', 'dining_chair', 'dining_chair', 'dining_chair'],
+    full:   ['sofa_3seat', 'coffee_table', 'tv_stand', 'tv', 'rug', 'bookshelf', 'dining_table_4', 'dining_chair', 'dining_chair', 'dining_chair', 'dining_chair', 'plant', 'aircon']
+  },
+  bedroom: {
+    light:  ['bed_single'],
+    normal: ['bed_single', 'nightstand', 'closet'],
+    full:   ['bed_semi_double', 'nightstand', 'closet', 'dresser', 'aircon']
+  },
+  dining_kitchen: {
+    light:  ['dining_table_2', 'dining_chair', 'dining_chair', 'fridge'],
+    normal: ['dining_table_4', 'dining_chair', 'dining_chair', 'dining_chair', 'dining_chair', 'fridge', 'cupboard'],
+    full:   ['dining_table_4', 'dining_chair', 'dining_chair', 'dining_chair', 'dining_chair', 'fridge', 'cupboard', 'microwave_stand']
+  },
+  kitchen: {
+    light:  ['fridge'],
+    normal: ['fridge', 'cupboard'],
+    full:   ['fridge', 'cupboard', 'microwave_stand']
+  },
+  bath: {
+    light:  ['bathtub'],
+    normal: ['bathtub', 'washstand'],
+    full:   ['bathtub', 'washstand', 'washing_machine']
+  },
+  toilet: {
+    light:  ['toilet'],
+    normal: ['toilet'],
+    full:   ['toilet']
+  },
+  washroom: {
+    light:  ['washstand'],
+    normal: ['washstand', 'washing_machine'],
+    full:   ['washstand', 'washing_machine']
+  },
+  generic: {
+    light:  ['desk'],
+    normal: ['desk', 'office_chair'],
+    full:   ['desk', 'office_chair', 'bookshelf']
+  }
+};
+
+var PLACE_HINT = {
+  bed_single: 'top', bed_semi_double: 'top', bed_double: 'top',
+  closet: 'bottom', tv_stand: 'top', tv: 'top',
+  bookshelf: 'left', aircon: 'top',
+  fridge: 'top-right', cupboard: 'top',
+  microwave_stand: 'top',
+  bathtub: 'top', washstand: 'left', washing_machine: 'right',
+  toilet: 'top',
+  kitchen_counter: 'top',
+  sofa_2seat: 'center-bottom', sofa_3seat: 'center-bottom',
+  coffee_table: 'center', rug: 'center',
+  dining_table_4: 'center', dining_table_2: 'center',
+  dining_chair: 'around-table',
+  desk: 'top', office_chair: 'center',
+  dresser: 'left', nightstand: 'beside-bed',
+  plant: 'corner'
+};
+
+function detectRoomType(text) {
+  if (!text) return 'generic';
+  if (/LDK|リビング/.test(text)) return 'living_dining';
+  if (/DK/.test(text)) return 'dining_kitchen';
+  if (/洋室|居室|寝室|ベッド/.test(text)) return 'bedroom';
+  if (/K|キッチン|台所/.test(text)) return 'kitchen';
+  if (/バス|浴室|風呂/.test(text)) return 'bath';
+  if (/トイレ/.test(text)) return 'toilet';
+  if (/洗面/.test(text)) return 'washroom';
+  return 'generic';
+}
+
+function getRoomRect(label) {
+  var area = (label.area && label.area > 0) ? label.area : 6;
+  var side = Math.sqrt(area) * 100; // m² → cm
+  var margin = 20;
+  return { x: label.x - side / 2 + margin, y: label.y - side / 2 + margin,
+           w: side - margin * 2, h: side - margin * 2 };
+}
+
+function rectsOverlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+         a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function computePlacement(roomRect, furnitureType, placed, allExisting) {
+  var cat = findCatalogItem(furnitureType);
+  if (!cat) return null;
+  var fw = cat.w, fh = cat.h;
+  var hint = PLACE_HINT[furnitureType] || 'center';
+  var rx = roomRect.x, ry = roomRect.y, rw = roomRect.w, rh = roomRect.h;
+  var cx, cy;
+
+  // Calculate initial position based on hint
+  if (hint === 'top') {
+    cx = rx + (rw - fw) / 2; cy = ry;
+  } else if (hint === 'bottom') {
+    cx = rx + (rw - fw) / 2; cy = ry + rh - fh;
+  } else if (hint === 'left') {
+    cx = rx; cy = ry + (rh - fh) / 2;
+  } else if (hint === 'right') {
+    cx = rx + rw - fw; cy = ry + (rh - fh) / 2;
+  } else if (hint === 'top-right') {
+    cx = rx + rw - fw; cy = ry;
+  } else if (hint === 'center') {
+    cx = rx + (rw - fw) / 2; cy = ry + (rh - fh) / 2;
+  } else if (hint === 'center-bottom') {
+    cx = rx + (rw - fw) / 2; cy = ry + rh * 0.6;
+  } else if (hint === 'corner') {
+    cx = rx; cy = ry;
+  } else if (hint === 'around-table') {
+    // Find last placed table and position around it
+    var table = null;
+    for (var ti = placed.length - 1; ti >= 0; ti--) {
+      if (/dining_table|coffee_table/.test(placed[ti].type)) { table = placed[ti]; break; }
+    }
+    if (table) {
+      var chairCount = 0;
+      for (var ci = 0; ci < placed.length; ci++) {
+        if (placed[ci].type === 'dining_chair') chairCount++;
+      }
+      var side = chairCount % 4;
+      if (side === 0) { cx = table.x - fw - 5; cy = table.y + (table.h - fh) / 2; }
+      else if (side === 1) { cx = table.x + table.w + 5; cy = table.y + (table.h - fh) / 2; }
+      else if (side === 2) { cx = table.x + (table.w - fw) / 2; cy = table.y - fh - 5; }
+      else { cx = table.x + (table.w - fw) / 2; cy = table.y + table.h + 5; }
+    } else {
+      cx = rx + (rw - fw) / 2; cy = ry + (rh - fh) / 2;
+    }
+  } else if (hint === 'beside-bed') {
+    var bed = null;
+    for (var bi = placed.length - 1; bi >= 0; bi--) {
+      if (/^bed_/.test(placed[bi].type)) { bed = placed[bi]; break; }
+    }
+    if (bed) {
+      cx = bed.x + bed.w + 5; cy = bed.y;
+    } else {
+      cx = rx + rw - fw; cy = ry;
+    }
+  } else {
+    cx = rx + (rw - fw) / 2; cy = ry + (rh - fh) / 2;
+  }
+
+  // Snap to grid
+  cx = Math.round(cx / S.gridSize) * S.gridSize;
+  cy = Math.round(cy / S.gridSize) * S.gridSize;
+
+  var candidate = { x: cx, y: cy, w: fw, h: fh };
+  // Check overlap with existing + already placed, try shifting if needed
+  var step = S.gridSize;
+  var maxAttempts = 20;
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    var overlap = false;
+    for (var ei = 0; ei < allExisting.length; ei++) {
+      if (rectsOverlap(candidate, allExisting[ei])) { overlap = true; break; }
+    }
+    if (!overlap) {
+      for (var pi = 0; pi < placed.length; pi++) {
+        if (rectsOverlap(candidate, placed[pi])) { overlap = true; break; }
+      }
+    }
+    if (!overlap) return candidate;
+    // Shift in spiral pattern
+    var dir = attempt % 4;
+    var dist = Math.floor(attempt / 4 + 1) * step;
+    if (dir === 0) candidate.x = cx + dist;
+    else if (dir === 1) candidate.x = cx - dist;
+    else if (dir === 2) { candidate.x = cx; candidate.y = cy + dist; }
+    else { candidate.x = cx; candidate.y = cy - dist; }
+  }
+  return null; // Could not place without overlap
+}
+
+function autoPlaceFurniture(density) {
+  if (S.labels.length === 0) {
+    if (window.__TT_showToast) window.__TT_showToast('部屋ラベルが見つかりません');
+    return;
+  }
+
+  // Collect existing furniture rects
+  var existingRects = S.furniture.map(function(f) {
+    return { x: f.x, y: f.y, w: f.w, h: f.h };
+  });
+
+  var addedFurniture = [];
+
+  S.labels.forEach(function(label) {
+    var roomType = detectRoomType(label.text);
+    var preset = ROOM_PRESETS[roomType];
+    if (!preset) return;
+    var items = preset[density];
+    if (!items) return;
+
+    var roomRect = getRoomRect(label);
+    var placedInRoom = [];
+
+    items.forEach(function(furnitureType) {
+      var cat = findCatalogItem(furnitureType);
+      if (!cat) return;
+
+      var pos = computePlacement(roomRect, furnitureType, placedInRoom, existingRects.concat(addedFurniture.map(function(f) {
+        return { x: f.x, y: f.y, w: f.w, h: f.h };
+      })));
+      if (!pos) return; // Skip if cannot place
+
+      var newF = {
+        id: S.nextId++, type: cat.type, x: pos.x, y: pos.y,
+        w: cat.w, h: cat.h, rotation: 0,
+        category: '', label: cat.label, color: cat.color
+      };
+      addedFurniture.push(newF);
+      placedInRoom.push({ x: pos.x, y: pos.y, w: cat.w, h: cat.h, type: cat.type });
+    });
+  });
+
+  if (addedFurniture.length === 0) {
+    if (window.__TT_showToast) window.__TT_showToast('配置できる家具がありませんでした');
+    return;
+  }
+
+  // Add all furniture to state
+  addedFurniture.forEach(function(f) { S.furniture.push(f); });
+
+  // Push single undo action for all
+  pushUndo({ type: 'add_multi', objType: 'furniture', objs: deepCopy(addedFurniture) });
+
+  clearSelection();
+  zoomToFit();
+  if (window.__TT_showToast) window.__TT_showToast(addedFurniture.length + '個の家具を配置しました');
+}
+
+// Auto-place modal events
+document.getElementById('btn-auto-place').addEventListener('click', function() {
+  document.getElementById('auto-place-modal').classList.remove('hidden');
+});
+document.querySelectorAll('.auto-place-card').forEach(function(card) {
+  card.addEventListener('click', function() {
+    var density = this.getAttribute('data-density');
+    document.getElementById('auto-place-modal').classList.add('hidden');
+    autoPlaceFurniture(density);
+  });
+});
+document.getElementById('auto-place-modal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.add('hidden');
 });
 
 /* ===== Init ===== */
