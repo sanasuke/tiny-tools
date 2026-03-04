@@ -1441,7 +1441,7 @@ canvas.addEventListener('wheel', function(e) {
   if (e.ctrlKey || e.metaKey) {
     // Pinch zoom (trackpad) or Ctrl+wheel
     var pos = getMousePos(e);
-    var factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    var factor = e.deltaY < 0 ? 1.05 : 1 / 1.05;
     zoomAtPoint(S.zoom * factor, pos.x, pos.y);
   } else {
     // Trackpad two-finger slide → pan
@@ -1497,8 +1497,8 @@ document.addEventListener('keydown', function(e) {
     return;
   }
   if (e.key === 'g' || e.key === 'G') { S.showGrid = !S.showGrid; scheduleRender(); return; }
-  if (e.key === '+' || e.key === '=') { zoomAtPoint(S.zoom * 1.15, cw/2, ch/2); return; }
-  if (e.key === '-' || e.key === '_') { zoomAtPoint(S.zoom / 1.15, cw/2, ch/2); return; }
+  if (e.key === '+' || e.key === '=') { zoomAtPoint(S.zoom * 1.1, cw/2, ch/2); return; }
+  if (e.key === '-' || e.key === '_') { zoomAtPoint(S.zoom / 1.1, cw/2, ch/2); return; }
   if (e.key === '0') { zoomToFit(); return; }
 });
 document.addEventListener('keyup', function(e) {
@@ -1521,8 +1521,8 @@ document.getElementById('chk-snap').addEventListener('change', function() { S.sn
 document.getElementById('chk-dim').addEventListener('change', function() { S.showDimensions = this.checked; scheduleRender(); });
 
 /* ===== Zoom Buttons ===== */
-document.getElementById('btn-zoom-in').addEventListener('click', function() { zoomAtPoint(S.zoom * 1.3, cw/2, ch/2); });
-document.getElementById('btn-zoom-out').addEventListener('click', function() { zoomAtPoint(S.zoom / 1.3, cw/2, ch/2); });
+document.getElementById('btn-zoom-in').addEventListener('click', function() { zoomAtPoint(S.zoom * 1.15, cw/2, ch/2); });
+document.getElementById('btn-zoom-out').addEventListener('click', function() { zoomAtPoint(S.zoom / 1.15, cw/2, ch/2); });
 document.getElementById('btn-zoom-fit').addEventListener('click', zoomToFit);
 
 /* ===== Sidebar Toggle (mobile) ===== */
