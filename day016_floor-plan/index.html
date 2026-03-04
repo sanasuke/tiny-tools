@@ -35,7 +35,7 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column;
 .tb-chk input{margin:0}
 
 /* ===== Tool Panel ===== */
-.tool-panel{display:flex;flex-direction:column;gap:2px;padding:6px 4px;background:#fff;border-right:1px solid #ddd;overflow-y:auto}
+.tool-panel{display:flex;flex-direction:column;gap:2px;padding:6px 4px;background:#fff;border-right:1px solid #ddd;overflow:visible}
 .tool-btn{width:44px;height:36px;border:2px solid transparent;border-radius:6px;background:none;cursor:pointer;
   font-size:16px;color:#666;display:flex;align-items:center;justify-content:center;transition:background .12s;
   position:relative}
@@ -43,7 +43,7 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column;
 .tool-btn.active{background:rgba(74,144,217,0.1);color:#4a90d9;border-color:#4a90d9}
 .tool-btn[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;left:calc(100% + 6px);top:50%;
   transform:translateY(-50%);background:#333;color:#fff;font-size:11px;padding:3px 8px;border-radius:4px;
-  white-space:nowrap;z-index:10;pointer-events:none}
+  white-space:nowrap;z-index:100;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,0.2)}
 .tool-sep{height:1px;background:#e0e0e0;margin:4px 8px}
 
 /* ===== Canvas Area ===== */
