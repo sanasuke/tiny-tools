@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>間取り図エディタ | tiny-tools Day 16</title>
+<meta name="description" content="間取り図の作成・家具配置シミュレーション。テンプレート・面積計算・SVG出力対応">
+<style>
+/* ===== Reset & Base ===== */
+*{margin:0;padding:0;box-sizing:border-box}
+body{height:100vh;overflow:hidden;display:flex;flex-direction:column;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Hiragino Sans','Noto Sans JP',sans-serif;
+  background:#f0f0f0;color:#333}
+
+/* ===== App Grid ===== */
+.app{display:grid;grid-template-columns:52px 1fr 240px;grid-template-rows:40px 1fr 28px;
+  grid-template-areas:"toolbar toolbar toolbar""tools canvas sidebar""status status status";
+  flex:1;min-height:0;margin-top:44px}
+.toolbar{grid-area:toolbar}
+.tool-panel{grid-area:tools}
+.canvas-area{grid-area:canvas}
+.sidebar{grid-area:sidebar}
+.statusbar{grid-area:status}
+
+/* ===== Toolbar ===== */
+.toolbar{display:flex;align-items:center;gap:4px;padding:0 8px;background:#fff;border-bottom:1px solid #ddd;overflow-x:auto}
+.toolbar-group{display:flex;align-items:center;gap:4px}
+.toolbar-sep{width:1px;height:20px;background:#ddd;margin:0 4px;flex-shrink:0}
+.tb-btn{padding:4px 8px;border:1px solid transparent;border-radius:4px;background:none;cursor:pointer;
+  font-size:12px;color:#555;white-space:nowrap;font-family:inherit}
+.tb-btn:hover{background:#e8e8e8;color:#222}
+.toolbar select{padding:2px 4px;border:1px solid #ddd;border-radius:4px;font-size:12px;background:#f5f5f5;color:#333;font-family:inherit}
+.toolbar label{font-size:11px;color:#666;white-space:nowrap}
+.tb-chk{display:flex;align-items:center;gap:2px;font-size:11px;color:#666;cursor:pointer}
+.tb-chk input{margin:0}
+
+/* ===== Tool Panel ===== */
+.tool-panel{display:flex;flex-direction:column;gap:2px;padding:6px 4px;background:#fff;border-right:1px solid #ddd;overflow-y:auto}
+.tool-btn{width:44px;height:36px;border:2px solid transparent;border-radius:6px;background:none;cursor:pointer;
+  font-size:16px;color:#666;display:flex;align-items:center;justify-content:center;transition:background .12s}
+.tool-btn:hover{background:#e8e8e8;color:#333}
+.tool-btn.active{background:rgba(74,144,217,0.1);color:#4a90d9;border-color:#4a90d9}
+.tool-sep{height:1px;background:#e0e0e0;margin:4px 8px}
+
+/* ===== Canvas Area ===== */
+.canvas-area{position:relative;background:#d0d0d0;overflow:hidden}
+.canvas-area canvas{position:absolute;top:0;left:0}
+
+/* ===== Sidebar ===== */
+.sidebar{display:flex;flex-direction:column;background:#fff;border-left:1px solid #ddd;overflow-y:auto}
+.sb-section{padding:10px;border-bottom:1px solid #eee}
+.sb-title{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:8px;letter-spacing:.5px}
+.prop-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px}
+.prop-row label{color:#666;min-width:32px;flex-shrink:0}
+.prop-row input[type="number"],.prop-row input[type="text"]{width:60px;padding:2px 4px;border:1px solid #ddd;border-radius:3px;font-size:12px;background:#f5f5f5;color:#333}
+.prop-row select{padding:2px 4px;border:1px solid #ddd;border-radius:3px;font-size:12px;background:#f5f5f5;color:#333}
+.prop-row span{font-size:12px;color:#333}
+.prop-hint{font-size:12px;color:#999;line-height:1.5}
+
+/* Category Tabs */
+.category-tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px}
+.cat-tab{padding:3px 8px;border-radius:12px;font-size:11px;border:1px solid #ddd;background:none;cursor:pointer;white-space:nowrap;color:#666;font-family:inherit}
+.cat-tab.active{background:#4a90d9;color:#fff;border-color:#4a90d9}
+
+/* Furniture List */
+.furniture-list{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow-y:auto}
+.furniture-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;
+  border:2px solid transparent;transition:background .15s}
+.furniture-item:hover{background:#f0f0f0}
+.furniture-item.active{border-color:#4a90d9;background:#f0f6ff}
+.fi-preview{border-radius:3px;flex-shrink:0;border:1px solid rgba(0,0,0,0.15)}
+.fi-name{font-size:12px;font-weight:500}
+.fi-size{font-size:10px;color:#888}
+
+/* ===== Statusbar ===== */
+.statusbar{display:flex;align-items:center;gap:12px;padding:0 10px;background:#fff;border-top:1px solid #ddd;font-size:11px;color:#666}
+.status-spacer{flex:1}
+.stat-btn{width:24px;height:22px;border:1px solid #ddd;border-radius:3px;background:none;cursor:pointer;font-size:13px;color:#666;display:flex;align-items:center;justify-content:center}
+.stat-btn:hover{background:#e8e8e8;color:#333}
+#sidebar-toggle{display:none}
+
+/* ===== Modal ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal-overlay.hidden{display:none}
+.modal{background:#fff;border-radius:12px;padding:28px 32px;max-width:480px;width:90%;text-align:center}
+.modal h3{font-size:18px;margin-bottom:8px}
+.modal-desc{font-size:13px;color:#888;margin-bottom:18px}
+.template-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.template-card{padding:16px 8px;border:2px solid #ddd;border-radius:8px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center}
+.template-card:hover{border-color:#4a90d9;background:#f0f6ff}
+.template-card .tc-icon{font-size:24px;margin-bottom:4px}
+.template-card .tc-name{font-size:13px;font-weight:600}
+.template-card .tc-size{font-size:11px;color:#888;margin-top:2px}
+.modal-hint{font-size:11px;color:#aaa}
+
+/* ===== Cursor Classes ===== */
+.cursor-default canvas{cursor:default}
+.cursor-pointer canvas{cursor:pointer}
+.cursor-crosshair canvas{cursor:crosshair}
+.cursor-copy canvas{cursor:copy}
+.cursor-text canvas{cursor:text}
+.cursor-grab canvas{cursor:grab}
+.cursor-grabbing canvas{cursor:grabbing}
+.cursor-nw-resize canvas{cursor:nw-resize}
+.cursor-ne-resize canvas{cursor:ne-resize}
+.cursor-se-resize canvas{cursor:se-resize}
+.cursor-sw-resize canvas{cursor:sw-resize}
+
+/* ===== Dark Mode ===== */
+body.tt-dark .app{background:#1a1a2e}
+body.tt-dark .toolbar{background:#16213e!important;border-color:#0f3460!important}
+body.tt-dark .toolbar select{background:#1a1a2e!important;color:#e0e0e0!important;border-color:#0f3460!important}
+body.tt-dark .toolbar label,.body.tt-dark .tb-chk{color:#aaa!important}
+body.tt-dark .tb-btn{color:#ccc!important}
+body.tt-dark .tb-btn:hover{background:#0f3460!important;color:#fff!important}
+body.tt-dark .tool-panel{background:#16213e!important;border-color:#0f3460!important}
+body.tt-dark .tool-btn{color:#aaa!important}
+body.tt-dark .tool-btn:hover{background:#0f3460!important;color:#fff!important}
+body.tt-dark .tool-btn.active{background:rgba(74,144,217,0.15)!important;color:#6ab0f3!important;border-color:#4a90d9!important}
+body.tt-dark .tool-sep{background:#0f3460!important}
+body.tt-dark .canvas-area{background:#111!important}
+body.tt-dark .sidebar{background:#16213e!important;border-color:#0f3460!important}
+body.tt-dark .sb-section{border-color:#0f3460!important}
+body.tt-dark .sb-title{color:#888!important}
+body.tt-dark .prop-row label{color:#aaa!important}
+body.tt-dark .prop-row span{color:#e0e0e0!important}
+body.tt-dark .prop-row input,.body.tt-dark .prop-row select{background:#1a1a2e!important;color:#e0e0e0!important;border-color:#0f3460!important}
+body.tt-dark .prop-hint{color:#666!important}
+body.tt-dark .cat-tab{color:#aaa!important;border-color:#0f3460!important;background:none!important}
+body.tt-dark .cat-tab.active{background:#4a90d9!important;color:#fff!important;border-color:#4a90d9!important}
+body.tt-dark .furniture-item:hover{background:#0f3460!important}
+body.tt-dark .furniture-item.active{background:rgba(74,144,217,0.15)!important;border-color:#4a90d9!important}
+body.tt-dark .fi-name{color:#e0e0e0!important}
+body.tt-dark .fi-size{color:#888!important}
+body.tt-dark .statusbar{background:#16213e!important;border-color:#0f3460!important;color:#888!important}
+body.tt-dark .stat-btn{border-color:#0f3460!important;color:#aaa!important}
+body.tt-dark .stat-btn:hover{background:#0f3460!important;color:#fff!important}
+body.tt-dark .modal{background:#16213e!important;color:#e0e0e0!important}
+body.tt-dark .modal-desc{color:#999!important}
+body.tt-dark .template-card{border-color:#0f3460!important;color:#e0e0e0!important}
+body.tt-dark .template-card:hover{border-color:#4a90d9!important;background:rgba(74,144,217,0.15)!important}
+body.tt-dark .template-card .tc-size{color:#888!important}
+body.tt-dark .modal-hint{color:#666!important}
+body.tt-dark .toolbar-sep{background:#0f3460!important}
+body.tt-dark ::-webkit-scrollbar{width:8px;height:8px}
+body.tt-dark ::-webkit-scrollbar-track{background:#1a1a2e}
+body.tt-dark ::-webkit-scrollbar-thumb{background:#0f3460;border-radius:4px}
+
+/* ===== Print ===== */
+@media print{
+  #tt-header,#tt-overlay,#tt-toast,.toolbar,.tool-panel,.sidebar,.statusbar,.modal-overlay{display:none!important}
+  body{background:white!important;overflow:visible!important;height:auto!important}
+  .app{display:block!important}
+  .canvas-area{position:static!important;width:100%!important;height:auto!important;background:white!important}
+  .canvas-area canvas{position:static!important;width:100%!important;height:auto!important}
+  @page{size:A4 landscape;margin:10mm}
+}
+
+/* ===== Responsive ===== */
+@media(max-width:768px){
+  .app{grid-template-columns:44px 1fr;grid-template-rows:auto 1fr 28px;
+    grid-template-areas:"toolbar toolbar""tools canvas""status status"}
+  .sidebar{display:none;position:absolute;right:0;top:0;bottom:28px;width:240px;z-index:50;
+    box-shadow:-2px 0 8px rgba(0,0,0,0.2)}
+  .sidebar.open{display:flex}
+  .toolbar{font-size:10px}
+  .tool-btn{width:32px;height:30px;font-size:14px}
+  #sidebar-toggle{display:flex}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <select id="template-select" title="テンプレート">
+        <option value="">テンプレート...</option>
+        <option value="blank">白紙</option>
+        <option value="oneK">1K (~20m²)</option>
+        <option value="oneLDK">1LDK (~35m²)</option>
+        <option value="twoLDK">2LDK (~55m²)</option>
+      </select>
+    </div>
+    <div class="toolbar-sep"></div>
+    <div class="toolbar-group">
+      <button class="tb-btn" id="btn-new" title="新規作成">🗋 新規</button>
+      <button class="tb-btn" id="btn-save" title="JSONで保存">💾 保存</button>
+      <button class="tb-btn" id="btn-load" title="JSONを読み込み">📂 読込</button>
+      <input type="file" id="file-input" accept=".json" style="display:none">
+    </div>
+    <div class="toolbar-sep"></div>
+    <div class="toolbar-group">
+      <button class="tb-btn" id="btn-png" title="PNG画像でエクスポート">PNG</button>
+      <button class="tb-btn" id="btn-svg" title="SVG画像でエクスポート">SVG</button>
+      <button class="tb-btn" id="btn-print" title="印刷 (A4横)">🖨</button>
+    </div>
+    <div class="toolbar-sep"></div>
+    <div class="toolbar-group">
+      <label>グリッド</label>
+      <select id="grid-size-select">
+        <option value="25">25cm</option>
+        <option value="50" selected>50cm</option>
+        <option value="100">100cm</option>
+      </select>
+      <label class="tb-chk"><input type="checkbox" id="chk-snap" checked> スナップ</label>
+      <label class="tb-chk"><input type="checkbox" id="chk-dim" checked> 寸法</label>
+    </div>
+  </div>
+
+  <!-- Tool Panel -->
+  <div class="tool-panel">
+    <button class="tool-btn active" data-tool="select" title="選択/移動 (V)">↖</button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" data-tool="wall" title="壁描画 (W)">━</button>
+    <button class="tool-btn" data-tool="door" title="ドア (D)">🚪</button>
+    <button class="tool-btn" data-tool="window" title="窓 (N)">☐</button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" data-tool="furniture" title="家具配置 (F)">🪑</button>
+    <button class="tool-btn" data-tool="label" title="ラベル (L)">A</button>
+    <button class="tool-btn" data-tool="measure" title="寸法線 (M)">↔</button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" data-tool="delete" title="削除 (X)">✕</button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" id="btn-undo" title="元に戻す (Ctrl+Z)" disabled>↩</button>
+    <button class="tool-btn" id="btn-redo" title="やり直し (Ctrl+Shift+Z)" disabled>↪</button>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-area" id="canvas-area">
+    <canvas id="main-canvas"></canvas>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="sb-section" id="prop-panel">
+      <div class="sb-title">プロパティ</div>
+      <div id="prop-empty" class="prop-hint">オブジェクトを選択すると<br>ここにプロパティが表示されます</div>
+      <div id="prop-furniture" style="display:none">
+        <div class="prop-row"><label>名前</label><span id="prop-f-name"></span></div>
+        <div class="prop-row"><label>X</label><input type="number" id="prop-f-x" step="10"><label>Y</label><input type="number" id="prop-f-y" step="10"></div>
+        <div class="prop-row"><label>幅</label><input type="number" id="prop-f-w" step="5" min="10"><label>奥行</label><input type="number" id="prop-f-h" step="5" min="10"></div>
+        <div class="prop-row"><label>回転</label><input type="number" id="prop-f-rot" step="15" min="0" max="345">°</div>
+      </div>
+      <div id="prop-wall" style="display:none">
+        <div class="prop-row"><label>長さ</label><span id="prop-w-len"></span>cm</div>
+        <div class="prop-row"><label>太さ</label><select id="prop-w-thick"><option value="12">外壁 (12cm)</option><option value="8" selected>内壁 (8cm)</option></select></div>
+      </div>
+      <div id="prop-label" style="display:none">
+        <div class="prop-row"><label>テキスト</label><input type="text" id="prop-l-text" placeholder="部屋名" style="width:100px"></div>
+        <div class="prop-row"><label>面積</label><input type="number" id="prop-l-area" step="0.5" min="0" placeholder="m²" style="width:60px"> m²</div>
+        <div class="prop-row"><span id="prop-l-display"></span></div>
+      </div>
+      <div id="prop-door" style="display:none">
+        <div class="prop-row"><label>種類</label><select id="prop-d-type"><option value="swing">開き戸</option><option value="slide">引き戸</option></select></div>
+        <div class="prop-row"><label>幅</label><input type="number" id="prop-d-width" step="5" min="60" max="120" value="80">cm</div>
+        <div class="prop-row"><label>回転</label><input type="number" id="prop-d-rot" step="90" min="0" max="270">°</div>
+      </div>
+      <div id="prop-window" style="display:none">
+        <div class="prop-row"><label>幅</label><input type="number" id="prop-win-width" step="5" min="40" max="200" value="80">cm</div>
+        <div class="prop-row"><label>回転</label><input type="number" id="prop-win-rot" step="90" min="0" max="270">°</div>
+      </div>
+    </div>
+    <div class="sb-section" id="furniture-palette">
+      <div class="sb-title">家具パレット</div>
+      <div class="category-tabs" id="cat-tabs"></div>
+      <div class="furniture-list" id="furniture-list"></div>
+    </div>
+  </div>
+
+  <!-- Statusbar -->
+  <div class="statusbar">
+    <span id="stat-zoom">🔍 100%</span>
+    <span id="stat-pos">📍 (0, 0)cm</span>
+    <span id="stat-grid">グリッド: 50cm</span>
+    <span id="stat-snap">スナップ: ON</span>
+    <span class="status-spacer"></span>
+    <button class="stat-btn" id="sidebar-toggle" title="サイドバー">📋</button>
+    <button class="stat-btn" id="btn-zoom-out" title="ズームアウト">−</button>
+    <button class="stat-btn" id="btn-zoom-in" title="ズームイン">+</button>
+    <button class="stat-btn" id="btn-zoom-fit" title="全体表示">⊞</button>
+  </div>
+</div>
+
+<!-- Welcome Modal -->
+<div class="modal-overlay hidden" id="welcome-modal">
+  <div class="modal">
+    <h3>📐 間取り図エディタ</h3>
+    <p class="modal-desc">テンプレートを選んでスタートしましょう</p>
+    <div class="template-grid" id="template-grid"></div>
+    <p class="modal-hint">※ 後からツールバーでも変更できます</p>
+  </div>
+</div>
+
+<script src="../shared/header.js" data-repo="https://github.com/naoki-wjm/tiny-tools" data-note="https://note.com/sana_suke"></script>
+<script>
+(function(){
+'use strict';
+
+/* ===== Constants & Data ===== */
+var FURNITURE_CATALOG = {
+  living: [
+    { type:'sofa_2seat',   label:'2人掛けソファ',  w:150, h:80,  color:'#8B7355' },
+    { type:'sofa_3seat',   label:'3人掛けソファ',  w:200, h:85,  color:'#8B7355' },
+    { type:'coffee_table', label:'ローテーブル',   w:110, h:55,  color:'#C4A882' },
+    { type:'tv_stand',     label:'テレビ台',       w:150, h:45,  color:'#A0522D' },
+    { type:'tv',           label:'テレビ',         w:120, h:8,   color:'#2C2C2C' },
+    { type:'bookshelf',    label:'本棚',           w:80,  h:30,  color:'#A0522D' },
+    { type:'rug',          label:'ラグ',           w:200, h:140, color:'#D2B48C' }
+  ],
+  bedroom: [
+    { type:'bed_single',      label:'シングルベッド',   w:100, h:210, color:'#DEB887' },
+    { type:'bed_semi_double', label:'セミダブルベッド', w:120, h:210, color:'#DEB887' },
+    { type:'bed_double',      label:'ダブルベッド',     w:140, h:210, color:'#DEB887' },
+    { type:'closet',          label:'クローゼット',     w:180, h:60,  color:'#8B6914' },
+    { type:'dresser',         label:'ドレッサー',       w:80,  h:40,  color:'#A0522D' },
+    { type:'nightstand',      label:'ナイトテーブル',   w:40,  h:40,  color:'#A0522D' }
+  ],
+  dining: [
+    { type:'dining_table_4', label:'ダイニングテーブル(4人)', w:135, h:80, color:'#C4A882' },
+    { type:'dining_table_2', label:'ダイニングテーブル(2人)', w:80,  h:80, color:'#C4A882' },
+    { type:'dining_chair',   label:'椅子',                   w:45,  h:45, color:'#8B6914' }
+  ],
+  kitchen: [
+    { type:'fridge',          label:'冷蔵庫',             w:65,  h:65,  color:'#C0C0C0' },
+    { type:'cupboard',        label:'食器棚',             w:90,  h:45,  color:'#A0522D' },
+    { type:'microwave_stand', label:'レンジ台',           w:60,  h:45,  color:'#A0522D' },
+    { type:'kitchen_counter', label:'キッチンカウンター', w:250, h:65,  color:'#808080' }
+  ],
+  bathroom: [
+    { type:'bathtub',         label:'浴槽',   w:140, h:75, color:'#ADD8E6' },
+    { type:'toilet',          label:'トイレ', w:45,  h:70, color:'#F5F5F5' },
+    { type:'washstand',       label:'洗面台', w:75,  h:50, color:'#F5F5F5' },
+    { type:'washing_machine', label:'洗濯機', w:60,  h:60, color:'#E8E8E8' }
+  ],
+  other: [
+    { type:'aircon',       label:'エアコン',       w:80,  h:20, color:'#E8E8E8' },
+    { type:'plant',        label:'観葉植物',       w:40,  h:40, color:'#228B22' },
+    { type:'desk',         label:'デスク',         w:120, h:60, color:'#A0522D' },
+    { type:'office_chair', label:'オフィスチェア', w:55,  h:55, color:'#333333' }
+  ]
+};
+var CATEGORY_LABELS = {
+  living:'リビング', bedroom:'ベッドルーム', dining:'ダイニング',
+  kitchen:'キッチン', bathroom:'バス・トイレ', other:'その他'
+};
+
+/* ===== State ===== */
+var S = {
+  zoom:1.0, panX:0, panY:0,
+  gridSize:50, showGrid:true, snapToGrid:true, showDimensions:true,
+  scalePixelsPerCm:2,
+  tool:'select',
+  walls:[], furniture:[], doors:[], windows:[], labels:[], measures:[],
+  nextId:1,
+  selectedType:null, selectedId:null,
+  dragMode:null, dragStartWX:0, dragStartWY:0, dragOffsetX:0, dragOffsetY:0,
+  resizeHandle:null, dragOriginal:null,
+  furnitureCategory:'living', furniturePlaceType:null,
+  isPanning:false, spaceDown:false, isDrawing:false,
+  wallStartX:0, wallStartY:0, wallPreview:null,
+  hoverWX:0, hoverWY:0, hoverHit:null,
+  undoStack:[], redoStack:[], maxUndo:50,
+  autoSaveKey:'tt-floor-plan-autosave', autoSaveTimer:null,
+  renderScheduled:false
+};
+
+/* ===== DOM refs ===== */
+var canvasArea = document.getElementById('canvas-area');
+var canvas = document.getElementById('main-canvas');
+var ctx = canvas.getContext('2d');
+var cw = 100, ch = 100;
+
+/* ===== Canvas setup ===== */
+function resizeCanvas() {
+  var r = canvasArea.getBoundingClientRect();
+  cw = r.width; ch = r.height;
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  scheduleRender();
+}
+if (window.ResizeObserver) {
+  new ResizeObserver(resizeCanvas).observe(canvasArea);
+} else {
+  window.addEventListener('resize', resizeCanvas);
+}
+setTimeout(resizeCanvas, 0);
+
+/* ===== Coordinate transforms ===== */
+function worldToScreen(wx, wy) {
+  var s = S.zoom * S.scalePixelsPerCm;
+  return { x: wx * s + S.panX + cw / 2, y: wy * s + S.panY + ch / 2 };
+}
+function screenToWorld(sx, sy) {
+  var s = S.zoom * S.scalePixelsPerCm;
+  return { x: (sx - S.panX - cw / 2) / s, y: (sy - S.panY - ch / 2) / s };
+}
+function snap(val) {
+  return S.snapToGrid ? Math.round(val / S.gridSize) * S.gridSize : val;
+}
+
+/* ===== Zoom ===== */
+function zoomAtPoint(newZoom, sx, sy) {
+  var before = screenToWorld(sx, sy);
+  S.zoom = Math.max(0.1, Math.min(10, newZoom));
+  var after = screenToWorld(sx, sy);
+  var s = S.zoom * S.scalePixelsPerCm;
+  S.panX += (after.x - before.x) * s;
+  S.panY += (after.y - before.y) * s;
+  scheduleRender();
+}
+function zoomToFit() {
+  var bb = getBoundingBox();
+  if (!bb) { S.zoom = 1; S.panX = 0; S.panY = 0; scheduleRender(); return; }
+  var pad = 100;
+  var bw = bb.maxX - bb.minX + pad * 2;
+  var bh = bb.maxY - bb.minY + pad * 2;
+  var zx = cw / (bw * S.scalePixelsPerCm);
+  var zy = ch / (bh * S.scalePixelsPerCm);
+  S.zoom = Math.max(0.1, Math.min(10, Math.min(zx, zy)));
+  var cx = (bb.minX + bb.maxX) / 2;
+  var cy = (bb.minY + bb.maxY) / 2;
+  S.panX = -cx * S.zoom * S.scalePixelsPerCm;
+  S.panY = -cy * S.zoom * S.scalePixelsPerCm;
+  scheduleRender();
+}
+function getBoundingBox() {
+  var pts = [];
+  S.walls.forEach(function(w) { pts.push(w.x1, w.x2); pts.push(w.y1, w.y2); });
+  S.furniture.forEach(function(f) { pts.push(f.x, f.x + f.w); pts.push(f.y, f.y + f.h); });
+  S.doors.forEach(function(d) { pts.push(d.x - d.width / 2, d.x + d.width / 2); pts.push(d.y - d.width / 2, d.y + d.width / 2); });
+  S.windows.forEach(function(w) { pts.push(w.x - w.width / 2, w.x + w.width / 2); pts.push(w.y - w.width / 2, w.y + w.width / 2); });
+  S.labels.forEach(function(l) { pts.push(l.x - 50, l.x + 50); pts.push(l.y - 20, l.y + 20); });
+  S.measures.forEach(function(m) { pts.push(m.x1, m.x2); pts.push(m.y1, m.y2); });
+  if (pts.length < 2) return null;
+  var xs = [], ys = [];
+  for (var i = 0; i < pts.length; i += 2) { xs.push(pts[i]); }
+  for (var i = 1; i < pts.length; i += 2) { ys.push(pts[i]); }
+  // Fix: separate x and y
+  xs = []; ys = [];
+  S.walls.forEach(function(w) { xs.push(w.x1, w.x2); ys.push(w.y1, w.y2); });
+  S.furniture.forEach(function(f) { xs.push(f.x, f.x + f.w); ys.push(f.y, f.y + f.h); });
+  S.doors.forEach(function(d) { xs.push(d.x - d.width/2, d.x + d.width/2); ys.push(d.y - d.width/2, d.y + d.width/2); });
+  S.windows.forEach(function(w) { xs.push(w.x - w.width/2, w.x + w.width/2); ys.push(w.y - w.width/2, w.y + w.width/2); });
+  S.labels.forEach(function(l) { xs.push(l.x - 50, l.x + 50); ys.push(l.y - 20, l.y + 20); });
+  S.measures.forEach(function(m) { xs.push(m.x1, m.x2); ys.push(m.y1, m.y2); });
+  if (xs.length === 0) return null;
+  return { minX: Math.min.apply(null, xs), maxX: Math.max.apply(null, xs),
+           minY: Math.min.apply(null, ys), maxY: Math.max.apply(null, ys) };
+}
+
+/* ===== Render ===== */
+function scheduleRender() {
+  if (S.renderScheduled) return;
+  S.renderScheduled = true;
+  requestAnimationFrame(render);
+}
+function isDark() { return document.body.classList.contains('tt-dark'); }
+
+function render() {
+  S.renderScheduled = false;
+  var dark = isDark();
+  // Clear
+  ctx.save();
+  ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+  ctx.fillStyle = dark ? '#111' : '#d0d0d0';
+  ctx.fillRect(0, 0, cw, ch);
+
+  var totalObj = S.walls.length + S.furniture.length + S.doors.length + S.windows.length + S.labels.length + S.measures.length;
+
+  // Empty guide
+  if (totalObj === 0 && !S.wallPreview && !S.furniturePlaceType) {
+    ctx.fillStyle = dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.25)';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('壁ツールで壁を描くか、', cw / 2, ch / 2 - 12);
+    ctx.fillText('テンプレートを選択してスタートしましょう', cw / 2, ch / 2 + 12);
+  }
+
+  // Apply transform
+  var s = S.zoom * S.scalePixelsPerCm;
+  ctx.translate(S.panX + cw / 2, S.panY + ch / 2);
+  ctx.scale(s, s);
+
+  // Grid
+  if (S.showGrid) drawGrid(dark);
+
+  // Objects
+  drawWalls(dark);
+  drawDoors(dark);
+  drawWindows(dark);
+  drawFurniture(dark);
+  drawLabels(dark);
+  drawMeasures(dark);
+
+  // Delete hover highlight
+  if (S.tool === 'delete' && S.hoverHit) drawDeleteHighlight(dark);
+
+  // Selection handles
+  if (S.selectedId !== null) drawSelectionHandles(dark);
+
+  // Wall preview
+  if (S.wallPreview) drawWallPreview(dark);
+
+  // Furniture ghost
+  if (S.furniturePlaceType && S.tool === 'furniture') drawFurnitureGhost(dark);
+
+  // Measure preview
+  if (S.tool === 'measure' && S.isDrawing) drawMeasurePreview(dark);
+
+  ctx.restore();
+
+  // Status bar
+  updateStatusBar();
+}
+
+/* ===== Grid Drawing ===== */
+function drawGrid(dark) {
+  var inv = screenToWorld(0, 0);
+  var inv2 = screenToWorld(cw, ch);
+  var startX = Math.floor(inv.x / S.gridSize) * S.gridSize;
+  var startY = Math.floor(inv.y / S.gridSize) * S.gridSize;
+  var endX = Math.ceil(inv2.x / S.gridSize) * S.gridSize;
+  var endY = Math.ceil(inv2.y / S.gridSize) * S.gridSize;
+  ctx.lineWidth = 1 / (S.zoom * S.scalePixelsPerCm);
+
+  for (var x = startX; x <= endX; x += S.gridSize) {
+    ctx.strokeStyle = (x % 100 === 0) ? (dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)')
+                                        : (dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)');
+    ctx.beginPath(); ctx.moveTo(x, startY); ctx.lineTo(x, endY); ctx.stroke();
+  }
+  for (var y = startY; y <= endY; y += S.gridSize) {
+    ctx.strokeStyle = (y % 100 === 0) ? (dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)')
+                                        : (dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)');
+    ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke();
+  }
+}
+
+/* ===== Wall Drawing ===== */
+function drawWalls(dark) {
+  S.walls.forEach(function(w) {
+    var sel = (S.selectedType === 'wall' && S.selectedId === w.id);
+    var dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) return;
+    var nx = -dy / len * w.thickness / 2;
+    var ny = dx / len * w.thickness / 2;
+    ctx.fillStyle = sel ? (dark ? '#6ab0f3' : '#4a90d9') : (dark ? '#999' : '#333');
+    ctx.beginPath();
+    ctx.moveTo(w.x1 + nx, w.y1 + ny);
+    ctx.lineTo(w.x2 + nx, w.y2 + ny);
+    ctx.lineTo(w.x2 - nx, w.y2 - ny);
+    ctx.lineTo(w.x1 - nx, w.y1 - ny);
+    ctx.closePath();
+    ctx.fill();
+
+    // Dimension label
+    if (S.showDimensions && len > 30) {
+      var mx = (w.x1 + w.x2) / 2, my = (w.y1 + w.y2) / 2;
+      var fs = 12 / (S.zoom * S.scalePixelsPerCm);
+      ctx.font = fs + 'px sans-serif';
+      ctx.fillStyle = dark ? '#ff6b81' : '#e94560';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(Math.round(len) + 'cm', mx, my - w.thickness / 2 - 4 / (S.zoom * S.scalePixelsPerCm));
+    }
+  });
+}
+
+function drawWallPreview(dark) {
+  var w = S.wallPreview;
+  var dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+  var len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return;
+  var nx = -dy / len * w.thickness / 2;
+  var ny = dx / len * w.thickness / 2;
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = dark ? '#6ab0f3' : '#4a90d9';
+  ctx.beginPath();
+  ctx.moveTo(w.x1 + nx, w.y1 + ny);
+  ctx.lineTo(w.x2 + nx, w.y2 + ny);
+  ctx.lineTo(w.x2 - nx, w.y2 - ny);
+  ctx.lineTo(w.x1 - nx, w.y1 - ny);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  var mx = (w.x1 + w.x2) / 2, my = (w.y1 + w.y2) / 2;
+  var fs = 12 / (S.zoom * S.scalePixelsPerCm);
+  ctx.font = 'bold ' + fs + 'px sans-serif';
+  ctx.fillStyle = dark ? '#ff6b81' : '#e94560';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText(Math.round(len) + 'cm', mx, my - w.thickness / 2 - 6 / (S.zoom * S.scalePixelsPerCm));
+}
+
+/* ===== Door Drawing ===== */
+function drawDoors(dark) {
+  S.doors.forEach(function(d) {
+    var sel = (S.selectedType === 'door' && S.selectedId === d.id);
+    ctx.save();
+    ctx.translate(d.x, d.y);
+    ctx.rotate(d.rotation * Math.PI / 180);
+    var w = d.width;
+    ctx.strokeStyle = sel ? (dark ? '#6ab0f3' : '#4a90d9') : (dark ? '#6ab0f3' : '#4a90d9');
+    ctx.lineWidth = 2 / (S.zoom * S.scalePixelsPerCm);
+    if (d.doorType === 'slide') {
+      ctx.beginPath(); ctx.moveTo(-w/2, 0); ctx.lineTo(w/2, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(w/4, -6/(S.zoom*S.scalePixelsPerCm));
+      ctx.lineTo(w/2, 0); ctx.lineTo(w/4, 6/(S.zoom*S.scalePixelsPerCm)); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(-w/2, 0); ctx.lineTo(w/2, 0); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-w/2, 0, w, 0, -Math.PI/2, true); ctx.stroke();
+    }
+    ctx.restore();
+  });
+}
+
+/* ===== Window Drawing ===== */
+function drawWindows(dark) {
+  S.windows.forEach(function(w) {
+    var sel = (S.selectedType === 'window' && S.selectedId === w.id);
+    ctx.save();
+    ctx.translate(w.x, w.y);
+    ctx.rotate(w.rotation * Math.PI / 180);
+    var hw = w.width / 2;
+    var t = 6;
+    ctx.strokeStyle = sel ? (dark ? '#6ab0f3' : '#4a90d9') : (dark ? '#6dd5c5' : '#5bb8a9');
+    ctx.lineWidth = 2 / (S.zoom * S.scalePixelsPerCm);
+    ctx.beginPath(); ctx.moveTo(-hw, -t/2); ctx.lineTo(hw, -t/2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-hw, t/2); ctx.lineTo(hw, t/2); ctx.stroke();
+    ctx.strokeStyle = sel ? (dark ? '#6ab0f3' : '#4a90d9') : (dark ? 'rgba(109,213,197,0.4)' : 'rgba(91,184,169,0.4)');
+    ctx.beginPath(); ctx.moveTo(-hw, 0); ctx.lineTo(hw, 0); ctx.stroke();
+    ctx.restore();
+  });
+}
+
+/* ===== Furniture Drawing ===== */
+function drawFurniture(dark) {
+  S.furniture.forEach(function(f) {
+    var sel = (S.selectedType === 'furniture' && S.selectedId === f.id);
+    ctx.save();
+    var cx = f.x + f.w / 2, cy = f.y + f.h / 2;
+    ctx.translate(cx, cy);
+    ctx.rotate(f.rotation * Math.PI / 180);
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = f.color;
+    ctx.fillRect(-f.w / 2, -f.h / 2, f.w, f.h);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = sel ? (dark ? '#6ab0f3' : '#4a90d9') : 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = sel ? 3 / (S.zoom * S.scalePixelsPerCm) : 1 / (S.zoom * S.scalePixelsPerCm);
+    ctx.strokeRect(-f.w / 2, -f.h / 2, f.w, f.h);
+    // Label
+    var fs = Math.min(14, Math.min(f.w, f.h) * 0.3);
+    fs = Math.max(8, fs);
+    ctx.font = fs + 'px sans-serif';
+    ctx.fillStyle = dark ? '#eee' : '#333';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(f.label, 0, 0);
+    ctx.restore();
+  });
+}
+
+function drawFurnitureGhost(dark) {
+  var cat = findCatalogItem(S.furniturePlaceType);
+  if (!cat) return;
+  var wx = snap(S.hoverWX), wy = snap(S.hoverWY);
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  ctx.fillStyle = cat.color;
+  ctx.fillRect(wx, wy, cat.w, cat.h);
+  ctx.strokeStyle = dark ? '#6ab0f3' : '#4a90d9';
+  ctx.lineWidth = 2 / (S.zoom * S.scalePixelsPerCm);
+  ctx.strokeRect(wx, wy, cat.w, cat.h);
+  ctx.globalAlpha = 0.6;
+  var fs = Math.min(14, Math.min(cat.w, cat.h) * 0.3);
+  ctx.font = Math.max(8, fs) + 'px sans-serif';
+  ctx.fillStyle = dark ? '#eee' : '#333';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(cat.label, wx + cat.w / 2, wy + cat.h / 2);
+  ctx.restore();
+}
+
+/* ===== Label Drawing ===== */
+function drawLabels(dark) {
+  S.labels.forEach(function(l) {
+    var sel = (S.selectedType === 'label' && S.selectedId === l.id);
+    var fs = (l.fontSize || 16);
+    ctx.font = 'bold ' + fs + 'px sans-serif';
+    ctx.fillStyle = sel ? (dark ? '#6ab0f3' : '#4a90d9') : (dark ? '#ddd' : '#333');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(l.text || '', l.x, l.y);
+    if (l.area != null && l.area > 0) {
+      var afs = fs * 0.7;
+      ctx.font = afs + 'px sans-serif';
+      ctx.fillStyle = dark ? '#aaa' : '#888';
+      var tatami = (l.area / 1.62).toFixed(1);
+      ctx.fillText(l.area + 'm² / ' + tatami + '畳', l.x, l.y + fs * 0.9);
+    }
+    if (sel) {
+      var tw = ctx.measureText(l.text || '').width;
+      ctx.strokeStyle = dark ? '#6ab0f3' : '#4a90d9';
+      ctx.lineWidth = 1 / (S.zoom * S.scalePixelsPerCm);
+      ctx.strokeRect(l.x - tw / 2 - 4, l.y - fs / 2 - 4, tw + 8, fs + 8 + (l.area > 0 ? fs * 0.9 : 0));
+    }
+  });
+}
+
+/* ===== Measure Drawing ===== */
+function drawMeasures(dark) {
+  S.measures.forEach(function(m) {
+    drawMeasureLine(m.x1, m.y1, m.x2, m.y2, dark, S.selectedType === 'measure' && S.selectedId === m.id);
+  });
+}
+function drawMeasurePreview(dark) {
+  drawMeasureLine(S.wallStartX, S.wallStartY, snap(S.hoverWX), snap(S.hoverWY), dark, false);
+}
+function drawMeasureLine(x1, y1, x2, y2, dark, sel) {
+  var dx = x2 - x1, dy = y2 - y1;
+  var len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1) return;
+  var arrowSize = 8 / (S.zoom * S.scalePixelsPerCm);
+  ctx.strokeStyle = sel ? (dark ? '#6ab0f3' : '#4a90d9') : (dark ? '#ff6b81' : '#e94560');
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.lineWidth = 1.5 / (S.zoom * S.scalePixelsPerCm);
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  // Arrows
+  var angle = Math.atan2(dy, dx);
+  drawArrowHead(x1, y1, angle + Math.PI, arrowSize);
+  drawArrowHead(x2, y2, angle, arrowSize);
+  // Text
+  var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  var fs = 12 / (S.zoom * S.scalePixelsPerCm);
+  ctx.font = 'bold ' + fs + 'px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText(Math.round(len) + 'cm', mx, my - 6 / (S.zoom * S.scalePixelsPerCm));
+}
+function drawArrowHead(x, y, angle, size) {
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x - size * Math.cos(angle - 0.4), y - size * Math.sin(angle - 0.4));
+  ctx.lineTo(x - size * Math.cos(angle + 0.4), y - size * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fill();
+}
+
+/* ===== Delete Highlight ===== */
+function drawDeleteHighlight(dark) {
+  var h = S.hoverHit;
+  if (!h) return;
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = 'rgba(233,69,96,0.3)';
+  var obj = findObj(h.type, h.id);
+  if (!obj) { ctx.globalAlpha = 1; return; }
+  if (h.type === 'wall') {
+    var w = obj, dx = w.x2 - w.x1, dy = w.y2 - w.y1, len = Math.sqrt(dx*dx+dy*dy);
+    if (len > 0) {
+      var nx = -dy/len*w.thickness/2, ny = dx/len*w.thickness/2;
+      ctx.beginPath(); ctx.moveTo(w.x1+nx,w.y1+ny); ctx.lineTo(w.x2+nx,w.y2+ny);
+      ctx.lineTo(w.x2-nx,w.y2-ny); ctx.lineTo(w.x1-nx,w.y1-ny); ctx.closePath(); ctx.fill();
+    }
+  } else if (h.type === 'furniture') {
+    ctx.save(); ctx.translate(obj.x+obj.w/2, obj.y+obj.h/2); ctx.rotate(obj.rotation*Math.PI/180);
+    ctx.fillRect(-obj.w/2,-obj.h/2,obj.w,obj.h); ctx.restore();
+  } else if (h.type === 'door' || h.type === 'window') {
+    var r = obj.width / 2 + 10;
+    ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI*2); ctx.fill();
+  } else if (h.type === 'label') {
+    ctx.beginPath(); ctx.arc(obj.x, obj.y, 30, 0, Math.PI*2); ctx.fill();
+  } else if (h.type === 'measure') {
+    ctx.lineWidth = 6/(S.zoom*S.scalePixelsPerCm);
+    ctx.strokeStyle = 'rgba(233,69,96,0.4)';
+    ctx.beginPath(); ctx.moveTo(obj.x1,obj.y1); ctx.lineTo(obj.x2,obj.y2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ===== Selection Handles ===== */
+function drawSelectionHandles(dark) {
+  var obj = findObj(S.selectedType, S.selectedId);
+  if (!obj) return;
+  var hs = 6 / (S.zoom * S.scalePixelsPerCm);
+  ctx.strokeStyle = dark ? '#6ab0f3' : '#4a90d9';
+  ctx.fillStyle = '#fff';
+  ctx.lineWidth = 1.5 / (S.zoom * S.scalePixelsPerCm);
+  if (S.selectedType === 'furniture') {
+    ctx.save();
+    ctx.translate(obj.x + obj.w/2, obj.y + obj.h/2);
+    ctx.rotate(obj.rotation * Math.PI / 180);
+    var hw = obj.w/2, hh = obj.h/2;
+    [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].forEach(function(p) {
+      ctx.fillRect(p[0]-hs/2, p[1]-hs/2, hs, hs);
+      ctx.strokeRect(p[0]-hs/2, p[1]-hs/2, hs, hs);
+    });
+    // Rotation handle
+    var rr = hs * 0.6;
+    ctx.beginPath(); ctx.arc(0, -hh - 20/(S.zoom*S.scalePixelsPerCm), rr, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -hh); ctx.lineTo(0, -hh - 20/(S.zoom*S.scalePixelsPerCm) + rr); ctx.stroke();
+    ctx.restore();
+  } else if (S.selectedType === 'wall') {
+    var rr = hs * 0.7;
+    [[obj.x1,obj.y1],[obj.x2,obj.y2]].forEach(function(p) {
+      ctx.beginPath(); ctx.arc(p[0], p[1], rr, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    });
+  } else if (S.selectedType === 'door' || S.selectedType === 'window') {
+    ctx.beginPath(); ctx.arc(obj.x, obj.y, hs*0.7, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+}
+
+/* ===== Hit Test ===== */
+function hitTest(wx, wy) {
+  var i, f, d;
+  // Furniture (reverse order)
+  for (i = S.furniture.length - 1; i >= 0; i--) {
+    f = S.furniture[i];
+    if (pointInRotatedRect(wx, wy, f)) return { type: 'furniture', id: f.id };
+  }
+  // Labels
+  for (i = S.labels.length - 1; i >= 0; i--) {
+    d = Math.sqrt(Math.pow(wx - S.labels[i].x, 2) + Math.pow(wy - S.labels[i].y, 2));
+    if (d < 30) return { type: 'label', id: S.labels[i].id };
+  }
+  // Measures
+  for (i = S.measures.length - 1; i >= 0; i--) {
+    var m = S.measures[i];
+    if (pointToSegmentDist(wx, wy, m.x1, m.y1, m.x2, m.y2) < 10) return { type: 'measure', id: m.id };
+  }
+  // Doors
+  for (i = S.doors.length - 1; i >= 0; i--) {
+    d = Math.sqrt(Math.pow(wx - S.doors[i].x, 2) + Math.pow(wy - S.doors[i].y, 2));
+    if (d < S.doors[i].width / 2 + 10) return { type: 'door', id: S.doors[i].id };
+  }
+  // Windows
+  for (i = S.windows.length - 1; i >= 0; i--) {
+    d = Math.sqrt(Math.pow(wx - S.windows[i].x, 2) + Math.pow(wy - S.windows[i].y, 2));
+    if (d < S.windows[i].width / 2 + 10) return { type: 'window', id: S.windows[i].id };
+  }
+  // Walls
+  for (i = S.walls.length - 1; i >= 0; i--) {
+    var w = S.walls[i];
+    if (pointToSegmentDist(wx, wy, w.x1, w.y1, w.x2, w.y2) < w.thickness / 2 + 5)
+      return { type: 'wall', id: w.id };
+  }
+  return null;
+}
+
+function pointInRotatedRect(px, py, f) {
+  var cx = f.x + f.w / 2, cy = f.y + f.h / 2;
+  var cos = Math.cos(-f.rotation * Math.PI / 180);
+  var sin = Math.sin(-f.rotation * Math.PI / 180);
+  var dx = px - cx, dy = py - cy;
+  var lx = dx * cos - dy * sin;
+  var ly = dx * sin + dy * cos;
+  return Math.abs(lx) <= f.w / 2 + 5 && Math.abs(ly) <= f.h / 2 + 5;
+}
+
+function pointToSegmentDist(px, py, x1, y1, x2, y2) {
+  var dx = x2 - x1, dy = y2 - y1;
+  var lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.sqrt((px-x1)*(px-x1) + (py-y1)*(py-y1));
+  var t = Math.max(0, Math.min(1, ((px-x1)*dx + (py-y1)*dy) / lenSq));
+  var cx = x1 + t * dx, cy = y1 + t * dy;
+  return Math.sqrt((px-cx)*(px-cx) + (py-cy)*(py-cy));
+}
+
+function hitResizeHandle(wx, wy) {
+  if (S.selectedType !== 'furniture') return null;
+  var obj = findObj('furniture', S.selectedId);
+  if (!obj) return null;
+  var cx = obj.x + obj.w/2, cy = obj.y + obj.h/2;
+  var cos = Math.cos(-obj.rotation*Math.PI/180), sin = Math.sin(-obj.rotation*Math.PI/180);
+  var dx = wx - cx, dy = wy - cy;
+  var lx = dx*cos - dy*sin, ly = dx*sin + dy*cos;
+  var hw = obj.w/2, hh = obj.h/2;
+  var threshold = 10;
+  // Rotation handle
+  if (Math.abs(lx) < threshold && Math.abs(ly - (-hh - 20/(S.zoom*S.scalePixelsPerCm))) < threshold)
+    return 'rotate';
+  var handles = [['nw',-hw,-hh],['ne',hw,-hh],['se',hw,hh],['sw',-hw,hh]];
+  for (var i = 0; i < handles.length; i++) {
+    if (Math.abs(lx - handles[i][1]) < threshold && Math.abs(ly - handles[i][2]) < threshold)
+      return handles[i][0];
+  }
+  return null;
+}
+
+/* ===== Helpers ===== */
+function findObj(type, id) {
+  var arr = type === 'wall' ? S.walls : type === 'furniture' ? S.furniture :
+            type === 'door' ? S.doors : type === 'window' ? S.windows :
+            type === 'label' ? S.labels : type === 'measure' ? S.measures : [];
+  for (var i = 0; i < arr.length; i++) { if (arr[i].id === id) return arr[i]; }
+  return null;
+}
+function findObjIndex(type, id) {
+  var arr = type === 'wall' ? S.walls : type === 'furniture' ? S.furniture :
+            type === 'door' ? S.doors : type === 'window' ? S.windows :
+            type === 'label' ? S.labels : type === 'measure' ? S.measures : [];
+  for (var i = 0; i < arr.length; i++) { if (arr[i].id === id) return i; }
+  return -1;
+}
+function removeObj(type, id) {
+  var arr = type === 'wall' ? S.walls : type === 'furniture' ? S.furniture :
+            type === 'door' ? S.doors : type === 'window' ? S.windows :
+            type === 'label' ? S.labels : type === 'measure' ? S.measures : [];
+  var idx = findObjIndex(type, id);
+  if (idx >= 0) arr.splice(idx, 1);
+}
+function findCatalogItem(type) {
+  var cats = Object.keys(FURNITURE_CATALOG);
+  for (var c = 0; c < cats.length; c++) {
+    var items = FURNITURE_CATALOG[cats[c]];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type === type) return items[i];
+    }
+  }
+  return null;
+}
+function deepCopy(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+/* ===== Undo/Redo ===== */
+function pushUndo(action) {
+  S.undoStack.push(action);
+  if (S.undoStack.length > S.maxUndo) S.undoStack.shift();
+  S.redoStack = [];
+  updateUndoButtons();
+  scheduleAutoSave();
+}
+function undo() {
+  if (S.undoStack.length === 0) return;
+  var a = S.undoStack.pop();
+  applyReverse(a);
+  S.redoStack.push(a);
+  updateUndoButtons();
+  clearSelection();
+  scheduleRender();
+  scheduleAutoSave();
+}
+function redo() {
+  if (S.redoStack.length === 0) return;
+  var a = S.redoStack.pop();
+  applyForward(a);
+  S.undoStack.push(a);
+  updateUndoButtons();
+  clearSelection();
+  scheduleRender();
+  scheduleAutoSave();
+}
+function applyForward(a) {
+  var arr = getArr(a.objType);
+  if (a.type === 'add') { arr.push(deepCopy(a.obj)); }
+  else if (a.type === 'remove') { removeObj(a.objType, a.obj.id); }
+  else if (a.type === 'modify') {
+    var obj = findObj(a.objType, a.id);
+    if (obj) Object.assign(obj, deepCopy(a.after));
+  }
+}
+function applyReverse(a) {
+  var arr = getArr(a.objType);
+  if (a.type === 'add') { removeObj(a.objType, a.obj.id); }
+  else if (a.type === 'remove') { arr.push(deepCopy(a.obj)); }
+  else if (a.type === 'modify') {
+    var obj = findObj(a.objType, a.id);
+    if (obj) Object.assign(obj, deepCopy(a.before));
+  }
+}
+function getArr(t) {
+  return t==='wall'?S.walls:t==='furniture'?S.furniture:t==='door'?S.doors:
+         t==='window'?S.windows:t==='label'?S.labels:t==='measure'?S.measures:[];
+}
+function updateUndoButtons() {
+  document.getElementById('btn-undo').disabled = S.undoStack.length === 0;
+  document.getElementById('btn-redo').disabled = S.redoStack.length === 0;
+}
+
+/* ===== Selection ===== */
+function clearSelection() {
+  S.selectedType = null; S.selectedId = null; S.dragMode = null;
+  updatePropertyPanel();
+}
+function selectObj(type, id) {
+  S.selectedType = type; S.selectedId = id;
+  updatePropertyPanel();
+}
+
+/* ===== Property Panel ===== */
+function updatePropertyPanel() {
+  var panels = ['prop-empty','prop-furniture','prop-wall','prop-label','prop-door','prop-window'];
+  panels.forEach(function(p) { document.getElementById(p).style.display = 'none'; });
+  if (!S.selectedType) { document.getElementById('prop-empty').style.display = ''; return; }
+  var obj = findObj(S.selectedType, S.selectedId);
+  if (!obj) { document.getElementById('prop-empty').style.display = ''; return; }
+  if (S.selectedType === 'furniture') {
+    document.getElementById('prop-furniture').style.display = '';
+    document.getElementById('prop-f-name').textContent = obj.label;
+    document.getElementById('prop-f-x').value = Math.round(obj.x);
+    document.getElementById('prop-f-y').value = Math.round(obj.y);
+    document.getElementById('prop-f-w').value = Math.round(obj.w);
+    document.getElementById('prop-f-h').value = Math.round(obj.h);
+    document.getElementById('prop-f-rot').value = Math.round(obj.rotation);
+  } else if (S.selectedType === 'wall') {
+    document.getElementById('prop-wall').style.display = '';
+    var dx = obj.x2-obj.x1, dy = obj.y2-obj.y1;
+    document.getElementById('prop-w-len').textContent = Math.round(Math.sqrt(dx*dx+dy*dy));
+    document.getElementById('prop-w-thick').value = String(obj.thickness);
+  } else if (S.selectedType === 'label') {
+    document.getElementById('prop-label').style.display = '';
+    document.getElementById('prop-l-text').value = obj.text || '';
+    document.getElementById('prop-l-area').value = obj.area || '';
+    var disp = '';
+    if (obj.area > 0) {
+      disp = obj.area + 'm² / ' + (obj.area / 1.62).toFixed(1) + '畳';
+    }
+    document.getElementById('prop-l-display').textContent = disp;
+  } else if (S.selectedType === 'door') {
+    document.getElementById('prop-door').style.display = '';
+    document.getElementById('prop-d-type').value = obj.doorType || 'swing';
+    document.getElementById('prop-d-width').value = obj.width;
+    document.getElementById('prop-d-rot').value = Math.round(obj.rotation);
+  } else if (S.selectedType === 'window') {
+    document.getElementById('prop-window').style.display = '';
+    document.getElementById('prop-win-width').value = obj.width;
+    document.getElementById('prop-win-rot').value = Math.round(obj.rotation);
+  }
+}
+
+/* ===== Property Panel Event Listeners ===== */
+function setupPropertyListeners() {
+  ['prop-f-x','prop-f-y','prop-f-w','prop-f-h','prop-f-rot'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', function() {
+      if (S.selectedType !== 'furniture') return;
+      var obj = findObj('furniture', S.selectedId);
+      if (!obj) return;
+      var before = deepCopy(obj);
+      obj.x = +document.getElementById('prop-f-x').value;
+      obj.y = +document.getElementById('prop-f-y').value;
+      obj.w = Math.max(10, +document.getElementById('prop-f-w').value);
+      obj.h = Math.max(10, +document.getElementById('prop-f-h').value);
+      obj.rotation = +document.getElementById('prop-f-rot').value % 360;
+      pushUndo({type:'modify',objType:'furniture',id:obj.id,before:before,after:deepCopy(obj)});
+      scheduleRender();
+    });
+  });
+  document.getElementById('prop-w-thick').addEventListener('change', function() {
+    if (S.selectedType !== 'wall') return;
+    var obj = findObj('wall', S.selectedId);
+    if (!obj) return;
+    var before = deepCopy(obj);
+    obj.thickness = +this.value;
+    pushUndo({type:'modify',objType:'wall',id:obj.id,before:before,after:deepCopy(obj)});
+    scheduleRender();
+  });
+  document.getElementById('prop-l-text').addEventListener('change', function() {
+    if (S.selectedType !== 'label') return;
+    var obj = findObj('label', S.selectedId);
+    if (!obj) return;
+    var before = deepCopy(obj);
+    obj.text = this.value;
+    pushUndo({type:'modify',objType:'label',id:obj.id,before:before,after:deepCopy(obj)});
+    scheduleRender();
+  });
+  document.getElementById('prop-l-area').addEventListener('change', function() {
+    if (S.selectedType !== 'label') return;
+    var obj = findObj('label', S.selectedId);
+    if (!obj) return;
+    var before = deepCopy(obj);
+    obj.area = +this.value || null;
+    pushUndo({type:'modify',objType:'label',id:obj.id,before:before,after:deepCopy(obj)});
+    updatePropertyPanel();
+    scheduleRender();
+  });
+  document.getElementById('prop-d-type').addEventListener('change', function() {
+    if (S.selectedType !== 'door') return;
+    var obj = findObj('door', S.selectedId);
+    if (!obj) return;
+    var before = deepCopy(obj);
+    obj.doorType = this.value;
+    pushUndo({type:'modify',objType:'door',id:obj.id,before:before,after:deepCopy(obj)});
+    scheduleRender();
+  });
+  document.getElementById('prop-d-width').addEventListener('change', function() {
+    if (S.selectedType !== 'door') return;
+    var obj = findObj('door', S.selectedId);
+    if (!obj) return;
+    var before = deepCopy(obj);
+    obj.width = +this.value;
+    pushUndo({type:'modify',objType:'door',id:obj.id,before:before,after:deepCopy(obj)});
+    scheduleRender();
+  });
+  document.getElementById('prop-d-rot').addEventListener('change', function() {
+    if (S.selectedType !== 'door') return;
+    var obj = findObj('door', S.selectedId);
+    if (!obj) return;
+    var before = deepCopy(obj);
+    obj.rotation = +this.value % 360;
+    pushUndo({type:'modify',objType:'door',id:obj.id,before:before,after:deepCopy(obj)});
+    scheduleRender();
+  });
+  document.getElementById('prop-win-width').addEventListener('change', function() {
+    if (S.selectedType !== 'window') return;
+    var obj = findObj('window', S.selectedId);
+    if (!obj) return;
+    var before = deepCopy(obj);
+    obj.width = +this.value;
+    pushUndo({type:'modify',objType:'window',id:obj.id,before:before,after:deepCopy(obj)});
+    scheduleRender();
+  });
+  document.getElementById('prop-win-rot').addEventListener('change', function() {
+    if (S.selectedType !== 'window') return;
+    var obj = findObj('window', S.selectedId);
+    if (!obj) return;
+    var before = deepCopy(obj);
+    obj.rotation = +this.value % 360;
+    pushUndo({type:'modify',objType:'window',id:obj.id,before:before,after:deepCopy(obj)});
+    scheduleRender();
+  });
+}
+
+/* ===== Cursor ===== */
+function updateCursor() {
+  var area = canvasArea;
+  area.className = 'canvas-area';
+  if (S.isPanning) { area.classList.add('cursor-grabbing'); return; }
+  if (S.spaceDown) { area.classList.add('cursor-grab'); return; }
+  switch (S.tool) {
+    case 'select':
+      if (S.dragMode === 'move') { area.classList.add('cursor-grabbing'); }
+      else if (S.dragMode === 'rotate') { area.classList.add('cursor-grabbing'); }
+      else if (S.resizeHandle && S.resizeHandle !== 'rotate') { area.classList.add('cursor-' + S.resizeHandle + '-resize'); }
+      else if (S.hoverHit) { area.classList.add('cursor-pointer'); }
+      else { area.classList.add('cursor-default'); }
+      break;
+    case 'wall': case 'measure': case 'delete': area.classList.add('cursor-crosshair'); break;
+    case 'door': case 'window': case 'furniture': area.classList.add('cursor-copy'); break;
+    case 'label': area.classList.add('cursor-text'); break;
+    default: area.classList.add('cursor-default');
+  }
+}
+
+/* ===== Tool Switching ===== */
+function setTool(t) {
+  S.tool = t;
+  S.furniturePlaceType = null;
+  S.wallPreview = null;
+  S.isDrawing = false;
+  document.querySelectorAll('.tool-btn[data-tool]').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-tool') === t);
+  });
+  updateCursor();
+  scheduleRender();
+}
+
+/* ===== Mouse Events ===== */
+function getMousePos(e) {
+  var r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+canvas.addEventListener('mousedown', function(e) {
+  if (e.button === 1 || S.spaceDown) { // Middle click or space
+    S.isPanning = true;
+    S.dragStartWX = e.clientX - S.panX;
+    S.dragStartWY = e.clientY - S.panY;
+    updateCursor();
+    e.preventDefault();
+    return;
+  }
+  if (e.button !== 0) return;
+  var pos = getMousePos(e);
+  var w = screenToWorld(pos.x, pos.y);
+  var wx = w.x, wy = w.y;
+
+  if (S.tool === 'select') {
+    // Check resize/rotate handles first
+    var handle = hitResizeHandle(wx, wy);
+    if (handle) {
+      S.dragMode = handle === 'rotate' ? 'rotate' : 'resize';
+      S.resizeHandle = handle;
+      S.dragStartWX = wx; S.dragStartWY = wy;
+      if (S.selectedType) S.dragOriginal = deepCopy(findObj(S.selectedType, S.selectedId));
+      updateCursor();
+      return;
+    }
+    var hit = hitTest(wx, wy);
+    if (hit) {
+      selectObj(hit.type, hit.id);
+      S.dragMode = 'move';
+      S.dragStartWX = wx; S.dragStartWY = wy;
+      var obj = findObj(hit.type, hit.id);
+      if (hit.type === 'furniture') {
+        S.dragOffsetX = wx - obj.x; S.dragOffsetY = wy - obj.y;
+      } else if (hit.type === 'wall') {
+        // Check which endpoint is closer
+        var d1 = Math.sqrt(Math.pow(wx-obj.x1,2)+Math.pow(wy-obj.y1,2));
+        var d2 = Math.sqrt(Math.pow(wx-obj.x2,2)+Math.pow(wy-obj.y2,2));
+        if (d1 < 15) { S.dragMode = 'wall-p1'; }
+        else if (d2 < 15) { S.dragMode = 'wall-p2'; }
+        else { S.dragOffsetX = wx - obj.x1; S.dragOffsetY = wy - obj.y1; }
+      } else if (hit.type === 'door' || hit.type === 'window' || hit.type === 'label') {
+        S.dragOffsetX = wx - obj.x; S.dragOffsetY = wy - obj.y;
+      } else if (hit.type === 'measure') {
+        var dm1 = Math.sqrt(Math.pow(wx-obj.x1,2)+Math.pow(wy-obj.y1,2));
+        var dm2 = Math.sqrt(Math.pow(wx-obj.x2,2)+Math.pow(wy-obj.y2,2));
+        if (dm1 < 15) { S.dragMode = 'measure-p1'; }
+        else if (dm2 < 15) { S.dragMode = 'measure-p2'; }
+        else { S.dragOffsetX = wx - obj.x1; S.dragOffsetY = wy - obj.y1; }
+      }
+      S.dragOriginal = deepCopy(obj);
+      updateCursor();
+    } else {
+      clearSelection();
+    }
+    scheduleRender();
+  } else if (S.tool === 'wall') {
+    S.isDrawing = true;
+    S.wallStartX = snap(wx); S.wallStartY = snap(wy);
+    S.wallPreview = { x1:S.wallStartX, y1:S.wallStartY, x2:S.wallStartX, y2:S.wallStartY, thickness:8 };
+  } else if (S.tool === 'door') {
+    var nd = { id:S.nextId++, x:snap(wx), y:snap(wy), width:80, rotation:0, doorType:'swing', openDirection:'right' };
+    S.doors.push(nd);
+    pushUndo({type:'add', objType:'door', obj:deepCopy(nd)});
+    selectObj('door', nd.id);
+    scheduleRender();
+  } else if (S.tool === 'window') {
+    var nw = { id:S.nextId++, x:snap(wx), y:snap(wy), width:80, rotation:0 };
+    S.windows.push(nw);
+    pushUndo({type:'add', objType:'window', obj:deepCopy(nw)});
+    selectObj('window', nw.id);
+    scheduleRender();
+  } else if (S.tool === 'furniture' && S.furniturePlaceType) {
+    var cat = findCatalogItem(S.furniturePlaceType);
+    if (cat) {
+      var nf = { id:S.nextId++, type:cat.type, x:snap(wx), y:snap(wy), w:cat.w, h:cat.h,
+                 rotation:0, category:'', label:cat.label, color:cat.color };
+      S.furniture.push(nf);
+      pushUndo({type:'add', objType:'furniture', obj:deepCopy(nf)});
+      selectObj('furniture', nf.id);
+      scheduleRender();
+    }
+  } else if (S.tool === 'label') {
+    var text = prompt('ラベルテキストを入力:', '');
+    if (text !== null && text !== '') {
+      var nl = { id:S.nextId++, x:snap(wx), y:snap(wy), text:text, fontSize:16, area:null };
+      S.labels.push(nl);
+      pushUndo({type:'add', objType:'label', obj:deepCopy(nl)});
+      selectObj('label', nl.id);
+      scheduleRender();
+    }
+  } else if (S.tool === 'measure') {
+    S.isDrawing = true;
+    S.wallStartX = snap(wx); S.wallStartY = snap(wy);
+  } else if (S.tool === 'delete') {
+    var dh = hitTest(wx, wy);
+    if (dh) {
+      var dobj = findObj(dh.type, dh.id);
+      if (dobj) {
+        pushUndo({type:'remove', objType:dh.type, obj:deepCopy(dobj)});
+        removeObj(dh.type, dh.id);
+        if (S.selectedType === dh.type && S.selectedId === dh.id) clearSelection();
+        scheduleRender();
+      }
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', function(e) {
+  var pos = getMousePos(e);
+  // Panning
+  if (S.isPanning) {
+    S.panX = e.clientX - S.dragStartWX;
+    S.panY = e.clientY - S.dragStartWY;
+    scheduleRender();
+    return;
+  }
+  var w = screenToWorld(pos.x, pos.y);
+  S.hoverWX = w.x; S.hoverWY = w.y;
+
+  if (S.tool === 'wall' && S.isDrawing) {
+    var ex = snap(w.x), ey = snap(w.y);
+    if (e.shiftKey) {
+      var dx = Math.abs(ex - S.wallStartX), dy = Math.abs(ey - S.wallStartY);
+      if (dx > dy) ey = S.wallStartY; else ex = S.wallStartX;
+    }
+    S.wallPreview = { x1:S.wallStartX, y1:S.wallStartY, x2:ex, y2:ey, thickness:8 };
+    scheduleRender();
+    return;
+  }
+
+  if (S.tool === 'measure' && S.isDrawing) {
+    scheduleRender();
+    return;
+  }
+
+  if (S.tool === 'select' && S.dragMode) {
+    var obj = findObj(S.selectedType, S.selectedId);
+    if (!obj) return;
+    if (S.dragMode === 'move') {
+      if (S.selectedType === 'furniture') {
+        obj.x = snap(w.x - S.dragOffsetX); obj.y = snap(w.y - S.dragOffsetY);
+      } else if (S.selectedType === 'wall') {
+        var ddx = snap(w.x - S.dragOffsetX) - obj.x1;
+        var ddy = snap(w.y - S.dragOffsetY) - obj.y1;
+        obj.x1 += ddx; obj.y1 += ddy; obj.x2 += ddx; obj.y2 += ddy;
+      } else if (S.selectedType === 'door' || S.selectedType === 'window' || S.selectedType === 'label') {
+        obj.x = snap(w.x - S.dragOffsetX); obj.y = snap(w.y - S.dragOffsetY);
+      } else if (S.selectedType === 'measure') {
+        var mdx = snap(w.x - S.dragOffsetX) - obj.x1;
+        var mdy = snap(w.y - S.dragOffsetY) - obj.y1;
+        obj.x1 += mdx; obj.y1 += mdy; obj.x2 += mdx; obj.y2 += mdy;
+      }
+    } else if (S.dragMode === 'wall-p1') {
+      obj.x1 = snap(w.x); obj.y1 = snap(w.y);
+    } else if (S.dragMode === 'wall-p2') {
+      obj.x2 = snap(w.x); obj.y2 = snap(w.y);
+    } else if (S.dragMode === 'measure-p1') {
+      obj.x1 = snap(w.x); obj.y1 = snap(w.y);
+    } else if (S.dragMode === 'measure-p2') {
+      obj.x2 = snap(w.x); obj.y2 = snap(w.y);
+    } else if (S.dragMode === 'rotate') {
+      var cx = obj.x + obj.w/2, cy = obj.y + obj.h/2;
+      var angle = Math.atan2(w.y - cy, w.x - cx) * 180 / Math.PI + 90;
+      obj.rotation = Math.round(angle / 15) * 15;
+      if (obj.rotation < 0) obj.rotation += 360;
+      obj.rotation = obj.rotation % 360;
+    } else if (S.dragMode === 'resize') {
+      // Simple resize for furniture
+      var cx2 = obj.x + obj.w/2, cy2 = obj.y + obj.h/2;
+      var cos2 = Math.cos(-obj.rotation*Math.PI/180), sin2 = Math.sin(-obj.rotation*Math.PI/180);
+      var dlx = (w.x-cx2)*cos2 - (w.y-cy2)*sin2;
+      var dly = (w.x-cx2)*sin2 + (w.y-cy2)*cos2;
+      var hw = obj.w/2, hh = obj.h/2;
+      if (S.resizeHandle === 'se') {
+        obj.w = Math.max(10, snap(Math.abs(dlx) * 2));
+        obj.h = Math.max(10, snap(Math.abs(dly) * 2));
+      } else if (S.resizeHandle === 'nw') {
+        obj.w = Math.max(10, snap(Math.abs(dlx) * 2));
+        obj.h = Math.max(10, snap(Math.abs(dly) * 2));
+      } else if (S.resizeHandle === 'ne') {
+        obj.w = Math.max(10, snap(Math.abs(dlx) * 2));
+        obj.h = Math.max(10, snap(Math.abs(dly) * 2));
+      } else if (S.resizeHandle === 'sw') {
+        obj.w = Math.max(10, snap(Math.abs(dlx) * 2));
+        obj.h = Math.max(10, snap(Math.abs(dly) * 2));
+      }
+    }
+    updatePropertyPanel();
+    scheduleRender();
+    return;
+  }
+
+  // Hover hit test for cursor
+  if (S.tool === 'select') {
+    var rh = hitResizeHandle(w.x, w.y);
+    S.resizeHandle = rh;
+    S.hoverHit = hitTest(w.x, w.y);
+  } else if (S.tool === 'delete') {
+    S.hoverHit = hitTest(w.x, w.y);
+    scheduleRender();
+  } else if (S.tool === 'furniture') {
+    scheduleRender();
+  }
+  updateCursor();
+});
+
+canvas.addEventListener('mouseup', function(e) {
+  if (S.isPanning) {
+    S.isPanning = false;
+    updateCursor();
+    return;
+  }
+  if (S.tool === 'wall' && S.isDrawing) {
+    S.isDrawing = false;
+    var wp = S.wallPreview;
+    S.wallPreview = null;
+    if (wp) {
+      var dx = wp.x2 - wp.x1, dy = wp.y2 - wp.y1;
+      var len = Math.sqrt(dx*dx + dy*dy);
+      if (len >= 10) {
+        var nw = { id:S.nextId++, x1:wp.x1, y1:wp.y1, x2:wp.x2, y2:wp.y2, thickness:wp.thickness };
+        S.walls.push(nw);
+        pushUndo({type:'add', objType:'wall', obj:deepCopy(nw)});
+      }
+    }
+    scheduleRender();
+    return;
+  }
+  if (S.tool === 'measure' && S.isDrawing) {
+    S.isDrawing = false;
+    var mx1 = S.wallStartX, my1 = S.wallStartY;
+    var mx2 = snap(S.hoverWX), my2 = snap(S.hoverWY);
+    var mlen = Math.sqrt(Math.pow(mx2-mx1,2) + Math.pow(my2-my1,2));
+    if (mlen >= 10) {
+      var nm = { id:S.nextId++, x1:mx1, y1:my1, x2:mx2, y2:my2 };
+      S.measures.push(nm);
+      pushUndo({type:'add', objType:'measure', obj:deepCopy(nm)});
+    }
+    scheduleRender();
+    return;
+  }
+  if (S.tool === 'select' && S.dragMode) {
+    var obj = findObj(S.selectedType, S.selectedId);
+    if (obj && S.dragOriginal) {
+      var changed = JSON.stringify(obj) !== JSON.stringify(S.dragOriginal);
+      if (changed) {
+        pushUndo({type:'modify', objType:S.selectedType, id:S.selectedId,
+                  before:S.dragOriginal, after:deepCopy(obj)});
+      }
+    }
+    S.dragMode = null;
+    S.dragOriginal = null;
+    S.resizeHandle = null;
+    updateCursor();
+    scheduleRender();
+  }
+});
+
+canvas.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+  if (S.furniturePlaceType) {
+    S.furniturePlaceType = null;
+    setTool('select');
+  }
+});
+
+canvas.addEventListener('wheel', function(e) {
+  e.preventDefault();
+  var pos = getMousePos(e);
+  var factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  zoomAtPoint(S.zoom * factor, pos.x, pos.y);
+}, { passive: false });
+
+/* ===== Keyboard ===== */
+document.addEventListener('keydown', function(e) {
+  var tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if (e.key === ' ') { e.preventDefault(); S.spaceDown = true; updateCursor(); return; }
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+    if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); redo(); return; }
+  }
+  var keyMap = { v:'select', w:'wall', d:'door', n:'window', f:'furniture', l:'label', m:'measure', x:'delete' };
+  if (keyMap[e.key.toLowerCase()]) { setTool(keyMap[e.key.toLowerCase()]); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (S.selectedType && S.selectedId !== null) {
+      var obj = findObj(S.selectedType, S.selectedId);
+      if (obj) {
+        pushUndo({type:'remove', objType:S.selectedType, obj:deepCopy(obj)});
+        removeObj(S.selectedType, S.selectedId);
+        clearSelection();
+        scheduleRender();
+      }
+    }
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (S.furniturePlaceType) { S.furniturePlaceType = null; setTool('select'); }
+    else { clearSelection(); }
+    var modal = document.getElementById('welcome-modal');
+    if (!modal.classList.contains('hidden')) modal.classList.add('hidden');
+    scheduleRender();
+    return;
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    if (S.selectedType === 'furniture' || S.selectedType === 'door' || S.selectedType === 'window') {
+      var obj = findObj(S.selectedType, S.selectedId);
+      if (obj) {
+        var before = deepCopy(obj);
+        obj.rotation = (obj.rotation + 90) % 360;
+        pushUndo({type:'modify', objType:S.selectedType, id:obj.id, before:before, after:deepCopy(obj)});
+        updatePropertyPanel();
+        scheduleRender();
+      }
+    }
+    return;
+  }
+  if (e.key === 'g' || e.key === 'G') { S.showGrid = !S.showGrid; scheduleRender(); return; }
+  if (e.key === '+' || e.key === '=') { zoomAtPoint(S.zoom * 1.15, cw/2, ch/2); return; }
+  if (e.key === '-' || e.key === '_') { zoomAtPoint(S.zoom / 1.15, cw/2, ch/2); return; }
+  if (e.key === '0') { zoomToFit(); return; }
+});
+document.addEventListener('keyup', function(e) {
+  if (e.key === ' ') { S.spaceDown = false; updateCursor(); }
+});
+
+/* ===== Tool Panel Clicks ===== */
+document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn) {
+  btn.addEventListener('click', function() { setTool(this.getAttribute('data-tool')); });
+});
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-redo').addEventListener('click', redo);
+
+/* ===== Toolbar Controls ===== */
+document.getElementById('grid-size-select').addEventListener('change', function() {
+  S.gridSize = +this.value;
+  scheduleRender();
+});
+document.getElementById('chk-snap').addEventListener('change', function() { S.snapToGrid = this.checked; });
+document.getElementById('chk-dim').addEventListener('change', function() { S.showDimensions = this.checked; scheduleRender(); });
+
+/* ===== Zoom Buttons ===== */
+document.getElementById('btn-zoom-in').addEventListener('click', function() { zoomAtPoint(S.zoom * 1.3, cw/2, ch/2); });
+document.getElementById('btn-zoom-out').addEventListener('click', function() { zoomAtPoint(S.zoom / 1.3, cw/2, ch/2); });
+document.getElementById('btn-zoom-fit').addEventListener('click', zoomToFit);
+
+/* ===== Sidebar Toggle (mobile) ===== */
+document.getElementById('sidebar-toggle').addEventListener('click', function() {
+  document.getElementById('sidebar').classList.toggle('open');
+});
+
+/* ===== Status Bar ===== */
+function updateStatusBar() {
+  document.getElementById('stat-zoom').textContent = '🔍 ' + Math.round(S.zoom * 100) + '%';
+  document.getElementById('stat-pos').textContent = '📍 (' + Math.round(S.hoverWX) + ', ' + Math.round(S.hoverWY) + ')cm';
+  document.getElementById('stat-grid').textContent = 'グリッド: ' + S.gridSize + 'cm';
+  document.getElementById('stat-snap').textContent = 'スナップ: ' + (S.snapToGrid ? 'ON' : 'OFF');
+}
+
+/* ===== Furniture Palette ===== */
+function buildFurniturePalette() {
+  var tabsEl = document.getElementById('cat-tabs');
+  var listEl = document.getElementById('furniture-list');
+  tabsEl.innerHTML = '';
+  var cats = Object.keys(FURNITURE_CATALOG);
+  cats.forEach(function(cat) {
+    var btn = document.createElement('button');
+    btn.className = 'cat-tab' + (cat === S.furnitureCategory ? ' active' : '');
+    btn.textContent = CATEGORY_LABELS[cat];
+    btn.addEventListener('click', function() {
+      S.furnitureCategory = cat;
+      tabsEl.querySelectorAll('.cat-tab').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      renderFurnitureList();
+    });
+    tabsEl.appendChild(btn);
+  });
+  renderFurnitureList();
+}
+function renderFurnitureList() {
+  var listEl = document.getElementById('furniture-list');
+  listEl.innerHTML = '';
+  var items = FURNITURE_CATALOG[S.furnitureCategory] || [];
+  items.forEach(function(item) {
+    var div = document.createElement('div');
+    div.className = 'furniture-item' + (S.furniturePlaceType === item.type ? ' active' : '');
+    div.setAttribute('data-type', item.type);
+    var pw = Math.min(30, item.w / 5), ph = Math.min(20, item.h / 5);
+    div.innerHTML = '<div class="fi-preview" style="background:' + item.color + ';width:' + pw + 'px;height:' + ph + 'px"></div>' +
+      '<div><div class="fi-name">' + item.label + '</div><div class="fi-size">' + item.w + '×' + item.h + 'cm</div></div>';
+    div.addEventListener('click', function() {
+      S.furniturePlaceType = item.type;
+      setTool('furniture');
+      S.furniturePlaceType = item.type; // re-set after setTool clears it
+      renderFurnitureList();
+      updateCursor();
+    });
+    listEl.appendChild(div);
+  });
+}
+
+/* ===== Templates ===== */
+var TEMPLATES = {
+  blank: { label:'白紙', walls:[], doors:[], windows:[], labels:[], measures:[] },
+  oneK: { label:'1K (~20m²)', walls:[
+    {id:1,x1:0,y1:0,x2:450,y2:0,thickness:12},{id:2,x1:450,y1:0,x2:450,y2:700,thickness:12},
+    {id:3,x1:450,y1:700,x2:0,y2:700,thickness:12},{id:4,x1:0,y1:700,x2:0,y2:0,thickness:12},
+    {id:5,x1:0,y1:300,x2:200,y2:300,thickness:8},{id:6,x1:280,y1:300,x2:450,y2:300,thickness:8},
+    {id:7,x1:200,y1:300,x2:200,y2:450,thickness:8},{id:8,x1:200,y1:450,x2:200,y2:700,thickness:8}
+  ], doors:[
+    {id:9,x:240,y:300,width:80,rotation:0,doorType:'swing',openDirection:'right'},
+    {id:10,x:200,y:480,width:60,rotation:90,doorType:'swing',openDirection:'right'}
+  ], windows:[
+    {id:11,x:225,y:0,width:120,rotation:0},{id:12,x:0,y:500,width:100,rotation:90}
+  ], labels:[
+    {id:13,x:225,y:150,text:'居室',fontSize:18,area:9.45},
+    {id:14,x:100,y:500,text:'K',fontSize:16,area:4.5},
+    {id:15,x:100,y:380,text:'バス',fontSize:14,area:2.4}
+  ] },
+  oneLDK: { label:'1LDK (~35m²)', walls:[
+    {id:1,x1:0,y1:0,x2:700,y2:0,thickness:12},{id:2,x1:700,y1:0,x2:700,y2:700,thickness:12},
+    {id:3,x1:700,y1:700,x2:0,y2:700,thickness:12},{id:4,x1:0,y1:700,x2:0,y2:0,thickness:12},
+    {id:5,x1:350,y1:0,x2:350,y2:350,thickness:8},{id:6,x1:350,y1:350,x2:700,y2:350,thickness:8},
+    {id:7,x1:0,y1:500,x2:200,y2:500,thickness:8},{id:8,x1:200,y1:500,x2:200,y2:700,thickness:8}
+  ], doors:[
+    {id:9,x:350,y:200,width:80,rotation:90,doorType:'swing',openDirection:'right'},
+    {id:10,x:500,y:350,width:80,rotation:0,doorType:'swing',openDirection:'right'},
+    {id:11,x:100,y:500,width:70,rotation:0,doorType:'swing',openDirection:'right'}
+  ], windows:[
+    {id:12,x:175,y:0,width:150,rotation:0},{id:13,x:525,y:0,width:120,rotation:0},
+    {id:14,x:700,y:500,width:120,rotation:90},{id:15,x:0,y:350,width:100,rotation:90}
+  ], labels:[
+    {id:16,x:175,y:250,text:'洋室',fontSize:18,area:12.25},
+    {id:17,x:525,y:525,text:'LDK',fontSize:20,area:12.25},
+    {id:18,x:100,y:600,text:'バス・トイレ',fontSize:12,area:4.0}
+  ] },
+  twoLDK: { label:'2LDK (~55m²)', walls:[
+    {id:1,x1:0,y1:0,x2:900,y2:0,thickness:12},{id:2,x1:900,y1:0,x2:900,y2:800,thickness:12},
+    {id:3,x1:900,y1:800,x2:0,y2:800,thickness:12},{id:4,x1:0,y1:800,x2:0,y2:0,thickness:12},
+    {id:5,x1:350,y1:0,x2:350,y2:400,thickness:8},{id:6,x1:350,y1:400,x2:0,y2:400,thickness:8},
+    {id:7,x1:600,y1:0,x2:600,y2:400,thickness:8},{id:8,x1:350,y1:400,x2:900,y2:400,thickness:8},
+    {id:9,x1:0,y1:600,x2:200,y2:600,thickness:8},{id:10,x1:200,y1:600,x2:200,y2:800,thickness:8}
+  ], doors:[
+    {id:11,x:350,y:200,width:80,rotation:90,doorType:'swing',openDirection:'right'},
+    {id:12,x:600,y:200,width:80,rotation:90,doorType:'swing',openDirection:'right'},
+    {id:13,x:500,y:400,width:80,rotation:0,doorType:'swing',openDirection:'right'},
+    {id:14,x:100,y:600,width:70,rotation:0,doorType:'swing',openDirection:'right'}
+  ], windows:[
+    {id:15,x:175,y:0,width:120,rotation:0},{id:16,x:475,y:0,width:100,rotation:0},
+    {id:17,x:750,y:0,width:120,rotation:0},{id:18,x:900,y:600,width:140,rotation:90},
+    {id:19,x:0,y:200,width:100,rotation:90}
+  ], labels:[
+    {id:20,x:175,y:200,text:'洋室1',fontSize:18,area:14.0},
+    {id:21,x:475,y:200,text:'洋室2',fontSize:18,area:10.0},
+    {id:22,x:600,y:600,text:'LDK',fontSize:22,area:20.0},
+    {id:23,x:100,y:700,text:'バス・トイレ',fontSize:12,area:4.0}
+  ] }
+};
+
+function loadTemplate(key) {
+  var tmpl = TEMPLATES[key];
+  if (!tmpl) return;
+  var totalObj = S.walls.length + S.furniture.length + S.doors.length + S.windows.length + S.labels.length + S.measures.length;
+  if (key !== 'blank' && totalObj > 0) {
+    if (!confirm('現在の作業内容を破棄してテンプレートを読み込みますか？')) return;
+  }
+  var data = deepCopy(tmpl);
+  data.nextId = 1;
+  var allObjs = [].concat(data.walls||[], data.doors||[], data.windows||[], data.labels||[], data.measures||[]);
+  allObjs.forEach(function(o) { if (o.id >= data.nextId) data.nextId = o.id + 1; });
+  deserializeProject({ version:1, walls:data.walls, doors:data.doors, windows:data.windows,
+                        labels:data.labels, measures:data.measures||[], furniture:[],
+                        nextId:data.nextId, gridSize:S.gridSize });
+  zoomToFit();
+  if (window.__TT_showToast) window.__TT_showToast('テンプレートを読み込みました');
+}
+
+/* ===== Welcome Modal ===== */
+function buildWelcomeModal() {
+  var grid = document.getElementById('template-grid');
+  grid.innerHTML = '';
+  var items = [
+    { key:'blank', icon:'📄', name:'白紙', size:'' },
+    { key:'oneK', icon:'🏠', name:'1K', size:'~20m²' },
+    { key:'oneLDK', icon:'🏡', name:'1LDK', size:'~35m²' },
+    { key:'twoLDK', icon:'🏘', name:'2LDK', size:'~55m²' }
+  ];
+  items.forEach(function(item) {
+    var card = document.createElement('div');
+    card.className = 'template-card';
+    card.innerHTML = '<div class="tc-icon">' + item.icon + '</div><div class="tc-name">' + item.name + '</div>' +
+      (item.size ? '<div class="tc-size">' + item.size + '</div>' : '<div class="tc-size">&nbsp;</div>');
+    card.addEventListener('click', function() {
+      document.getElementById('welcome-modal').classList.add('hidden');
+      loadTemplate(item.key);
+    });
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('template-select').addEventListener('change', function() {
+  var v = this.value;
+  this.value = '';
+  if (v) loadTemplate(v);
+});
+
+/* ===== Save / Load ===== */
+function serializeProject() {
+  return { version:1, gridSize:S.gridSize, walls:S.walls, furniture:S.furniture,
+    doors:S.doors, windows:S.windows, labels:S.labels, measures:S.measures, nextId:S.nextId };
+}
+function deserializeProject(data) {
+  S.walls = data.walls || [];
+  S.furniture = data.furniture || [];
+  S.doors = data.doors || [];
+  S.windows = data.windows || [];
+  S.labels = data.labels || [];
+  S.measures = data.measures || [];
+  S.nextId = data.nextId || 1;
+  S.gridSize = data.gridSize || 50;
+  document.getElementById('grid-size-select').value = String(S.gridSize);
+  S.undoStack = []; S.redoStack = [];
+  updateUndoButtons();
+  clearSelection();
+  scheduleRender();
+}
+
+function scheduleAutoSave() {
+  clearTimeout(S.autoSaveTimer);
+  S.autoSaveTimer = setTimeout(function() {
+    try { localStorage.setItem(S.autoSaveKey, JSON.stringify(serializeProject())); } catch(e) {}
+  }, 3000);
+}
+
+document.getElementById('btn-new').addEventListener('click', function() {
+  var totalObj = S.walls.length + S.furniture.length + S.doors.length + S.windows.length + S.labels.length + S.measures.length;
+  if (totalObj > 0 && !confirm('現在の作業内容を破棄して新規作成しますか？')) return;
+  deserializeProject({ version:1, walls:[], furniture:[], doors:[], windows:[], labels:[], measures:[], nextId:1, gridSize:50 });
+  S.zoom = 1; S.panX = 0; S.panY = 0;
+  scheduleRender();
+  scheduleAutoSave();
+});
+
+document.getElementById('btn-save').addEventListener('click', function() {
+  var data = JSON.stringify(serializeProject(), null, 2);
+  var blob = new Blob([data], { type:'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'floor-plan.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  if (window.__TT_showToast) window.__TT_showToast('保存しました');
+});
+
+document.getElementById('btn-load').addEventListener('click', function() {
+  document.getElementById('file-input').click();
+});
+document.getElementById('file-input').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var totalObj = S.walls.length + S.furniture.length + S.doors.length + S.windows.length + S.labels.length + S.measures.length;
+  if (totalObj > 0 && !confirm('現在の作業内容を破棄してファイルを読み込みますか？')) { this.value = ''; return; }
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var data = JSON.parse(ev.target.result);
+      deserializeProject(data);
+      zoomToFit();
+      if (window.__TT_showToast) window.__TT_showToast('読み込みました');
+    } catch(err) {
+      alert('ファイルの読み込みに失敗しました');
+    }
+  };
+  reader.readAsText(file);
+  this.value = '';
+});
+
+/* ===== PNG Export ===== */
+document.getElementById('btn-png').addEventListener('click', function() {
+  var bb = getBoundingBox();
+  if (!bb) { alert('エクスポートするオブジェクトがありません'); return; }
+  var pad = 50;
+  var w = bb.maxX - bb.minX + pad * 2;
+  var h = bb.maxY - bb.minY + pad * 2;
+  var scale = 3;
+  var offCanvas = document.createElement('canvas');
+  offCanvas.width = w * scale;
+  offCanvas.height = h * scale;
+  var offCtx = offCanvas.getContext('2d');
+  offCtx.fillStyle = '#fff';
+  offCtx.fillRect(0, 0, offCanvas.width, offCanvas.height);
+  offCtx.save();
+  offCtx.scale(scale, scale);
+  offCtx.translate(-bb.minX + pad, -bb.minY + pad);
+
+  // Draw all objects with offCtx
+  var origCtx = ctx;
+  ctx = offCtx;
+  var origZoom = S.zoom, origScale = S.scalePixelsPerCm;
+  S.zoom = 1; S.scalePixelsPerCm = 1;
+  drawWalls(false); drawDoors(false); drawWindows(false);
+  drawFurniture(false); drawLabels(false); drawMeasures(false);
+  S.zoom = origZoom; S.scalePixelsPerCm = origScale;
+  ctx = origCtx;
+  offCtx.restore();
+
+  offCanvas.toBlob(function(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'floor-plan.png';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    if (window.__TT_showToast) window.__TT_showToast('PNGをダウンロードしました');
+  }, 'image/png');
+});
+
+/* ===== SVG Export ===== */
+document.getElementById('btn-svg').addEventListener('click', function() {
+  var bb = getBoundingBox();
+  if (!bb) { alert('エクスポートするオブジェクトがありません'); return; }
+  var pad = 50;
+  var vx = bb.minX - pad, vy = bb.minY - pad;
+  var vw = bb.maxX - bb.minX + pad * 2, vh = bb.maxY - bb.minY + pad * 2;
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + vx + ' ' + vy + ' ' + vw + ' ' + vh + '" width="' + vw + '" height="' + vh + '">\n';
+  svg += '<rect x="'+vx+'" y="'+vy+'" width="'+vw+'" height="'+vh+'" fill="#fff"/>\n';
+  // Walls
+  S.walls.forEach(function(w) {
+    var dx = w.x2-w.x1, dy = w.y2-w.y1, len = Math.sqrt(dx*dx+dy*dy);
+    if (len === 0) return;
+    var nx = -dy/len*w.thickness/2, ny = dx/len*w.thickness/2;
+    svg += '<polygon points="'+(w.x1+nx)+','+(w.y1+ny)+' '+(w.x2+nx)+','+(w.y2+ny)+' '+(w.x2-nx)+','+(w.y2-ny)+' '+(w.x1-nx)+','+(w.y1-ny)+'" fill="#333"/>\n';
+  });
+  // Furniture
+  S.furniture.forEach(function(f) {
+    var cx = f.x+f.w/2, cy = f.y+f.h/2;
+    svg += '<g transform="translate('+cx+','+cy+') rotate('+f.rotation+')">';
+    svg += '<rect x="'+(-f.w/2)+'" y="'+(-f.h/2)+'" width="'+f.w+'" height="'+f.h+'" fill="'+f.color+'" opacity="0.7" stroke="#333" stroke-width="1"/>';
+    svg += '<text x="0" y="4" text-anchor="middle" font-size="'+Math.max(8,Math.min(14,Math.min(f.w,f.h)*0.3))+'" fill="#333">'+f.label+'</text>';
+    svg += '</g>\n';
+  });
+  // Labels
+  S.labels.forEach(function(l) {
+    svg += '<text x="'+l.x+'" y="'+l.y+'" text-anchor="middle" font-size="'+(l.fontSize||16)+'" font-weight="bold" fill="#333">'+l.text+'</text>\n';
+    if (l.area > 0) {
+      svg += '<text x="'+l.x+'" y="'+(l.y+(l.fontSize||16)*0.9)+'" text-anchor="middle" font-size="'+((l.fontSize||16)*0.7)+'" fill="#888">'+l.area+'m² / '+(l.area/1.62).toFixed(1)+'畳</text>\n';
+    }
+  });
+  // Doors
+  S.doors.forEach(function(d) {
+    svg += '<g transform="translate('+d.x+','+d.y+') rotate('+d.rotation+')">';
+    if (d.doorType === 'slide') {
+      svg += '<line x1="'+(-d.width/2)+'" y1="0" x2="'+(d.width/2)+'" y2="0" stroke="#4a90d9" stroke-width="2"/>';
+    } else {
+      svg += '<line x1="'+(-d.width/2)+'" y1="0" x2="'+(d.width/2)+'" y2="0" stroke="#4a90d9" stroke-width="2"/>';
+      svg += '<path d="M '+(-d.width/2)+' 0 A '+d.width+' '+d.width+' 0 0 0 '+(-d.width/2+d.width*Math.cos(Math.PI/2))+' '+(0-d.width*Math.sin(Math.PI/2))+'" fill="none" stroke="#4a90d9" stroke-width="2"/>';
+    }
+    svg += '</g>\n';
+  });
+  // Windows
+  S.windows.forEach(function(w) {
+    svg += '<g transform="translate('+w.x+','+w.y+') rotate('+w.rotation+')">';
+    svg += '<line x1="'+(-w.width/2)+'" y1="-3" x2="'+(w.width/2)+'" y2="-3" stroke="#5bb8a9" stroke-width="2"/>';
+    svg += '<line x1="'+(-w.width/2)+'" y1="3" x2="'+(w.width/2)+'" y2="3" stroke="#5bb8a9" stroke-width="2"/>';
+    svg += '</g>\n';
+  });
+  // Measures
+  S.measures.forEach(function(m) {
+    var dx = m.x2-m.x1, dy = m.y2-m.y1, len = Math.round(Math.sqrt(dx*dx+dy*dy));
+    svg += '<line x1="'+m.x1+'" y1="'+m.y1+'" x2="'+m.x2+'" y2="'+m.y2+'" stroke="#e94560" stroke-width="1.5"/>';
+    svg += '<text x="'+((m.x1+m.x2)/2)+'" y="'+((m.y1+m.y2)/2-6)+'" text-anchor="middle" font-size="12" font-weight="bold" fill="#e94560">'+len+'cm</text>\n';
+  });
+  svg += '</svg>';
+  var blob = new Blob([svg], { type:'image/svg+xml' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'floor-plan.svg';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  if (window.__TT_showToast) window.__TT_showToast('SVGをダウンロードしました');
+});
+
+/* ===== Print ===== */
+document.getElementById('btn-print').addEventListener('click', function() {
+  var origZoom = S.zoom, origPanX = S.panX, origPanY = S.panY, origGrid = S.showGrid;
+  S.showGrid = false;
+  zoomToFit();
+  scheduleRender();
+  requestAnimationFrame(function() {
+    window.print();
+    S.zoom = origZoom; S.panX = origPanX; S.panY = origPanY; S.showGrid = origGrid;
+    scheduleRender();
+  });
+});
+
+/* ===== Init ===== */
+function init() {
+  buildFurniturePalette();
+  buildWelcomeModal();
+  setupPropertyListeners();
+  // Try auto-restore
+  try {
+    var saved = localStorage.getItem(S.autoSaveKey);
+    if (saved) {
+      var data = JSON.parse(saved);
+      deserializeProject(data);
+      zoomToFit();
+    } else {
+      document.getElementById('welcome-modal').classList.remove('hidden');
+    }
+  } catch(e) {
+    document.getElementById('welcome-modal').classList.remove('hidden');
+  }
+  scheduleRender();
+}
+init();
+
+})();
+</script>
+</body>
+</html>

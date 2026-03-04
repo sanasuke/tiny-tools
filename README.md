@@ -25,6 +25,7 @@
 | [013](https://tiny-tools-cjj.pages.dev/day013_roulette/) | ルーレット | ルーレット・抽選ツール。項目を自由に設定して回そう。重み付き・除外モード対応 |
 | [014](https://tiny-tools-cjj.pages.dev/day014_pomodoro/) | ポモドーロタイマー | トマト型タイマーで集中管理。作業/休憩サイクル・セッション記録対応 |
 | [015](https://tiny-tools-cjj.pages.dev/day015_icon-resize/) | SNSアイコンリサイズ | SNS用アイコン画像を一括リサイズ。8プラットフォーム対応・円形プレビュー付き |
+| [016](https://tiny-tools-cjj.pages.dev/day016_floor-plan/) | 間取り図エディタ | 間取り図の作成・家具配置シミュレーション。テンプレート・面積計算・SVG出力対応 |
 
 ## 使い方
 
@@ -77,6 +78,8 @@ tiny-tools/
 │   └── js/
 ├── day015_icon-resize/
 │   └── index.html                    # SNSアイコンリサイズ
+├── day016_floor-plan/
+│   └── index.html                    # 間取り図エディタ
 ├── shared/
 │   └── header.js                     # 共通ヘッダー
 ├── .gitignore
