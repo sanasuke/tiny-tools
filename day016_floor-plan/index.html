@@ -1209,7 +1209,12 @@ canvas.addEventListener('mousedown', function(e) {
       S.dragOriginal = deepCopy(obj);
       updateCursor();
     } else {
+      // Empty area drag → pan
       clearSelection();
+      S.isPanning = true;
+      S.dragStartWX = e.clientX - S.panX;
+      S.dragStartWY = e.clientY - S.panY;
+      updateCursor();
     }
     scheduleRender();
   } else if (S.tool === 'wall') {
@@ -1425,9 +1430,17 @@ canvas.addEventListener('contextmenu', function(e) {
 
 canvas.addEventListener('wheel', function(e) {
   e.preventDefault();
-  var pos = getMousePos(e);
-  var factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  zoomAtPoint(S.zoom * factor, pos.x, pos.y);
+  if (e.ctrlKey || e.metaKey) {
+    // Pinch zoom (trackpad) or Ctrl+wheel
+    var pos = getMousePos(e);
+    var factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    zoomAtPoint(S.zoom * factor, pos.x, pos.y);
+  } else {
+    // Trackpad two-finger slide → pan
+    S.panX -= e.deltaX;
+    S.panY -= e.deltaY;
+    scheduleRender();
+  }
 }, { passive: false });
 
 /* ===== Keyboard ===== */
