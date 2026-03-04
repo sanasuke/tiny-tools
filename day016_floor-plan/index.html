@@ -1179,6 +1179,17 @@ canvas.addEventListener('mousedown', function(e) {
       S.resizeHandle = handle;
       S.dragStartWX = wx; S.dragStartWY = wy;
       if (S.selectedType) S.dragOriginal = deepCopy(findObj(S.selectedType, S.selectedId));
+      // Compute anchor (opposite corner in world coords)
+      if (handle !== 'rotate' && S.selectedType === 'furniture') {
+        var ro = findObj('furniture', S.selectedId);
+        var rcx = ro.x + ro.w/2, rcy = ro.y + ro.h/2;
+        var cosR = Math.cos(ro.rotation*Math.PI/180), sinR = Math.sin(ro.rotation*Math.PI/180);
+        var hw = ro.w/2, hh = ro.h/2;
+        var anchorMap = { se:[-hw,-hh], nw:[hw,hh], ne:[-hw,hh], sw:[hw,-hh] };
+        var al = anchorMap[handle];
+        S.resizeAnchorX = rcx + al[0]*cosR - al[1]*sinR;
+        S.resizeAnchorY = rcy + al[0]*sinR + al[1]*cosR;
+      }
       updateCursor();
       return;
     }
@@ -1329,25 +1340,18 @@ canvas.addEventListener('mousemove', function(e) {
       if (obj.rotation < 0) obj.rotation += 360;
       obj.rotation = obj.rotation % 360;
     } else if (S.dragMode === 'resize') {
-      // Simple resize for furniture
-      var cx2 = obj.x + obj.w/2, cy2 = obj.y + obj.h/2;
-      var cos2 = Math.cos(-obj.rotation*Math.PI/180), sin2 = Math.sin(-obj.rotation*Math.PI/180);
-      var dlx = (w.x-cx2)*cos2 - (w.y-cy2)*sin2;
-      var dly = (w.x-cx2)*sin2 + (w.y-cy2)*cos2;
-      var hw = obj.w/2, hh = obj.h/2;
-      if (S.resizeHandle === 'se') {
-        obj.w = Math.max(10, snap(Math.abs(dlx) * 2));
-        obj.h = Math.max(10, snap(Math.abs(dly) * 2));
-      } else if (S.resizeHandle === 'nw') {
-        obj.w = Math.max(10, snap(Math.abs(dlx) * 2));
-        obj.h = Math.max(10, snap(Math.abs(dly) * 2));
-      } else if (S.resizeHandle === 'ne') {
-        obj.w = Math.max(10, snap(Math.abs(dlx) * 2));
-        obj.h = Math.max(10, snap(Math.abs(dly) * 2));
-      } else if (S.resizeHandle === 'sw') {
-        obj.w = Math.max(10, snap(Math.abs(dlx) * 2));
-        obj.h = Math.max(10, snap(Math.abs(dly) * 2));
-      }
+      // Anchor-based resize: opposite corner stays fixed
+      var ax = S.resizeAnchorX, ay = S.resizeAnchorY;
+      var mx = snap(w.x), my = snap(w.y);
+      // Project anchor→mouse vector onto object's local axes
+      var cosN = Math.cos(-obj.rotation*Math.PI/180), sinN = Math.sin(-obj.rotation*Math.PI/180);
+      var dxW = mx - ax, dyW = my - ay;
+      var newW = Math.max(10, Math.abs(dxW * cosN - dyW * sinN));
+      var newH = Math.max(10, Math.abs(dxW * sinN + dyW * cosN));
+      // New center is midpoint of anchor and mouse
+      var ncx = (ax + mx) / 2, ncy = (ay + my) / 2;
+      obj.w = newW; obj.h = newH;
+      obj.x = ncx - newW / 2; obj.y = ncy - newH / 2;
     }
     updatePropertyPanel();
     scheduleRender();
