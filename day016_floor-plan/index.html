@@ -405,6 +405,7 @@ var S = {
   isPanning:false, spaceDown:false, isDrawing:false,
   wallStartX:0, wallStartY:0, wallPreview:null,
   hoverWX:0, hoverWY:0, hoverHit:null,
+  clipboard:null,
   undoStack:[], redoStack:[], maxUndo:50,
   autoSaveKey:'tt-floor-plan-autosave', autoSaveTimer:null,
   renderScheduled:false
@@ -1505,6 +1506,49 @@ document.addEventListener('keydown', function(e) {
   if (e.ctrlKey || e.metaKey) {
     if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
     if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); redo(); return; }
+    if (e.key === 'c') {
+      e.preventDefault();
+      if (S.selectedType && S.selectedId !== null) {
+        var obj = findObj(S.selectedType, S.selectedId);
+        if (obj) {
+          S.clipboard = { type: S.selectedType, data: deepCopy(obj) };
+          if (window.__TT_showToast) window.__TT_showToast('コピーしました');
+        }
+      }
+      return;
+    }
+    if (e.key === 'v') {
+      e.preventDefault();
+      if (S.clipboard) {
+        var src = deepCopy(S.clipboard.data);
+        var offset = S.gridSize;
+        src.id = S.nextId++;
+        if (S.clipboard.type === 'furniture') {
+          src.x += offset; src.y += offset;
+          S.furniture.push(src);
+        } else if (S.clipboard.type === 'wall') {
+          src.x1 += offset; src.y1 += offset; src.x2 += offset; src.y2 += offset;
+          S.walls.push(src);
+        } else if (S.clipboard.type === 'door') {
+          src.x += offset; src.y += offset;
+          S.doors.push(src);
+        } else if (S.clipboard.type === 'window') {
+          src.x += offset; src.y += offset;
+          S.windows.push(src);
+        } else if (S.clipboard.type === 'label') {
+          src.x += offset; src.y += offset;
+          S.labels.push(src);
+        } else if (S.clipboard.type === 'measure') {
+          src.x1 += offset; src.y1 += offset; src.x2 += offset; src.y2 += offset;
+          S.measures.push(src);
+        }
+        pushUndo({ type: 'add', objType: S.clipboard.type, obj: deepCopy(src) });
+        selectObj(S.clipboard.type, src.id);
+        S.clipboard.data = deepCopy(src); // 連続貼り付けで位置がずれるように
+        scheduleRender();
+      }
+      return;
+    }
   }
   var keyMap = { v:'select', w:'wall', d:'door', n:'window', f:'furniture', l:'label', m:'measure', x:'delete' };
   if (keyMap[e.key.toLowerCase()]) { setTool(keyMap[e.key.toLowerCase()]); return; }
