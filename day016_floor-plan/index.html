@@ -1588,6 +1588,24 @@ document.addEventListener('keydown', function(e) {
     }
     return;
   }
+  if (/^Arrow(Up|Down|Left|Right)$/.test(e.key) && S.selectedType && S.selectedId !== null) {
+    e.preventDefault();
+    var obj = findObj(S.selectedType, S.selectedId);
+    if (obj) {
+      var before = deepCopy(obj);
+      var dx = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      var dy = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      if (S.selectedType === 'wall' || S.selectedType === 'measure') {
+        obj.x1 += dx; obj.y1 += dy; obj.x2 += dx; obj.y2 += dy;
+      } else {
+        obj.x += dx; obj.y += dy;
+      }
+      pushUndo({type:'modify', objType:S.selectedType, id:obj.id, before:before, after:deepCopy(obj)});
+      updatePropertyPanel();
+      scheduleRender();
+    }
+    return;
+  }
   if (e.key === 'g' || e.key === 'G') { S.showGrid = !S.showGrid; scheduleRender(); return; }
   if (e.key === '+' || e.key === '=') { zoomAtPoint(S.zoom * 1.1, cw/2, ch/2); return; }
   if (e.key === '-' || e.key === '_') { zoomAtPoint(S.zoom / 1.1, cw/2, ch/2); return; }
