@@ -29,7 +29,8 @@
     { day: 12, name: 'QRコードツール', desc: 'QRコードの生成・読み取り。テキスト・URL・WiFi・メール・電話に対応', path: 'day012_qr-tool', genres: ['utility'] },
     { day: 13, name: 'ルーレット', desc: 'ルーレット・抽選ツール。項目を自由に設定して回そう。重み付き・除外モード対応', path: 'day013_roulette', genres: ['utility'] },
     { day: 14, name: 'ポモドーロタイマー', desc: 'トマト型タイマーで集中管理。作業/休憩サイクル・セッション記録対応', path: 'day014_pomodoro', genres: ['utility'] },
-    { day: 15, name: 'SNSアイコンリサイズ', desc: 'SNS用アイコン画像を一括リサイズ。8プラットフォーム対応・円形プレビュー付き', path: 'day015_icon-resize', genres: ['design', 'utility'] }
+    { day: 15, name: 'SNSアイコンリサイズ', desc: 'SNS用アイコン画像を一括リサイズ。8プラットフォーム対応・円形プレビュー付き', path: 'day015_icon-resize', genres: ['design', 'utility'] },
+    { day: 16, name: '間取り図エディタ', desc: '間取り図の作成・家具配置シミュレーション。テンプレート・面積計算・SVG出力対応', path: 'day016_floor-plan', genres: ['design', 'utility'] }
   ];
 
   /* ---------- genres ---------- */
